@@ -13,6 +13,21 @@ Codex does not provide a `/webapp` slash command. 진행 중인 Codex 워크플�
 
 플러그인 이름을 포함한 `$harness50:webapp`, `$harness50:harness50-status`, `$harness50:harness50-reset`도 지원합니다. 하위 에이전트의 요청은 부모 워크플로를 일시정지하지 않습니다.
 
+## Jev-first direct questions
+
+When requested, Jev-first applies to every eligible typed judgment, including chat
+and arithmetic outside the seven workflow checkpoints. Standing authorization for
+selected ordinary nonsecret input is reused without a prompt for every question.
+The webapp skill also activates for a direct Jev question or an authorized standing
+Jev-first preference; no `$webapp` start command or workflow initialization is needed.
+The direct `scripts/jev-ask.mjs prepare|run --input -` CLI needs no workflow or source
+file; `run` also requires `--allow-network`. It preserves native Noul, abstaining
+Choice and ordered-rubric Score results. File-derived reviews retain their existing
+source-bound adapters and reports. Free generation, observation and actual tools
+remain host work; unsupported or unavailable results receive a visible fallback
+reason. No Jev result completes a step or replaces required tests or permissions.
+See the [direct question guide](../docs/jev-first.md) for the JSON contract and limits.
+
 ## Codex installation / 설치
 
 ### Local checkout

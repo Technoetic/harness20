@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.8.0 — 2026-09-20
+
+- Add `scripts/jev-ask.mjs prepare|run --input -` for direct inline questions without a workspace or fabricated source file. Preserve native Noul probability, abstaining Choice and ordered-rubric Score results, with exact response validation and sanitized advisory output.
+- Route user-requested Jev-first work across all eligible judgments, including chat and arithmetic beyond the seven checkpoints. Reuse standing authorization and matching reports, split unsupported generation/tools into host work, and disclose Jev use or host fallback without duplicate calls.
+- Bound UTF-8 stdin, wire and responses to 64 KiB; reject duplicate keys, invalid schemas, recognizable secrets and actual auth-key exposure. Keep network opt-in, fixed endpoint/model, deadlines, no redirects/retries, and no automatic file reads or writes.
+- Preserve existing `jev-review` and `jev-judge` contracts, policy hashes, file provenance and stored reports, along with required tests, permission boundaries, step sources, completion writers and historical workflow records.
+
 ## 2.7.0 — 2026-09-20
 
 - Add an advisory Jev choice-judgment CLI for Steps 16, 24, 25, 30, 37, 45 and 49, covering evidence support, research sufficiency, requirements, alternatives, explanations, scenario coverage and finding classification. Both hosts route authorized checkpoint reviews automatically and reuse prior authorization and matching current reports.

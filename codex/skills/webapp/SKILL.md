@@ -1,9 +1,16 @@
 ---
 name: webapp
-description: Use when a user invokes $webapp to start, resume, pause, or advance a Harness50 workflow in Codex.
+description: Use when a user invokes $webapp to start, resume, pause, or advance a Harness50 workflow in Codex, asks a direct Jev question, or has an authorized Jev-first preference covering the current request, including outside a workflow.
 ---
 
 # Harness50 Webapp
+
+**Route the request before workflow operations.** For an explicit direct Jev question
+or an authorized Jev-first preference covering an ordinary request, follow Jev-first
+request routing below. If no workflow control was requested, answer the direct
+request and return without calling the state manager or creating TOPIC or progress
+files. No existing workflow is required. The procedures below start, resume, pause
+or advance workflow state only when that control request is actually present.
 
 One user request starts sustained execution in the current turn. Advance only through
 the state manager, with exactly one manager-selected step per work unit. After each
@@ -21,6 +28,8 @@ Resolve these installed resources relative to this SKILL.md, not from the curren
 - QA report protocol and input schema: `../../../docs/QA-REPORTS.md`
 - Shared Jev checkpoint helper: `../../../scripts/jev-judge.mjs`
 - Jev input and authorization contract: `../../../docs/jev-checkpoints.md`
+- Direct Jev-first helper: `../../../scripts/jev-ask.mjs`
+- Direct input, native types and routing: `../../../docs/jev-first.md`
 
 Use the state manager for every workflow mutation. Pass the current project directory as the workspace. Do not derive package paths from environment variables or user-supplied flags.
 `init`, `resume`, `complete`, and `fail` return the state directly. For wrapped results
@@ -147,6 +156,41 @@ One-step execution below is one work unit inside this loop, not one whole turn.
 8. Otherwise call `fail` with a sanitized reason and evidence. Report the failure; do not invent completion. If snapshot or report recording fails, still call manager `fail`, identify the unavailable QA handoff, and do not fabricate a QA report. Include the recorded report digest when available and the next check to run. Reaching a retry limit never advances the step.
 9. Return the actual manager response to Continuous execution. Execute only one
    step in this work unit; the loop selects the next work unit after this one is accepted.
+
+## Jev-first request routing
+
+When the user requests Jev-first or maximum supported Jev use, including a standing
+authorized preference, route every eligible typed judgment in the current request
+to Jev first. This includes ordinary chat, arithmetic and questions outside the
+seven checkpoints. Do not skip because the answer seems easy or obvious. This
+mode handles direct questions without initializing, resuming or rewriting workflow
+state; only an actual workflow control request enters the corresponding procedure.
+
+Use the installed `../../../scripts/jev-ask.mjs prepare --input -` for a self-contained
+question or explicitly selected inline text, then the same JSON with
+`run --input - --allow-network` when authorized. No workspace or fabricated source
+file is required. Follow `../../../docs/jev-first.md`: Noul returns a probability,
+Choice requires an abstention category, and Score rates an ordered 2–10-level rubric.
+Never fabricate Noul confidence or treat Score as free numeric generation. Collect
+necessary current or environmental evidence first. Prefer abstaining Choice for
+evidence-dependent questions; missing evidence is not a proven negative. Noul and
+Score need applicable, sufficient context because they cannot guarantee abstention.
+
+Split mixed requests into supported judgments and host work. Free text, code and art
+generation, actual browser/file operations, observation and test execution remain
+host work; Jev can assess supplied candidates after evidence exists. Reuse standing
+authorization for ordinary selected nonsecret input in scope without asking again.
+Do not collect full history, private workspace bulk or hidden context. Existing file
+judgments keep their source-bound route below; denied or excluded files must never
+be relabeled as inline input. Keys and Jev results grant no additional permission.
+
+Prefer an existing current file report answering the same question. Reuse a direct
+result only with exact current `prepare` input, request and policy hashes. One
+designated caller sends one batch per unchanged request; this is host policy, with
+no automatic retry or duplicate caller/worker call. Mark validated results briefly
+as `Jev used`; mark no call, unsupported work or unavailable service as `Host fallback:
+<reason>`. Keep abstention and low certainty for review and continue authorized host
+work transparently. All acceptance gates, reviewers, tests and state writers remain.
 
 ## Optional Jev checkpoint routing
 

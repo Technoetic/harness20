@@ -119,6 +119,28 @@ state or replace measured quality/browser evidence. Step 50 enforces the six fin
 regression categories and their final HTML binding. Failed, missing and
 unexecuted required checks remain incomplete even when a retry limit is reached.
 
+## Jev-first typed judgments
+
+User-requested Jev-first mode applies to all eligible current typed judgments,
+including chat and arithmetic outside the fixed checkpoints. The additive
+[direct adapter](jev-first.md) accepts explicit inline context without pretending
+it is verified file evidence. Existing file judgments use their source-bound
+adapters, policies and reports. Never reclassify denied file content as inline input.
+
+Noul preserves the native probability without inventing confidence. Choice requires
+an abstention option. Score preserves its ordered rubric, legend, probabilities and
+weighted rating; it is not arbitrary numeric generation. Exact response validation
+rejects unrequested IDs, types, categories and free-form explanations. Low confidence,
+low Noul decisiveness, abstention and service failure return to host review. Current
+facts and environmental observations require actual evidence before judging; missing
+evidence does not prove a negative. These signals do not measure calibrated accuracy.
+
+Reuse existing transmission authorization and matching results, with one caller and
+one batch per unchanged request. No automatic retries, full-history upload or hidden
+workspace collection. Mark validated Jev use or the host fallback reason explicitly.
+Native typed judging does not generate arbitrary text/code, execute tools, grant
+permission or replace deterministic tests, independent review or completion writers.
+
 ## Advisory semantic checkpoints
 
 The [Jev checkpoint protocol](jev-checkpoints.md) adds bounded text judgments at
