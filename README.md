@@ -348,9 +348,9 @@ flowchart LR
 </details>
 
 > [!CAUTION]
-> harness50는 **brainstorming / TDD 등 superpowers skill의 HARD-GATE를 의도적으로 무력화**한다.<br/>
-> 다른 사용자가 이 플러그인을 깐 상태에서 일반 대화를 시도하면 "질문 없이 즉시 실행" 모드가 된다.<br/>
-> 활성 조건: `/webapp` 트리거 또는 `progress.json` 활성. 그 외엔 대부분 hook이 silent skip.
+> 활성 Claude 워크플로는 반복 진행 확인을 줄이는 자동 진행 지침을 사용한다.<br/>
+> Codex는 정상 권한 확인·샌드박스·승인 설정·훅 신뢰를 유지하며, 적용 범위는 호스트별 규약을 따른다.<br/>
+> 직접 Jev 질문은 워크플로를 시작하지 않는다. 워크플로 활성 조건과 권한 경계는 [Codex 안내서](codex/README.md)와 각 호스트 스킬을 참고한다.
 
 ---
 
@@ -720,8 +720,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests/security-regression.ps
 |:---|:---|
 | [**Technoetic/claude-code-commands**](https://github.com/Technoetic/claude-code-commands) | **자매 레포** — harness50의 9회차 audit 패턴이 원래 어디서 왔는지 보여주는 1년치 슬래시 명령 20종 컬렉션 |
 | [MoAI-ADK](https://github.com/moai-research/MoAI) | @MX 4종 태그 시스템 · TRUST 5 게이트 · EARS SPEC 형식 |
-| [superpowers](https://github.com/anthropics/skills) | brainstorming · TDD · debugging skill 골격 (HARD-GATE는 의도적 무력화) |
+| [superpowers](https://github.com/obra/superpowers) | brainstorming · TDD · debugging 스킬 구조와 개발 절차를 참고. 적용 범위·승인은 호스트별 규약을 따름 |
 | [Claude Code 공식 hooks](https://docs.claude.com/en/docs/claude-code/hooks) | `{"decision":"block"}` 자동 재개 메커니즘 · PreToolUse `permissionDecision:"allow"` |
+| [Jev / TypeSafe AI — 공식 API](https://docs.typesafe.ai/api) | **실제 연동 서비스** — Noul·Choice·Score 직접 질문과 7단계 선택형 의미 판단. 생성·도구 실행·필수 검증은 호스트가 담당 ([직접 질문](docs/jev-first.md) · [단계별 검토](docs/jev-checkpoints.md)) |
+| [Aside — 공식 문서](https://docs.aside.com/) | **브라우저 검증 백엔드** — `aside repl`을 통한 화면·상호작용·스크린샷 확인. Playwright 사용이 제한된 환경을 지원하며 사용자 프로필 공유 등 제약을 기록 ([백엔드 안내](docs/BROWSER-TOOLS.md)) |
+| [axe-core (Deque Systems)](https://github.com/dequelabs/axe-core) | **자동 접근성 검사 엔진** — 두 브라우저 백엔드에서 WCAG 2/2.1 A·AA 규칙 검사에 사용. 자동 검사 범위의 결과이며 전체 접근성 준수를 보증하지 않음 |
+| [Playwright (Microsoft)](https://playwright.dev/) | **CI·사용이 허용된 PC의 브라우저 검증 백엔드** — 격리 Chromium 컨텍스트·라우팅·상호작용·스크린샷 검사. 의존성은 별도 `browser-verifier/`에 분리 ([백엔드 안내](docs/BROWSER-TOOLS.md)) |
 | Obsidian vault | 6개 핵심 철학 · `_규칙/HARNESS-규칙.md` · `_규칙/NEW-WORK-규칙.md` |
 
 ---
