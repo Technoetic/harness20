@@ -51,6 +51,15 @@ Codex의 새 작업은 한 줄 주제로 시작할 수 있습니다. 초기화 �
 Stop 후크 없이 동작하며, 전체 완료·사용자 일시정지·실제 입력 대기·차단 상태에서 멈춥니다.
 같은 주제의 기존 작업은 보존한 채 재개합니다. 상세 동작은 [Codex 안내서](codex/README.md)를 참고하세요.
 
+## Optional Step 25 Jev review / 선택형 기획 보조 검토
+
+Step 25의 선택한 기획 발췌문을 요구사항별로 추가 검토하는 공통 Node CLI를 제공합니다.
+사용자가 보조 검토와 선택 내용의 외부 전송을 명시적으로 선택하고 `run --allow-network`를
+사용한 경우에만 TypeSafe API를 호출합니다. 키 설정이나 Step 도달로 선택을 추정하지 않습니다.
+`prepare`·`inspect`는 오프라인이며, 결과는 기존 독립 검증·필수 Acceptance·완료 게이트를
+대체하지 않습니다. Node.js 22 이상, `TYPESAFE_API_KEY` 환경 설정, 공개 가상 예제와
+UTF-8 stdin 사용법은 [Jev 보조 검토 안내서](docs/JEV-REVIEW.md)를 참고하세요.
+
 ## Codex installation / 설치
 
 ### Local checkout

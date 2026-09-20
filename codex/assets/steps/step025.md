@@ -99,6 +99,32 @@ phase: planning
 원래 23단계 결론과 달라진 조사 축·대안은 24단계의 검증된 최종 분석을 따른다. 보완이 없으면 명시된 빈 manifest를 확인한다.
 입력 digest와 결정 provenance에 채택한 보완 경로·hash를 기록하고 다음 기획·설계 산출물로 전달한다. 새 네트워크 수집이나 이전 증거 수정은 하지 않는다.
 
+## 선택형 Jev 보조 검토
+
+이 단계의 필수 절차는 네트워크 미사용 계약을 유지한다. Jev CLI는 사용자가 별도로
+명시 호출하는 독립 보조 검토이며 workflow가 자동 실행하지 않는다. 기존 네트워크
+계약이나 호스트 권한을 우회하는 예외로 해석하지 않는다.
+
+사용자가 보조 검토와 선택한 내용의 외부 전송을 명시적으로 선택한 경우에만 플러그인
+`docs/JEV-REVIEW.md`의 공통 CLI를 사용한다. 에이전트는 미지정 선택을 추정하지 않으며
+현재 단계 도달이나 `TYPESAFE_API_KEY` 존재만으로 실행하지 않는다. 실제 호출에는
+`run --allow-network`도 필요하다. `prepare`와 `inspect`는 오프라인이다.
+
+입력 JSON에는 `step_archive/TOPIC/TOPIC.md` 안의 정확한 `topic_excerpt`, 그 안에
+정확히 포함된 `requirements[].text`, 이미 선언된 `step_archive/step025_planning_chunk1.md`의
+상대경로와 정확한 `planning[].excerpt`를 명시한다. 공개 또는 외부 전송이 허용된
+비민감 내용만 선택해 stdin으로 전달하며 새 청크나 조사 자료를 자동 수집하지 않는다.
+
+결과는 요구사항별 `met`·`unmet`·`insufficient_evidence`와 확률분포·confidence를 담는
+보조 자료다. confidence는 실제 정답률이 아니며 한국어 정확도는 별도 검증이 필요하다.
+timeout·인증·응답 오류는 `unverified`, 보고서 생성 후 원본 변경은 `stale`로 취급한다.
+보고서는 `step_archive/outputs/jev-reviews/<sha256>.json`에 저장되며 재사용 전 `inspect`로
+원본 해시를 확인한다. `current`여도 `review_status: unverified`이면 미검증이다.
+
+독립 검증자는 이 자료를 참고하되 기존 필수 Acceptance, 조사·주제 충실성 판정 축과
+완료 조건을 모두 수행한다. Jev 결과·종료 코드 0·`current`는 PASS나 완료 권한이 아니며,
+필수 산출물·수락 증거와 workflow 상태·영수증을 대체하지 않는다.
+
 ## 완료 조건
 
 - `base-planning-snapshot`: 주제와 조사 증거를 추적하는 기초 기획 스냅샷이 있다.

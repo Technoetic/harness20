@@ -1726,7 +1726,7 @@ test("planning batch declares the exact Codex-native artifact contracts", async 
       phase: "planning",
       source: "assets/steps/step025.md",
       target: "codex/assets/steps/step025.md",
-      source_sha256: "168022f81e99a799460e1e904faf5a9cb8ba89ea1af67f1b13fc15cc32f8e17c",
+      source_sha256: "70b776ae417fcacaa24bf19b92cfde9756efc9618cf26ac910bb0f517552d172",
       inputs: [
         "step_archive/TOPIC/TOPIC.md",
         "step_archive/step016_조사결과_chunk1.md",
@@ -1944,7 +1944,7 @@ test("planning source hashes bind the reviewed source steps 025 through 030", as
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(24, 30));
 
   assert.deepEqual(hashes, {
-    step025: "168022f81e99a799460e1e904faf5a9cb8ba89ea1af67f1b13fc15cc32f8e17c",
+    step025: "70b776ae417fcacaa24bf19b92cfde9756efc9618cf26ac910bb0f517552d172",
     step026: "6f356e9081084e224aca6f0a4cffbedcff90455de9e5dee03a4c7204a4f9df0c",
     step027: "92e6538f33b3beb7a4be49460de06dcc45817296c5ca43f1f96af47be5ee9fe4",
     step028: "681e4901e23093f5caff6420431835fdacd37d6f3ac3e7f628c7c3566d7f93af",

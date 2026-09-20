@@ -117,6 +117,27 @@ Class 지향으로 기획한다.
 미해결 항목과 다음 검사를 기록하고 현재 Step을 INCOMPLETE로 인계한다.
 필수 실패를 스킵하거나 완료 보고 후 다음 Step으로 진행하지 않는다.
 
+## 선택형 Jev 보조 검토
+
+사용자가 **Jev 보조 검토와 선택한 내용의 외부 전송을 명시적으로 선택한 경우에만**
+플러그인 `docs/JEV-REVIEW.md`의 CLI를 사용한다. 에이전트가 미지정 선택을 추정하지 않는다.
+Step 25 도달이나 `TYPESAFE_API_KEY` 존재만으로 실행하지 않으며, 실제 호출에는
+`run --allow-network`가 추가로 필요하다. `prepare`와 `inspect`는 오프라인이다.
+
+입력은 `step_archive/TOPIC/TOPIC.md`의 정확한 `topic_excerpt`, 그 안에 정확히 포함된
+`requirements[].text`, 선택한 `step_archive/step025_*.md` 원본의 상대경로와 정확한
+`planning[].excerpt`를 명시한 JSON이다. 공개 또는 외부 전송이 허용된 비민감 내용만
+선택하고 stdin으로 전달한다. 파일 전체나 조사 자료를 자동 수집하지 않는다.
+
+Jev는 요구사항별 `met`·`unmet`·`insufficient_evidence`와 확률분포·confidence를 기록하는
+보조 평가다. confidence는 실제 정답률이 아니며 한국어 정확도는 별도 검증이 필요하다.
+timeout·인증·응답 오류 등은 `unverified`, 보고서 생성 후 원본 변경은 `stale`로 취급한다.
+보고서는 `step_archive/outputs/jev-reviews/<sha256>.json`에 저장되며 재사용 전 `inspect`로
+원본 해시를 대조한다. 결과·종료 코드 0·`current`를 PASS 또는 완료 권한으로 해석하지 않는다.
+
+기존 에이전트 B의 독립 검증, 필수 Acceptance, 주제 충실성 네 축과 완료 조건을 그대로
+수행한다. 선택형 보조 보고서는 검증자가 참고하며 기존 필수 평가와 완료 게이트를 대체하지 않는다.
+
 ## 실패 패턴 기록
 
 종료 시 (PASS 또는 INCOMPLETE) `step_archive/progress.json`의 `failure_patterns` 배열에 FAIL 항목을 추가한다.
