@@ -28,7 +28,7 @@ phase: implementation
 - 입력: `step_archive/step036_인코딩정책.md`
 - 필수 선행 항목: `step024`, `step022`, `step023`, `step030`, `step031`, `step032`, `step035`, `step036`
 - 산출물: `step_archive/step037_구현manifest.md`
-- 네트워크: 사용하지 않는다.
+- 네트워크: 승인된 Jev 선택 API만 허용한다. 일반 웹 탐색과 새 자료 수집은 사용하지 않는다.
 - 시각 검토: 필수
 
 ## 실행 역할
@@ -101,6 +101,24 @@ Class·async·접근성 계약과 screenshot-to-CSS 추적을 처음부터 확�
 원래 22·23단계 자료와 함께 채택한 보완 파일의 경로·SHA-256을 대조하고 필수 이미지를 실제로 연다.
 조사 축·대안이 보완되었다면 24단계 최종 분석을 따른다. 최신 기획·설계의 해당 provenance와 비교하고 기존 원본만으로 보완 결론을 대체하지 않는다.
 보완이 없으면 명시된 빈 manifest를 확인한다. 이 단계에서 새 사이트 방문이나 자료 수집을 하지 않는다.
+
+## Jev 의미 체크포인트
+
+`step_archive/step037_구현manifest.md`의 증거 섹션에 실제 구현에서 선택한 본문 발췌문을 출처 파일·위치·hash와 함께 먼저 저장한다. 대상 독자·핵심 용어와 이 저장된 설명을 함께 선택한다. 구현이 바뀌면 호스트가 출처를 다시 대조해 증거를 갱신한다. Jev는 저장된 텍스트만 평가하며 코드 실행 정확성을 증명하지 않는다.
+
+현재 작업에서 Jev 사용과 선택한 발췌문의 외부 전송이 승인된 경우 호스트가 자동 호출한다.
+기존 승인이 해당 범위를 포함하면 재확인하지 않는다. 단계 도달이나 `TYPESAFE_API_KEY` 존재는 승인이 아니다.
+승인이 없거나 서비스가 불가하면 이유를 기존 단계 보고서에 기록하고 독립 검증을 계속한다.
+
+신뢰한 플러그인의 `node "<plugin-root>/scripts/jev-judge.mjs" prepare --workspace ROOT --input -`로 준비한다.
+재사용 전 `inspect --workspace ROOT --report PATH`의 상태와 현재 prepare의 `request_hash`, `policy_hash`, `input_hash`, `sources`를 모두 대조한다.
+새 호출은 동일 JSON으로 `run --workspace ROOT --input - --allow-network`를 실행한다.
+변하지 않은 입력에는 한 배치만 호출하는 호스트 정책을 적용하며 전역 하드 쿼터로 해석하지 않는다.
+`unverified`·`stale`는 판정 근거로 쓰지 않고 abstain·낮은 confidence는 호스트가 원본을 검토한다.
+승인된 선택 API 예외는 일반 웹 탐색이나 새 자료 수집을 허용하지 않는다.
+
+입력 파일·발췌문 범위, 동의·중복 방지·보고서 검사는 `docs/jev-checkpoints.md`를 따른다.
+기존 독립 검증·Acceptance·실제 검사와 완료 writer는 유지한다. Jev 결과나 `current`는 PASS 또는 완료 권한이 아니다.
 
 ## 완료 조건
 

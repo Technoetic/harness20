@@ -171,6 +171,24 @@ step016_조사결과_chunk3.md (500줄 이하)
 
 미완료 항목이 있으면 해당 항목만 재조사한다.
 
+## Jev 의미 체크포인트
+
+조사 청크의 사실 주장과 대응 원문이 준비되면 해당 주장 하나를 원문이 뒷받침하는지 묻는다. 원문과 주장 발췌문을 함께 선택한다. URL·수집 경로·hash 대조는 기존 절차로 수행한다.
+
+현재 작업에서 Jev 사용과 선택한 발췌문의 외부 전송이 승인된 경우 호스트가 자동 호출한다.
+기존 승인이 해당 범위를 포함하면 재확인하지 않는다. 단계 도달이나 `TYPESAFE_API_KEY` 존재는 승인이 아니다.
+승인이 없거나 서비스가 불가하면 이유를 기존 단계 보고서에 기록하고 독립 검증을 계속한다.
+
+신뢰한 플러그인의 `node "<plugin-root>/scripts/jev-judge.mjs" prepare --workspace ROOT --input -`로 준비한다.
+재사용 전 `inspect --workspace ROOT --report PATH`의 상태와 현재 prepare의 `request_hash`, `policy_hash`, `input_hash`, `sources`를 모두 대조한다.
+새 호출은 동일 JSON으로 `run --workspace ROOT --input - --allow-network`를 실행한다.
+변하지 않은 입력에는 한 배치만 호출하는 호스트 정책을 적용하며 전역 하드 쿼터로 해석하지 않는다.
+`unverified`·`stale`는 판정 근거로 쓰지 않고 abstain·낮은 confidence는 호스트가 원본을 검토한다.
+승인된 선택 API 예외는 일반 웹 탐색이나 새 자료 수집을 허용하지 않는다.
+
+입력 파일·발췌문 범위, 동의·중복 방지·보고서 검사는 `docs/jev-checkpoints.md`를 따른다.
+기존 독립 검증·Acceptance·실제 검사와 완료 writer는 유지한다. Jev 결과나 `current`는 PASS 또는 완료 권한이 아니다.
+
 ## 오류 발생 시
 
 오류 발생 시 원인을 분석하고 수정한 뒤 재시도한다. 3회 재시도 후에도 실패하면 오류를 기록하고 다음 Step으로 진행한다.

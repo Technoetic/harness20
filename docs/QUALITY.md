@@ -119,6 +119,25 @@ state or replace measured quality/browser evidence. Step 50 enforces the six fin
 regression categories and their final HTML binding. Failed, missing and
 unexecuted required checks remain incomplete even when a retry limit is reached.
 
+## Advisory semantic checkpoints
+
+The [Jev checkpoint protocol](jev-checkpoints.md) adds bounded text judgments at
+steps 16, 24, 25, 30, 37, 45 and 49. Hosts call it automatically only when the active
+task authorizes Jev and sending the selected excerpts, reusing existing authorization.
+It evaluates claim support, research sufficiency, requirements, distinct alternatives,
+explanation text, scenario coverage and finding classification. It does not execute
+tests or inspect images. Step 37 persists selected implementation prose as evidence
+first; the judgment concerns that text, not executable correctness.
+
+Before reusing a report, compare current prepare metadata with inspect: request,
+policy, input and source hashes must match, and unverified reports remain unverified.
+Abstention, low confidence or unavailable service returns the decision to the host
+and existing independent review. The default 0.8 threshold is a review heuristic,
+not calibrated accuracy. Findings with insufficient evidence are not proven failures.
+Local report consistency is not provider attestation. Required acceptance and the
+measured quality, browser, E2E, visual, final-regression and completion gates retain
+their authority. One batch per unchanged checkpoint is host policy, not a runtime quota.
+
 ## Release verification and product evaluation
 
 `npm test` covers adapter/state/security contracts. `npm run test:browser` checks working and deliberately broken HTML fixtures in a real browser, always through the Playwright backend from `browser-verifier/` (the suite pins `backend: 'playwright'`; Aside runs are exercised manually with `node scripts/verify-output.mjs --backend aside`). Rating real generated tutorials also requires multiple topics, repeated full runs, cost/latency records and user evaluation. This release does not fabricate those results.

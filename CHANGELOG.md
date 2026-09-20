@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.7.0 — 2026-09-20
+
+- Add an advisory Jev choice-judgment CLI for Steps 16, 24, 25, 30, 37, 45 and 49, covering evidence support, research sufficiency, requirements, alternatives, explanations, scenario coverage and finding classification. Both hosts route authorized checkpoint reviews automatically and reuse prior authorization and matching current reports.
+- Require explicit selected text excerpts and an abstention choice; report low confidence and insufficient evidence as needing review. Bound network requests and validate categorical responses, source freshness and content-addressed reports without retaining source prose or provider explanations.
+- Preserve the Step25 adapter and reports, deterministic tests, visual review, reviewer separation and completion writers. Scoped optional API metadata does not grant general browsing permission; unavailable Jev returns to the existing review with a recorded reason.
+
 ## 2.6.0 — 2026-09-20
 
 - Add an optional Step 25 Jev planning review for both hosts through `scripts/jev-review.mjs prepare|run|inspect`. Only explicitly selected topic and planning excerpts are eligible; network calls require `--allow-network` and `TYPESAFE_API_KEY`.

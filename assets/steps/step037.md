@@ -83,6 +83,24 @@ Step 38에서 빌드 실패 시 이 Step으로 돌아와 수정한다.
 
 24단계 최종 PASS 보고서 `step_archive/outputs/step024_검증_r1.md`의 보완 manifest와 통합 분석을 최종 설계와 함께 읽는다. 채택한 보완 원본·이미지의 경로와 SHA-256을 확인하고 필수 이미지를 실제로 연다. 원래 23단계 분석만으로 최종 보완 결론을 대체하지 않는다. 보완이 없으면 명시된 빈 manifest를 확인한다. 새 자료 수집은 하지 않는다.
 
+## Jev 의미 체크포인트
+
+`step_archive/step037_구현manifest.md`의 증거 섹션에 실제 구현에서 선택한 본문 발췌문을 출처 파일·위치·hash와 함께 먼저 저장한다. 대상 독자·핵심 용어와 이 저장된 설명을 함께 선택한다. 구현이 바뀌면 호스트가 출처를 다시 대조해 증거를 갱신한다. Jev는 저장된 텍스트만 평가하며 코드 실행 정확성을 증명하지 않는다.
+
+현재 작업에서 Jev 사용과 선택한 발췌문의 외부 전송이 승인된 경우 호스트가 자동 호출한다.
+기존 승인이 해당 범위를 포함하면 재확인하지 않는다. 단계 도달이나 `TYPESAFE_API_KEY` 존재는 승인이 아니다.
+승인이 없거나 서비스가 불가하면 이유를 기존 단계 보고서에 기록하고 독립 검증을 계속한다.
+
+신뢰한 플러그인의 `node "<plugin-root>/scripts/jev-judge.mjs" prepare --workspace ROOT --input -`로 준비한다.
+재사용 전 `inspect --workspace ROOT --report PATH`의 상태와 현재 prepare의 `request_hash`, `policy_hash`, `input_hash`, `sources`를 모두 대조한다.
+새 호출은 동일 JSON으로 `run --workspace ROOT --input - --allow-network`를 실행한다.
+변하지 않은 입력에는 한 배치만 호출하는 호스트 정책을 적용하며 전역 하드 쿼터로 해석하지 않는다.
+`unverified`·`stale`는 판정 근거로 쓰지 않고 abstain·낮은 confidence는 호스트가 원본을 검토한다.
+승인된 선택 API 예외는 일반 웹 탐색이나 새 자료 수집을 허용하지 않는다.
+
+입력 파일·발췌문 범위, 동의·중복 방지·보고서 검사는 `docs/jev-checkpoints.md`를 따른다.
+기존 독립 검증·Acceptance·실제 검사와 완료 writer는 유지한다. Jev 결과나 `current`는 PASS 또는 완료 권한이 아니다.
+
 ## Self-Calibration
 
 구현 완료 후 다음을 스스로 평가하라:

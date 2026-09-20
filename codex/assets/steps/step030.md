@@ -22,7 +22,7 @@ phase: planning
 - 산출물: `step_archive/step030_레이아웃설계_chunk1.md`
 - 산출물: `step_archive/step030_전체설계_chunk1.md`
 - 산출물: `step_archive/outputs/step030_최종검증.md`
-- 네트워크: 사용하지 않는다.
+- 네트워크: 승인된 Jev 선택 API만 허용한다. 일반 웹 탐색과 새 자료 수집은 사용하지 않는다.
 - 시각 검토: 필요하지 않다.
 
 ## 실행 역할
@@ -134,6 +134,24 @@ unknown fallback 복원, 수정키 클릭·다른 target·download·외부 링�
 29단계의 최종 PASS 기획에 계승된 24단계 보완 manifest·통합 분석 provenance를 설계 입력으로 사용한다.
 원래 23단계 결론만으로 되돌아가지 않고 29단계가 검증한 최종 조사 축·대안과 보완 경로·hash를 설계 결정에 연결한다.
 보완이 없으면 기획의 빈 보완 manifest를 계승한다. 새 네트워크 수집이나 이전 증거 수정은 하지 않는다.
+
+## Jev 의미 체크포인트
+
+설계 대안 둘의 구조·제약 설명이 준비되면 표현만 바꾼 안인지 실질적으로 다른 구조인지 묻는다. 세 대안 생성, 독립 선택자와 최종 설계 검증은 그대로 수행한다.
+
+현재 작업에서 Jev 사용과 선택한 발췌문의 외부 전송이 승인된 경우 호스트가 자동 호출한다.
+기존 승인이 해당 범위를 포함하면 재확인하지 않는다. 단계 도달이나 `TYPESAFE_API_KEY` 존재는 승인이 아니다.
+승인이 없거나 서비스가 불가하면 이유를 기존 단계 보고서에 기록하고 독립 검증을 계속한다.
+
+신뢰한 플러그인의 `node "<plugin-root>/scripts/jev-judge.mjs" prepare --workspace ROOT --input -`로 준비한다.
+재사용 전 `inspect --workspace ROOT --report PATH`의 상태와 현재 prepare의 `request_hash`, `policy_hash`, `input_hash`, `sources`를 모두 대조한다.
+새 호출은 동일 JSON으로 `run --workspace ROOT --input - --allow-network`를 실행한다.
+변하지 않은 입력에는 한 배치만 호출하는 호스트 정책을 적용하며 전역 하드 쿼터로 해석하지 않는다.
+`unverified`·`stale`는 판정 근거로 쓰지 않고 abstain·낮은 confidence는 호스트가 원본을 검토한다.
+승인된 선택 API 예외는 일반 웹 탐색이나 새 자료 수집을 허용하지 않는다.
+
+입력 파일·발췌문 범위, 동의·중복 방지·보고서 검사는 `docs/jev-checkpoints.md`를 따른다.
+기존 독립 검증·Acceptance·실제 검사와 완료 writer는 유지한다. Jev 결과나 `current`는 PASS 또는 완료 권한이 아니다.
 
 ## 완료 조건
 

@@ -19,6 +19,8 @@ Resolve these installed resources relative to this SKILL.md, not from the curren
 - Codex step selected by the manager: `../../assets/steps/stepNNN.md`
 - Shared QA reporter: `../../../scripts/qa-report.mjs`
 - QA report protocol and input schema: `../../../docs/QA-REPORTS.md`
+- Shared Jev checkpoint helper: `../../../scripts/jev-judge.mjs`
+- Jev input and authorization contract: `../../../docs/jev-checkpoints.md`
 
 Use the state manager for every workflow mutation. Pass the current project directory as the workspace. Do not derive package paths from environment variables or user-supplied flags.
 `init`, `resume`, `complete`, and `fail` return the state directly. For wrapped results
@@ -145,6 +147,34 @@ One-step execution below is one work unit inside this loop, not one whole turn.
 8. Otherwise call `fail` with a sanitized reason and evidence. Report the failure; do not invent completion. If snapshot or report recording fails, still call manager `fail`, identify the unavailable QA handoff, and do not fabricate a QA report. Include the recorded report digest when available and the next check to run. Reaching a retry limit never advances the step.
 9. Return the actual manager response to Continuous execution. Execute only one
    step in this work unit; the loop selects the next work unit after this one is accepted.
+
+## Optional Jev checkpoint routing
+
+At steps 16, 24, 25, 30, 37, 45 and 49, after selected evidence is ready and before
+the existing independent review, use `../../../scripts/jev-judge.mjs` according to
+`../../../docs/jev-checkpoints.md`. The active task must authorize both Jev and
+transmission of those selected excerpts. Reuse existing authorization covering that
+scope; do not ask again. A stage number, whole-workflow request or API key alone is
+not consent. Without authorization or an available service, record the reason in the
+step report and continue the existing independent review.
+
+The orchestrator owns this call. If delegated explicitly to one worker, inspect its
+returned report without a duplicate call. Prepare offline with
+`prepare --workspace ROOT --input -`; before reuse, inspect the candidate report and
+compare `request_hash`, `policy_hash`, `input_hash`, `sources` with the new prepare
+result. Require a current matching report and distinguish `review_status: unverified`.
+For a new authorized request use the same input with
+`run --workspace ROOT --input - --allow-network`. One batch for unchanged input is
+host policy, not an enforced global quota. Do not retry the same service failure automatically.
+
+Persist the report path, digest and host disposition in the existing step evidence.
+Abstention and low confidence require host review; insufficient evidence is not a
+proven failure. The optional API exception does not grant general browsing or expand
+the step's collection scope. This advisory route leaves required Acceptance,
+independent reviewers, actual screenshots, project E2E, the QA writer and all manager
+mutations unchanged. A Jev result, exit zero or `current` never completes a step.
+The automatic Step 25 route uses the generic helper only; the legacy `jev-review.mjs`
+adapter stays compatible and is not invoked again for the same judgment.
 
 ## Boundaries and handoff
 

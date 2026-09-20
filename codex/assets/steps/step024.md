@@ -21,7 +21,7 @@ phase: research
 - 입력: `step_archive/step023_조사결과_chunk1.md`
 - 필수 선행 항목: `step016`, `step020`, `step022`, `step023`
 - 산출물: `step_archive/outputs/step024_검증_r1.md`
-- 네트워크: FAIL의 구체적 부족 항목을 보완할 때만 정상 권한 확인 아래 제한적으로 사용한다.
+- 네트워크: FAIL의 구체적 부족 항목을 보완할 때만 정상 권한 확인 아래 제한적으로 사용한다. 승인된 Jev 선택 API도 허용한다.
 - 시각 검토: 필수
 
 ## 실행 역할
@@ -82,6 +82,24 @@ phase: research
 최종 PASS 섹션에는 기존 증거와 채택한 보완 증거의 정확한 경로·hash, 최종 통합 분석과 조사 축·대안을 확정한다. 보완이 없으면 빈 보완 manifest를 명시한다.
 25·29단계 이후 기획·설계·시각 비교는 이 최종 manifest와 통합 분석을 소비하고 원래 23단계 결론만으로 되돌아가지 않는다.
 5라운드 후에도 PASS가 없으면 남은 실패를 생략하지 않고 현재 단계를 INCOMPLETE로 유지한다.
+
+## Jev 의미 체크포인트
+
+조사 축 하나의 대안·장단점과 채택 보완 분석이 준비되면 그 설계 결정에 근거가 충분한지 묻는다. Jev 텍스트 판정은 필수 이미지를 실제로 여는 시각 검사를 대체하지 않는다.
+
+현재 작업에서 Jev 사용과 선택한 발췌문의 외부 전송이 승인된 경우 호스트가 자동 호출한다.
+기존 승인이 해당 범위를 포함하면 재확인하지 않는다. 단계 도달이나 `TYPESAFE_API_KEY` 존재는 승인이 아니다.
+승인이 없거나 서비스가 불가하면 이유를 기존 단계 보고서에 기록하고 독립 검증을 계속한다.
+
+신뢰한 플러그인의 `node "<plugin-root>/scripts/jev-judge.mjs" prepare --workspace ROOT --input -`로 준비한다.
+재사용 전 `inspect --workspace ROOT --report PATH`의 상태와 현재 prepare의 `request_hash`, `policy_hash`, `input_hash`, `sources`를 모두 대조한다.
+새 호출은 동일 JSON으로 `run --workspace ROOT --input - --allow-network`를 실행한다.
+변하지 않은 입력에는 한 배치만 호출하는 호스트 정책을 적용하며 전역 하드 쿼터로 해석하지 않는다.
+`unverified`·`stale`는 판정 근거로 쓰지 않고 abstain·낮은 confidence는 호스트가 원본을 검토한다.
+승인된 선택 API 예외는 일반 웹 탐색이나 새 자료 수집을 허용하지 않는다.
+
+입력 파일·발췌문 범위, 동의·중복 방지·보고서 검사는 `docs/jev-checkpoints.md`를 따른다.
+기존 독립 검증·Acceptance·실제 검사와 완료 writer는 유지한다. Jev 결과나 `current`는 PASS 또는 완료 권한이 아니다.
 
 ## 완료 조건
 

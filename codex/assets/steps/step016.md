@@ -22,7 +22,7 @@ phase: research
 - 산출물: `step_archive/research-raw-step016-primary.txt`
 - 산출물: `step_archive/screenshots/research/step016-primary.png`
 - 선택 산출물: `step_archive/tokei-baseline.json`
-- 네트워크: 필수
+- 네트워크: 필수 승인된 Jev 선택 API도 허용한다.
 - 시각 검토: 필요하지 않다. 스크린샷은 수집 증거로만 사용한다.
 
 ## 실행 역할
@@ -84,6 +84,24 @@ tokei가 실행되지 않았는데 결과를 만들어 내거나 선택 기능�
 `step016_조사결과_chunk2.md`처럼 새 청크를 만들고, 첫 청크의 manifest에 모든 청크,
 줄 수, 주제, 원본 및 캡처 경로를 기록한다. 각 청크는 500줄 이하여야 하며 병합하지
 않는다.
+
+## Jev 의미 체크포인트
+
+조사 청크의 사실 주장과 대응 원문이 준비되면 해당 주장 하나를 원문이 뒷받침하는지 묻는다. 원문과 주장 발췌문을 함께 선택한다. URL·수집 경로·hash 대조는 기존 절차로 수행한다.
+
+현재 작업에서 Jev 사용과 선택한 발췌문의 외부 전송이 승인된 경우 호스트가 자동 호출한다.
+기존 승인이 해당 범위를 포함하면 재확인하지 않는다. 단계 도달이나 `TYPESAFE_API_KEY` 존재는 승인이 아니다.
+승인이 없거나 서비스가 불가하면 이유를 기존 단계 보고서에 기록하고 독립 검증을 계속한다.
+
+신뢰한 플러그인의 `node "<plugin-root>/scripts/jev-judge.mjs" prepare --workspace ROOT --input -`로 준비한다.
+재사용 전 `inspect --workspace ROOT --report PATH`의 상태와 현재 prepare의 `request_hash`, `policy_hash`, `input_hash`, `sources`를 모두 대조한다.
+새 호출은 동일 JSON으로 `run --workspace ROOT --input - --allow-network`를 실행한다.
+변하지 않은 입력에는 한 배치만 호출하는 호스트 정책을 적용하며 전역 하드 쿼터로 해석하지 않는다.
+`unverified`·`stale`는 판정 근거로 쓰지 않고 abstain·낮은 confidence는 호스트가 원본을 검토한다.
+승인된 선택 API 예외는 일반 웹 탐색이나 새 자료 수집을 허용하지 않는다.
+
+입력 파일·발췌문 범위, 동의·중복 방지·보고서 검사는 `docs/jev-checkpoints.md`를 따른다.
+기존 독립 검증·Acceptance·실제 검사와 완료 writer는 유지한다. Jev 결과나 `current`는 PASS 또는 완료 권한이 아니다.
 
 ## 완료 조건
 

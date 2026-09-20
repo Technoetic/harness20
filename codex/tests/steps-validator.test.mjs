@@ -1117,7 +1117,7 @@ test("research batch declares the exact Codex-native evidence contracts", async 
       phase: "research",
       source: "assets/steps/step016.md",
       target: "codex/assets/steps/step016.md",
-      source_sha256: "38ca9896b715a74779fadedffd53cdf2e085b3732b6aaaff94ec3e16d3a93234",
+      source_sha256: "83814c556556da24504ae20772146930fa52354fb6a1d3cf86a7387814be3eb2",
       inputs: [
         "step_archive/TOPIC/TOPIC.md",
         "step_archive/step001_preflight.md",
@@ -1358,7 +1358,7 @@ test("research batch declares the exact Codex-native evidence contracts", async 
       phase: "research",
       source: "assets/steps/step024.md",
       target: "codex/assets/steps/step024.md",
-      source_sha256: "2150999166c77e0ab4cc3d19ca3f5c49d4646d19523638c635fc1547e89ca94a",
+      source_sha256: "a57a38272cde57d70d86503a58b175b69434238a28c80b3210392ca1a5ab85f5",
       inputs: [
         "step_archive/step016_조사결과_chunk1.md",
         "step_archive/step020_선정URL.md",
@@ -1392,7 +1392,7 @@ test("research source hashes bind the untouched Claude steps 016 through 024", a
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(15, 24));
 
   assert.deepEqual(hashes, {
-    step016: "38ca9896b715a74779fadedffd53cdf2e085b3732b6aaaff94ec3e16d3a93234",
+    step016: "83814c556556da24504ae20772146930fa52354fb6a1d3cf86a7387814be3eb2",
     step017: "941288a9368915036af4f69ddac2ef1a605b8dd6181c277314f38c1b489f3fe9",
     step018: "d9f419671463c41d66e4261352d56743a053b13436f82ca9966697b118650014",
     step019: "d34370dc09411a8724906cc17965188f6d9f179a69b0997b0b036ccbfe9225c0",
@@ -1400,7 +1400,7 @@ test("research source hashes bind the untouched Claude steps 016 through 024", a
     step021: "c36004a40bd93ed6bc79043cd7120629f2f71e6582feb89ca3e3a6d20cc7da54",
     step022: "2d16baba92f09b0ab7811731517979c048434a3ab2f9a570c5e0ce7a690dd93c",
     step023: "6efdd52549990ea26e16968a6da65c576edcf46e5e914f8a6708292c81b8c461",
-    step024: "2150999166c77e0ab4cc3d19ca3f5c49d4646d19523638c635fc1547e89ca94a"
+    step024: "a57a38272cde57d70d86503a58b175b69434238a28c80b3210392ca1a5ab85f5"
   });
 });
 
@@ -1726,7 +1726,7 @@ test("planning batch declares the exact Codex-native artifact contracts", async 
       phase: "planning",
       source: "assets/steps/step025.md",
       target: "codex/assets/steps/step025.md",
-      source_sha256: "70b776ae417fcacaa24bf19b92cfde9756efc9618cf26ac910bb0f517552d172",
+      source_sha256: "856546680563f1c919baada5af17a340937bdfad2c48f5d09a967646751a1153",
       inputs: [
         "step_archive/TOPIC/TOPIC.md",
         "step_archive/step016_조사결과_chunk1.md",
@@ -1740,7 +1740,7 @@ test("planning batch declares the exact Codex-native artifact contracts", async 
       ],
       requires: ["step016", "step024"],
       optional_requires: [],
-      network: false,
+      network: true,
       visual_review: false,
       acceptance: [
         { id: "base-planning-snapshot", kind: "artifact", required: true, path: "step_archive/step025_planning_chunk1.md" },
@@ -1902,7 +1902,7 @@ test("planning batch declares the exact Codex-native artifact contracts", async 
       phase: "planning",
       source: "assets/steps/step030.md",
       target: "codex/assets/steps/step030.md",
-      source_sha256: "c48c4b050f5efeee75328797dba649ce07bcbcaac47cb2b7316cd86d0dede365",
+      source_sha256: "5f8643da4e1deb4c3451f3ce39cc443c8fd654aa39ef015243121defe092b9fc",
       inputs: [
         "step_archive/TOPIC/TOPIC.md",
         "step_archive/step029_planning_chunk1.md",
@@ -1917,7 +1917,7 @@ test("planning batch declares the exact Codex-native artifact contracts", async 
       ],
       requires: ["step029"],
       optional_requires: [],
-      network: false,
+      network: true,
       visual_review: false,
       acceptance: [
         { id: "design-alternatives", kind: "artifact", required: true, path: "step_archive/outputs/step030_설계대안.md" },
@@ -1944,12 +1944,12 @@ test("planning source hashes bind the reviewed source steps 025 through 030", as
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(24, 30));
 
   assert.deepEqual(hashes, {
-    step025: "70b776ae417fcacaa24bf19b92cfde9756efc9618cf26ac910bb0f517552d172",
+    step025: "856546680563f1c919baada5af17a340937bdfad2c48f5d09a967646751a1153",
     step026: "6f356e9081084e224aca6f0a4cffbedcff90455de9e5dee03a4c7204a4f9df0c",
     step027: "92e6538f33b3beb7a4be49460de06dcc45817296c5ca43f1f96af47be5ee9fe4",
     step028: "681e4901e23093f5caff6420431835fdacd37d6f3ac3e7f628c7c3566d7f93af",
     step029: "01ea1d8a424937393aa0827ab9f41c952200f04a771e90b121c9a5569e364d40",
-    step030: "c48c4b050f5efeee75328797dba649ce07bcbcaac47cb2b7316cd86d0dede365"
+    step030: "5f8643da4e1deb4c3451f3ce39cc443c8fd654aa39ef015243121defe092b9fc"
   });
 });
 
@@ -2010,11 +2010,11 @@ test("planning outputs are immutable snapshots with required evidence and closed
   assert.ok(planning.slice(1, 5).every((step) => !step.outputs.includes("step_archive/step025_planning_chunk1.md")));
 });
 
-test("planning instructions stay local, provider-neutral, permission-preserving, and receipt-owned", async () => {
+test("planning instructions scope optional Jev, preserve permissions, and remain receipt-owned", async () => {
   const planning = (await validateStepBatch(repoRoot, [25, 26, 27, 28, 29, 30])).steps;
 
   for (const step of planning) {
-    assert.equal(step.network, false);
+    assert.equal(step.network, [25, 30].includes(step.number));
     const content = await readFile(join(repoRoot, step.target), "utf8");
     assert.deepEqual(scanForbiddenTokens(content), []);
     assert.doesNotMatch(content, /(?:progress|state)\.json|\.harness50-codex|transcript/i);
@@ -2599,7 +2599,7 @@ const EXPECTED_IMPLEMENTATION_TARGET_SHA256 = Object.freeze({
   step034: "28ccaea5e66abc407ed9ad0f1543c2c989b9bcdd4648580e5e252131605d7892",
   step035: "9db05334af746fe8e0f02bac6ba1f9c4fce56855adbad3667ff30a8d1b65e249",
   step036: "309f1fc4c9ab8f7d23eb31b8d37d5648ce35e274154f4e70ffd7213cb4f05c7e",
-  step037: "f211a47dca1e11b4c251adde10478749e4562f7da150cc1c7a24a6209c5b5fa4",
+  step037: "149083bcba53e7df3f783e4885e3f3eb438f5637298318d042d8944360474d67",
   step038: "dae26106a224c11fdf7becbd6941659569bcd182e1c2b9909962bacd156e5198"
 });
 
@@ -2811,7 +2811,7 @@ test("implementation batch declares the exact Codex-native evidence contracts", 
       phase: "implementation",
       source: "assets/steps/step037.md",
       target: "codex/assets/steps/step037.md",
-      source_sha256: "64d00f9cc63ad1246e0141fbcc83721f4ae0e76632d58b66a9f3771521dd3508",
+      source_sha256: "4fde6cd81a22e429563170db70497a765508eaece81bf8dadc4297dbd3bf5e10",
       inputs: [
         "step_archive/outputs/step024_검증_r1.md",
         "step_archive/TOPIC/TOPIC.md",
@@ -2830,7 +2830,7 @@ test("implementation batch declares the exact Codex-native evidence contracts", 
       outputs: ["step_archive/step037_구현manifest.md"],
       requires: ["step024", "step022", "step023", "step030", "step031", "step032", "step035", "step036"],
       optional_requires: [],
-      network: false,
+      network: true,
       visual_review: true,
       acceptance: [
         { id: "implementation-manifest", kind: "artifact", required: true, path: "step_archive/step037_구현manifest.md" },
@@ -2892,7 +2892,7 @@ test("implementation source hashes bind the reviewed source steps 031 through 03
     step034: "f82ed6a8cd582b740d39d53e75b8b31b75b4b9b759b48d8d63add97cd24f4671",
     step035: "664d663cc7ed8cbb8605e3c5c5d2653fb139421eb469e81d1f08201fbf284acd",
     step036: "27787a5adeff811a6ce6b1f8c58fe9afc0703139f049e88a705b6e911b2fcec0",
-    step037: "64d00f9cc63ad1246e0141fbcc83721f4ae0e76632d58b66a9f3771521dd3508",
+    step037: "4fde6cd81a22e429563170db70497a765508eaece81bf8dadc4297dbd3bf5e10",
     step038: "f250caba0c63b654ecbe011b7591e6dff23cdeb8c83e4e6347dde937a94be8f0"
   });
 });
@@ -4240,7 +4240,7 @@ const EXPECTED_E2E_ROWS = [
     phase: "e2e",
     source: "assets/steps/step045.md",
     target: "codex/assets/steps/step045.md",
-    source_sha256: "9d47118c554a0ae166e0042ee5d9782a1bec4013d29cde2c82ed5dfcd2a0d0e3",
+    source_sha256: "1b0357d2ee3ad49c86988dc507d0791fd0f516423f6eea6df3fb811285088f76",
     inputs: [
       "step_archive/TOPIC/TOPIC.md",
       "step_archive/step001_preflight.md",
@@ -4398,7 +4398,7 @@ const EXPECTED_E2E_ROWS = [
     phase: "e2e",
     source: "assets/steps/step049.md",
     target: "codex/assets/steps/step049.md",
-    source_sha256: "e016d22df3d82ecbb7c8f7609ceb3911fb0653f23bd71a4f9dd28fc6224c18f5",
+    source_sha256: "3cebc468c5ed9c815e616d0070111a61adc55aa2015880728c242918d6c77c30",
     inputs: [
       "step_archive/step030_레이아웃설계_chunk1.md",
       "step_archive/step030_전체설계_chunk1.md",
@@ -4418,7 +4418,7 @@ const EXPECTED_E2E_ROWS = [
     ],
     requires: ["step030", "step038", "step040", "step043", "step044", "step047", "step048"],
     optional_requires: [],
-    network: false,
+    network: true,
     visual_review: true,
     acceptance: [
       { id: "design-visual-report", kind: "artifact", required: true, path: "step_archive/outputs/step049_검증_r1.md" },
@@ -4510,11 +4510,11 @@ test("e2e source hashes bind reviewed source steps 045 through 050", async () =>
   const index = await loadIndex(repoRoot);
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(44, 50));
   assert.deepEqual(hashes, {
-    step045: "9d47118c554a0ae166e0042ee5d9782a1bec4013d29cde2c82ed5dfcd2a0d0e3",
+    step045: "1b0357d2ee3ad49c86988dc507d0791fd0f516423f6eea6df3fb811285088f76",
     step046: "c290f0b81e68da011996abaa3a6fb2dd753d5c7199b8f6acaab2b8b3f606d1d9",
     step047: "e35c1b210e06b1cb4742573941a789e166aa4a131a2cc012481b3747ffdc04be",
     step048: "b171cb98e9ca33de2e7ff5f58f721dd1590c5df213b8598268726125176982d0",
-    step049: "e016d22df3d82ecbb7c8f7609ceb3911fb0653f23bd71a4f9dd28fc6224c18f5",
+    step049: "3cebc468c5ed9c815e616d0070111a61adc55aa2015880728c242918d6c77c30",
     step050: "f0efe75ebf5fd255749a5b4440e6e276a5744e55df8d97cb8df17160ad49efd0"
   });
 });
@@ -4529,11 +4529,11 @@ test("e2e acceptance descriptions reject placeholder-wide mutation", async () =>
 });
 
 const EXPECTED_E2E_TARGET_SHA256 = Object.freeze({
-  step045: "8706bffc859eee7e68398c581c2b51077b23a445007b756affc8ef7f552417b2",
+  step045: "35acd2adc4ec472ac2fd20b95274ba24ba32ccc457ee2ee0e690a7d977aea898",
   step046: "187a619f02da34101426d23f466182758b7d0b6bc0977ab3518c8c6bb2bfd93d",
   step047: "d2ed158f4fb15f52e21d76438776bbe0b1e5a0124a46eb4e7bd511c31398dfde",
   step048: "d858de0ea976dbce2a85c62ec71722964d2615528c2235fdf8e877b1d2a1558b",
-  step049: "579b418539ce598bf872ab62121b8a883998fe3d2f47591adb57f3c7fd325d6a",
+  step049: "b151cd00e427077405015452618825bd5b7443c26b2dbe3c8eb08d3ec34e5518",
   step050: "c803957f478a2159bc4f836cc3edc7b561a04fb90c5f3ab4edd16287863a2b60"
 });
 

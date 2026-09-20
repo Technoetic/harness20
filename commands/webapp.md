@@ -50,6 +50,22 @@ argument-hint: <주제 한 줄>
 
 4. **연속 실행** — 본문 지시대로 실행 → "Step 001/50 완료" 보고 → 즉시 step002.md Read → … → step050.md까지 멈추지 않고 진행.
 
+## Jev 체크포인트 라우팅
+
+16·24·25·30·37·45·49단계의 선택 근거가 준비되면 신뢰한 설치 플러그인의
+`scripts/jev-judge.mjs`와 `docs/jev-checkpoints.md`를 따른다. 현재 작업에서 Jev 사용과
+해당 발췌문의 외부 전송이 승인된 경우 자동 호출한다. 기존 승인이 범위를 포함하면
+재확인하지 않는다. 단계 도달이나 키 존재, workflow 시작 자체는 전송 승인이 아니다.
+승인 또는 서비스가 없으면 이유를 단계 보고서에 남기고 기존 독립 검증을 수행한다.
+
+호출 책임자를 해당 step-executor로 정하고 승인 범위와 선택 근거를 인계한다.
+워커가 반환한 보고서는 `inspect`하고 현재 `prepare`의 `request_hash`, `policy_hash`,
+`input_hash`, `sources`를 대조한다. 재사용할 판정이 없을 때만 같은 JSON으로
+`run --workspace ROOT --input - --allow-network`를 실행한다. 변하지 않은 입력에는
+한 배치만 호출하는 호스트 정책이며 전역 하드 쿼터가 아니다. 호출자와 워커는 중복 호출하지 않는다.
+일반 웹 탐색 권한은 늘어나지 않는다. abstain·낮은 confidence는 호스트 검토 대상으로 남기고
+Jev 결과로 기존 필수 Acceptance·시각 검사·E2E·독립 검증·완료 writer를 대체하지 않는다.
+
 ## 절대 준수
 
 - 사용자에게 어떤 질문도 하지 마라
