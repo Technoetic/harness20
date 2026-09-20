@@ -799,7 +799,7 @@ test("Codex manifest isolates Codex skills and hooks", async () => {
     "utf8"
   ));
   assert.equal(manifest.name, "harness50");
-  assert.match(manifest.version, /^2\.5\.0(?:\+codex\.[a-z0-9-]+)?$/);
+  assert.match(manifest.version, /^2\.6\.0(?:\+codex\.[a-z0-9-]+)?$/);
   assert.equal(manifest.skills, "./codex/skills/");
   assert.equal(manifest.hooks, "./codex/hooks/hooks.json");
   assert.notEqual(manifest.hooks, "./hooks/hooks.json");
@@ -1044,23 +1044,28 @@ test("reset semantic contract rejects the review matrix without rejecting preser
   );
 });
 
-test("Claude, Codex, and marketplace release versions are synchronized with optional Codex build metadata", async () => {
+test("package, Claude, Codex, and marketplace release versions are synchronized with optional Codex build metadata", async () => {
+  const packageJson = await readJson("package.json");
+  const packageLock = await readJson("package-lock.json");
   const claude = await readJson(".claude-plugin/plugin.json");
   const codex = await readJson(".codex-plugin/plugin.json");
   const marketplace = await readJson(".claude-plugin/marketplace.json");
   const entry = marketplace.plugins.find(plugin => plugin.name === "harness50");
 
   assert.equal(claude.name, "harness50");
-  assert.equal(claude.version, "2.5.0");
+  assert.equal(claude.version, "2.6.0");
+  assert.equal(packageJson.version, claude.version);
+  assert.equal(packageLock.version, claude.version);
+  assert.equal(packageLock.packages[""].version, claude.version);
   assert.equal(codex.name, "harness50");
   assert.equal(codex.version.split("+")[0], claude.version);
-  if (codex.version.includes("+")) assert.match(codex.version, /^2\.5\.0\+codex\.[a-z0-9-]+$/);
+  if (codex.version.includes("+")) assert.match(codex.version, /^2\.6\.0\+codex\.[a-z0-9-]+$/);
   assert.equal(codex.skills, "./codex/skills/");
   assert.equal(codex.hooks, "./codex/hooks/hooks.json");
   assert.equal(marketplace.name, "harness50");
-  assert.equal(marketplace.metadata.version, "2.5.0");
+  assert.equal(marketplace.metadata.version, "2.6.0");
   assert.equal(entry?.source, "./");
-  assert.equal(entry?.version, "2.5.0");
+  assert.equal(entry?.version, "2.6.0");
 
   const marketplaceRoot = new URL(".claude-plugin/marketplace.json", REPO_URL);
   const pluginSource = new URL(entry.source, REPO_URL);

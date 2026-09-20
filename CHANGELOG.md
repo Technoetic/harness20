@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.6.0 — 2026-09-20
+
+- Add an optional Step 25 Jev planning review for both hosts through `scripts/jev-review.mjs prepare|run|inspect`. Only explicitly selected topic and planning excerpts are eligible; network calls require `--allow-network` and `TYPESAFE_API_KEY`.
+- Pin the TypeSafe endpoint and Jev model, bound input and response sizes and request duration, reject recognizable credentials, and retain immutable advisory reports with source hashes and categorical results. Changed inputs and failed calls remain unverified; existing reviewers, completion gates and permissions stay authoritative.
+- Document the opt-in workflow and add library and CLI regression tests for source binding, secret rejection, transport failures, response validation, freshness, report integrity and sanitized output.
+
 ## 2.5.0 — 2026-09-16
 
 - Turn `scripts/verify-output.mjs` into a dispatcher over two browser verification backends. Playwright now lives isolated in `browser-verifier/` (its own `package.json`, used by CI and by machines that allow it); the new `aside` backend drives the Aside CLI (`aside repl`) on machines where Playwright is not allowed or not installed. Both produce the same schema-v3 report and four screenshots; the completion gate reads named fields only and does not distinguish backends.
