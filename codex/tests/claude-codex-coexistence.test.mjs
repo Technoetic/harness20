@@ -101,7 +101,9 @@ function invoke(plugin, variant, name, event, cwd, { stripCR = false } = {}) {
     cwd,
     input: JSON.stringify(event),
     encoding: 'utf8',
-    timeout: 60000,
+    // Git Bash emulation forks dozens of processes per hook call; auto-approve.sh on its allow
+    // path can take 40 s or more on Windows, so that path gets a much larger budget.
+    timeout: windows && variant !== 'ps1' ? 300000 : 60000,
     env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8', CLAUDE_PROJECT_DIR: '' }
   });
   assert.equal(result.status, 0, result.stderr || String(result.error));
@@ -434,18 +436,17 @@ test('Codex state turns Claude auto-approval off, even next to a stale progress.
   const f = fixture(t, { name: 'Codex 작업 approvals' });
   mkdirSync(f.archive, { recursive: true });
   writeFileSync(f.progressFile, JSON.stringify(STALE_LOADER_PROGRESS));
-  const variants = [defaultVariant];
-  if (windows && !bashOnWindows && existsSync(gitBash) && pythonAvailable()) variants.push('sh');
-  const approve = (event, variant) => f.run('auto-approve', event, variant, { stripCR: true });
+  // One variant per run, like the rest of this file: PowerShell on Windows, bash on POSIX, and the
+  // Git Bash emulation of auto-approve.sh only with H50_TEST_BASH=1. That emulation takes 40 s or
+  // more per allowed call, too slow for the default Windows suite.
+  const approve = event => f.run('auto-approve', event, defaultVariant, { stripCR: true });
   const edit = { tool_name: 'Write', tool_input: { file_path: join(f.project, 'src', 'app.js'), content: 'x' } };
   const search = { tool_name: 'WebSearch', tool_input: { query: 'css' } };
   const allow = /"permissionDecision":"allow"/;
 
   // Baseline: on its own the stale file still reads as an active Claude workflow.
-  for (const variant of variants) {
-    assert.match(approve(edit, variant), allow, variant);
-    assert.equal(approve({ ...edit, tool_input: { ...edit.tool_input, file_path: CODEX_STATE_RELATIVE } }, variant), '', variant);
-  }
+  assert.match(approve(edit), allow);
+  assert.equal(approve({ ...edit, tool_input: { ...edit.tool_input, file_path: CODEX_STATE_RELATIVE } }), '');
   const cases = {
     'running state': () => f.codex(codexState()),
     'broken state': () => f.codex('{broken'),
@@ -455,17 +456,15 @@ test('Codex state turns Claude auto-approval off, even next to a stale progress.
     rmSync(join(f.archive, '.harness50-codex'), { recursive: true, force: true });
     create();
     const before = f.snapshot();
-    for (const variant of variants) {
-      assert.equal(approve(edit, variant), '', `${name} (${variant})`);
-      assert.equal(approve(search, variant), '', `${name} (${variant})`);
-    }
+    assert.equal(approve(edit), '', name);
+    assert.equal(approve(search), '', name);
     assert.deepEqual(f.snapshot(), before, name);
   }
   // A Codex reset moves state.json into backups/: the previous behaviour returns.
   rmSync(join(f.archive, '.harness50-codex'), { recursive: true, force: true });
   mkdirSync(join(f.archive, '.harness50-codex', 'backups', 'reset-1'), { recursive: true });
   writeFileSync(join(f.archive, '.harness50-codex', 'backups', 'reset-1', 'state.json'), JSON.stringify(codexState()));
-  for (const variant of variants) assert.match(approve(edit, variant), allow, `after reset (${variant})`);
+  assert.match(approve(edit), allow, 'after reset');
 });
 
 test('hooks without node fall back to the probe warning text verbatim', () => {
