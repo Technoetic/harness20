@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import {
-  cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync
+  cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
@@ -76,7 +76,9 @@ function tree(root) {
 }
 
 function tempRoot(t, prefix) {
-  const root = mkdtempSync(join(tmpdir(), prefix));
+  // Physical path: macOS tmpdir() is /var/folders/… behind the /private symlink, and hooks that
+  // derive the project root from their cwd see the physical form.
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), prefix)));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   return root;
 }
