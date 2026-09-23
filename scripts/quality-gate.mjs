@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { runQualityGate, inspectQualityReport } from './lib/quality.mjs';
 import { physicalWorkspace, readSafe, writeSafe } from './lib/quality-files.mjs';
 import { inspectBrowserOutput } from './lib/final-output.mjs';
@@ -33,6 +35,9 @@ async function main() {
   if (!workspaceRoot) throw new Error('--workspace requires a directory');
   let round;
   if (hook) {
+    // Codex coexistence: step_archive/.harness50-codex/state.json means the Codex state manager
+    // owns completion here, so a stale Claude progress.json next to it never drives this Stop gate.
+    if (existsSync(join(workspaceRoot, 'step_archive', '.harness50-codex', 'state.json'))) return;
     let progress;
     try { progress = JSON.parse((await readSafe(await physicalWorkspace(workspaceRoot), 'step_archive/progress.json')).toString('utf8').replace(/^\uFEFF/, '')); }
     catch { return; }
