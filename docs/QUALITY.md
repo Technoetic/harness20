@@ -57,7 +57,11 @@ node scripts/verify-output.mjs --workspace "<project-root>" --backend auto
 `--probe` prints which backends are available and which one `auto` would select,
 without launching a browser. `--backend playwright|aside` (or the environment
 variable `HARNESS50_BROWSER_BACKEND`) forces one; `auto` prefers Playwright and falls
-back to Aside. No hook installs browser packages. The verifier loads the exact
+back to Aside. Step 3 locks its selection in `step_archive/outputs/browser-backend.json`
+with `node scripts/verify-output.mjs --probe --lock --workspace "<project-root>"`.
+After that, `auto` uses only the locked backend and fails instead of falling back, so
+install and repair only that backend
+([backend lock](BROWSER-TOOLS.md#backend-lock-step-3)). No hook installs browser packages. The verifier loads the exact
 `dist/index.html` bytes at 1440×900 and 390×844. It blocks network dependencies and
 WebSockets, reports JavaScript/console errors, detects horizontal overflow, checks
 initial keyboard focus and runs axe WCAG A/AA checks. It records measured load timing

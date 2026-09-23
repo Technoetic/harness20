@@ -438,3 +438,13 @@ test("validate-tools aside hints follow the Step 3 lock", async (t) => {
   assert.equal(lockedAside.code, baseline.code);
   assert.equal(lines(lockedAside.stdout).at(-1), HOOK_LINES.asideLockedAside);
 });
+
+test("the browser backend guide quotes the lock path and messages verbatim", async () => {
+  const guide = await readFile(join(repoRoot, "docs", "BROWSER-TOOLS.md"), "utf8");
+  assert.match(guide, /^## Backend lock \(Step 3\)$/m);
+  for (const text of [MISSING_TOOLS, INVALID_LOCK, lockedUnavailableMessage("aside"), LOCK_PATH,
+    'node scripts/verify-output.mjs --probe --lock --workspace "<project-root>"']) {
+    assert.ok(guide.includes(text), `docs/BROWSER-TOOLS.md must quote: ${text}`);
+  }
+  assert.doesNotMatch(guide, /prefer `playwright` for the\s+final Step 50 evidence/);
+});

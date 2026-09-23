@@ -24,7 +24,9 @@ node scripts/verify-output.mjs --probe
 prints `{ "backends": { "playwright": true|false, "aside": true|false }, "selected": "playwright"|"aside"|null, "tool_version": "..." }`
 without launching a browser and exits 0 only when a backend was selected.
 
-Selection order for `--backend auto` (the default):
+A project whose Step 3 recorded a [backend lock](#backend-lock-step-3) uses only the
+locked backend under `auto`. Without a lock, the selection order for `--backend auto`
+(the default) is:
 
 1. `playwright` if `browser-verifier/backend-playwright.mjs` can load the `playwright` package.
 2. `aside` if `aside --version` succeeds. This only proves the CLI is installed: the
@@ -33,7 +35,8 @@ Selection order for `--backend auto` (the default):
 3. Otherwise the run fails with
    `Browser tools missing: install browser-verifier (cd browser-verifier && npm ci && npx playwright install chromium) or the Aside CLI (aside --version)`.
 
-Force a backend with the flag, or with the environment variable `HARNESS50_BROWSER_BACKEND`:
+Force a backend with the flag, or with the environment variable `HARNESS50_BROWSER_BACKEND`
+(an explicit backend also overrides a Step 3 lock):
 
 ```text
 node scripts/verify-output.mjs --workspace "<project-root>" --backend auto
@@ -49,7 +52,7 @@ session. Measured floor: an Aside chunk needs at least ~9–14 s (`openTab` alon
 fixed ~5.4 s), so values below ~10000 fail with `Browser verification exceeded its
 deadline`; a full three-route run is about 16 chunks × ~8 s ≈ 120–150 s.
 
-Install one backend:
+Install one backend. Once Step 3 has locked a backend, install and repair only that one:
 
 ```text
 # Playwright (CI, allowed machines)
@@ -62,6 +65,71 @@ aside --version          # the Aside app must be running and an account logged i
 Check with the tool hook: `bash hooks/validate-tools.sh aside` or
 `powershell -File hooks/validate-tools.ps1 -Tool aside`. The `axe` tool check resolves
 `axe-core` from the project (root devDependency) and falls back to `@axe-core/playwright`.
+
+## Backend lock (Step 3)
+
+Step 3 probes once and records its choice inside the project, so later steps reuse it
+instead of re-running the `auto` order:
+
+```text
+node scripts/verify-output.mjs --probe --lock --workspace "<project-root>"
+```
+
+This writes `step_archive/outputs/browser-backend.json` (UTF-8 without BOM, LF, trailing
+newline; unknown extra keys are ignored when read):
+
+```json
+{
+  "schema_version": 1,
+  "selected": "aside",
+  "tool_version": "1.26.916.1741",
+  "probed_at": "2026-09-23T01:02:03.000Z"
+}
+```
+
+Precedence for `verify-output` runs and for `--probe --workspace`:
+
+1. An explicit `--backend playwright|aside` or `HARNESS50_BROWSER_BACKEND` wins, and the
+   lock is not read. The report records
+   `backend_selection: { requested, source: "explicit" | "lock" | "auto-order", backend }`,
+   so a global environment override stays visible.
+2. Otherwise (`auto`) a valid lock picks the backend. If that backend is unavailable, the
+   run fails and does not fall back to the other backend. The message names only the
+   locked backend's repair, for example:
+
+   ```text
+   Browser backend locked to aside by step_archive/outputs/browser-backend.json (Step 3) is not available: start the Aside app and check that `aside --version` works in this shell. Keep the locked backend; do not install another browser backend or browser binaries. To change backends deliberately, rerun the Step 3 probe with --backend <name> --lock.
+   ```
+
+   For a Playwright lock, the repair is `npm ci` in `browser-verifier/` plus
+   `npx playwright install chromium`.
+3. Without a lock, the order above applies unchanged.
+
+A missing lock means that there is no lock. Every other problem fails closed with
+`Browser backend lock step_archive/outputs/browser-backend.json is invalid; rerun the Step 3 probe with --backend <name> --lock to record the backend Step 3 selected`.
+That covers invalid UTF-8 or JSON, a BOM, `schema_version` other than 1, a `selected`
+other than `playwright`/`aside`, a non-string `tool_version`, an unparseable
+`probed_at`, a file over 4 KiB, and a symlinked, hard-linked or aliased path.
+
+- **Install only the locked backend.** A project locked to `aside` never needs Playwright
+  or its Chromium download. In that case `hooks/validate-tools.*` report Playwright as
+  "not needed" instead of printing the install hint. A project locked to `playwright`
+  keeps the Playwright install path and is not pointed at Aside.
+- **Only Step 3 writes the lock**, and only after the workflow is initialized. A Codex
+  workspace must not contain `step_archive/outputs/` before `$webapp` init. `--lock`
+  refuses to run without `--probe` and an explicit `--workspace`, so the lock never lands
+  in the checkout itself.
+- **Probe output.** Without `--workspace`, `--probe` prints exactly the object above.
+  With `--workspace` it also prints `lock` (the lock object, `null`, or `"invalid"` when
+  an explicit backend ignored a bad lock), plus `error` when nothing may run. With
+  `--lock` it also prints `previous`. It exits 0 only when a backend was selected (and,
+  with `--lock`, recorded).
+- **Changing backends is deliberate.** Rerun the Step 3 command with
+  `--backend <name> --lock`. The same command repairs an invalid lock. A project started
+  before the lock existed can record the backend named in
+  `step_archive/step003_playwright_test.md` this way (Claude Step 31 does so).
+- The lock prevents accidental switches. It is not a security boundary: deleting the
+  file or passing an explicit backend bypasses it.
 
 ## Procedure table: curriculum needs → Playwright → `aside repl`
 
@@ -169,9 +237,9 @@ produced the evidence and under what conditions:
 the verdict. It is disclosure: **shared-profile evidence reveals the user's colour
 scheme, language, DPR and installed extensions**, and a reviewer must not treat a
 dark-scheme ko-KR shared-profile screenshot as equivalent to a light-scheme fresh-context
-capture. When both backends are available on a machine, prefer `playwright` for the
-final Step 50 evidence and keep `aside` results as supplementary or as the only evidence
-where Playwright is banned.
+capture. When both backends are available at Step 3, `auto` selects and locks
+`playwright`. Once a project is locked, keep the locked backend for all evidence,
+including the final Step 50 report, and do not install the other backend to replace it.
 
 ## 요약 (한국어)
 
@@ -181,7 +249,13 @@ where Playwright is banned.
   4장의 스크린샷을 만들고, 게이트는 백엔드를 구분하지 않는다.
 - `node scripts/verify-output.mjs --probe`로 가용 백엔드를 확인하고,
   `--backend auto|playwright|aside`(또는 환경변수 `HARNESS50_BROWSER_BACKEND`)로 선택한다.
-  auto는 Playwright → Aside 순서다.
+  잠금 파일이 없을 때 auto는 Playwright → Aside 순서다.
+- Step 3은 `node scripts/verify-output.mjs --probe --lock --workspace "<project-root>"`로 선택을
+  `step_archive/outputs/browser-backend.json`에 고정한다. 그 뒤 `--backend` 없는 검증은 고정
+  백엔드만 쓰고, 사용할 수 없으면 다른 백엔드로 넘어가지 않고 그 백엔드의 복구 방법만 안내한다.
+  명시적 `--backend`/환경변수가 우선하며, 잘못된 잠금 파일은 실패로 처리한다(fail closed).
+  고정된 백엔드만 설치·복구하고 다른 백엔드(예: Aside 고정 프로젝트의 Playwright·Chromium)는
+  설치하지 않는다. 백엔드를 바꾸려면 `--backend <name> --lock`으로 다시 고정한다.
 - Aside 우회로(모두 실측): 모바일 뷰포트는 390×844 iframe, 초기화 스크립트는 서버가
   `<head>` 직후 주입, 외부 요청 차단은 CSP 헤더 + `securitypolicyviolation` 집계, 콘솔·페이지
   오류는 `dataset` 브리지, 뒤로/앞으로는 `history.back()` evaluate, 스크린샷은 실패 시

@@ -578,6 +578,8 @@ aside --version
 node scripts/verify-output.mjs --probe
 ```
 
+step003은 선택한 백엔드를 `node scripts/verify-output.mjs --probe --lock --workspace "<project-root>"`로 프로젝트의 `step_archive/outputs/browser-backend.json`에 고정한다. 이후 `--backend` 없는 브라우저 검증은 고정된 백엔드만 쓰므로 그 백엔드만 설치·복구하고, 다른 백엔드(예: Aside로 고정된 프로젝트의 Playwright·Chromium)는 설치하지 않는다.
+
 step045 E2E는 프로젝트의 `npm run e2e`를 실행한다 — 러너(Playwright test, Aside `repl` 스크립트 등)는 프로젝트가 정하고, step은 결과 전체 PASS만 본다.
 
 선택: `semgrep` (Trust5 Secured 축에서 9점/4점 분기).

@@ -150,6 +150,13 @@ Phase 3: 구현 에이전트 병렬 실행 (프롬프트에 Phase 1 산출물 �
 2. 디자인 요구사항 (조사에서 추출한 패턴)
 3. 출력 파일 경로 + UTF-8 / LF 줄바꿈
 
+## 10. 브라우저 검증 백엔드 고정
+
+- step003이 `step_archive/outputs/browser-backend.json`에 고정한 백엔드(`selected`)를 끝까지 유지한다. `--backend` 없는 `verify-output`은 그 백엔드만 쓰며, 사용할 수 없으면 다른 백엔드로 넘어가지 않는다.
+- 다른 백엔드의 package나 browser binary를 설치하지 않는다. 예: Aside로 고정된 프로젝트에서 Playwright나 Chromium을 설치하지 않는다. 고정 백엔드를 사용할 수 없다는 오류가 나면 그 백엔드만 복구한다.
+- 잠금 파일이 없는 진행 중 프로젝트는 `step_archive/step003_playwright_test.md`의 selected 값으로 검증 체크아웃에서 `node scripts/verify-output.mjs --probe --backend <selected> --lock --workspace "<project-root>"`를 한 번 실행해 고정한다.
+- 백엔드 변경은 사용자가 요청할 때만 `--backend <name> --lock`으로 다시 고정한다. 상세: `docs/BROWSER-TOOLS.md` "Backend lock (Step 3)".
+
 ---
 
 본 헌법은 **harness50 플러그인이 활성화된 모든 세션**에서 살아 있다.

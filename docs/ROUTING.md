@@ -157,7 +157,9 @@ node "<validation-checkout>/scripts/verify-output.mjs" --workspace "<project-roo
 ```
 
 `--backend playwright` or `--backend aside` forces a backend; `auto` prefers Playwright
-and falls back to Aside. With the Playwright backend, `--executable-path "<browser-path>"`
+and falls back to Aside. A Step 3 lock (`step_archive/outputs/browser-backend.json`)
+takes precedence over that order: `auto` then uses only the locked backend
+([backend lock](BROWSER-TOOLS.md#backend-lock-step-3)). With the Playwright backend, `--executable-path "<browser-path>"`
 selects an installed Chromium-based browser explicitly.
 
 The browser report uses **schema version 3**, with the exact `routing` manifest,
