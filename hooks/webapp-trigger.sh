@@ -60,6 +60,21 @@ done
 [ "$MATCHED" = "0" ] && exit 0
 log "TRIGGER matched"
 
+# Codex coexistence (mirrors webapp-trigger.ps1): an existing Codex workflow is resumed,
+# never re-initialized (codex/skills/webapp/SKILL.md). Leave TOPIC.md, progress.json and
+# step_archive/ untouched.
+if [ -e "$STEP_ARCHIVE/.harness50-codex/state.json" ]; then
+  log "Codex workflow state present -> trigger skipped"
+  CODEX_LINE=""
+  if command -v node >/dev/null 2>&1; then
+    CODEX_LINE="$(node "$(dirname "${BASH_SOURCE[0]}")/lib/codex-workflow.mjs" "$PROJECT_ROOT" 2>/dev/null || true)"
+  fi
+  [ -n "$CODEX_LINE" ] || CODEX_LINE="[HARNESS] WARNING: step_archive/.harness50-codex/state.json exists but is unreadable or incomplete - Claude hooks will not create progress.json or block Stop here. Inspect it with the harness50 plugin's codex/scripts/harness-state.mjs show and ask the user before repairing or resetting it."
+  echo "[HARNESS] webapp trigger skipped: a Codex workflow owns this workspace, so step_archive/TOPIC/TOPIC.md and progress.json were left unchanged. Resume that workflow, or use a separate workspace for a different topic."
+  printf '%s\n' "$CODEX_LINE"
+  exit 0
+fi
+
 mkdir -p "$STEP_ARCHIVE" "$ARCHIVED_DIR" "$TOPIC_DIR"
 
 # copy step001~050 if missing

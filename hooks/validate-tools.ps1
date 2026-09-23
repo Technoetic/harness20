@@ -8,7 +8,22 @@ $ErrorActionPreference = "Continue"
 $projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { Get-Location }
 $stepArchive = Join-Path $projectRoot "step_archive"
 $outDir = Join-Path $stepArchive "research-scripts"
-if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir -Force | Out-Null }
+if (-not (Test-Path -LiteralPath $outDir)) { New-Item -ItemType Directory -Path $outDir -Force | Out-Null }
+
+# Step 3 locks the project's browser backend in step_archive/outputs/browser-backend.json.
+# Missing-tool hints then name only that backend (docs/BROWSER-TOOLS.md, "Backend lock (Step 3)").
+# The same node one-liner as validate-tools.sh prints the locked backend or nothing.
+# It reads the absolute lock path from argv, so neither the caller's directory nor wildcard
+# characters such as [ ] in the project path can make it miss the lock.
+$lockFile = "step_archive/outputs/browser-backend.json"
+function Get-LockedBrowserBackend {
+  $js = "try{const j=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));if(j&&j.schema_version===1&&(j.selected==='playwright'||j.selected==='aside'))process.stdout.write(j.selected)}catch(e){}"
+  try {
+    $lockPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath((Join-Path $projectRoot $lockFile))
+    $locked = ((& node -e $js $lockPath 2>$null) -join '').Trim()
+  } catch { $locked = '' }
+  return $locked
+}
 
 switch ($Tool.ToLower()) {
   'playwright' {
@@ -16,20 +31,30 @@ switch ($Tool.ToLower()) {
     # `npx playwright`, which would install the package from the registry when it is missing.
     $browserVerifier = Join-Path (Split-Path -Parent $PSScriptRoot) "browser-verifier"
     $js = "const p=require.resolve('playwright/package.json',{paths:process.argv.slice(1)});console.log(require(p).version+' ('+require('path').dirname(p)+')')"
-    Push-Location $projectRoot
+    Push-Location -LiteralPath $projectRoot
     $out = (& cmd /c "node -e ""$js"" ""$browserVerifier"" ""$projectRoot"" 2>&1") -join "`n"
     Pop-Location
-    if ($LASTEXITCODE -eq 0) { Write-Host "playwright: $out"; exit 0 } else { Write-Host "playwright: missing (cd browser-verifier && npm ci && npx playwright install chromium, or use the aside backend)"; exit 1 }
+    if ($LASTEXITCODE -eq 0) { Write-Host "playwright: $out"; exit 0 }
+    $locked = Get-LockedBrowserBackend
+    if ($locked -eq 'aside') { Write-Host "playwright: missing (not needed: this project is locked to the aside backend by $lockFile; keep it and do not install Playwright or Chromium)" }
+    elseif ($locked -eq 'playwright') { Write-Host "playwright: missing (cd browser-verifier && npm ci && npx playwright install chromium; this project is locked to the playwright backend by $lockFile)" }
+    else { Write-Host "playwright: missing (cd browser-verifier && npm ci && npx playwright install chromium, or use the aside backend)" }
+    exit 1
   }
   'aside' {
-    Push-Location $projectRoot
+    Push-Location -LiteralPath $projectRoot
     $out = (& cmd /c "aside --version 2>&1") -join "`n"
+    $asideExit = $LASTEXITCODE
     Pop-Location
     Write-Host "aside: $out"
-    if ($LASTEXITCODE -eq 0) { exit 0 } else { exit 1 }
+    if ($asideExit -eq 0) { exit 0 }
+    $locked = Get-LockedBrowserBackend
+    if ($locked -eq 'playwright') { Write-Host "aside: not needed: this project is locked to the playwright backend by $lockFile; keep it and do not install the Aside CLI" }
+    elseif ($locked -eq 'aside') { Write-Host "aside: this project is locked to the aside backend by $lockFile; start the Aside app and check aside --version in this shell; do not install Playwright or Chromium" }
+    exit 1
   }
   'axe' {
-    Push-Location $projectRoot
+    Push-Location -LiteralPath $projectRoot
     $out = (& cmd /c "node -e ""require.resolve('axe-core')"" 2>&1") -join "`n"
     $found = ($LASTEXITCODE -eq 0)
     $label = 'axe-core'
@@ -42,28 +67,28 @@ switch ($Tool.ToLower()) {
     if ($found) { Write-Host "axe-core: OK ($label)"; exit 0 } else { Write-Host "axe-core: FAIL $out"; exit 1 }
   }
   'biome' {
-    Push-Location $projectRoot
+    Push-Location -LiteralPath $projectRoot
     $out = (& cmd /c "npx biome --version 2>&1") -join "`n"
     Pop-Location
     Write-Host "biome: $out"
     if ($LASTEXITCODE -eq 0) { exit 0 } else { exit 1 }
   }
   'stylelint' {
-    Push-Location $projectRoot
+    Push-Location -LiteralPath $projectRoot
     $out = (& cmd /c "npx stylelint --version 2>&1") -join "`n"
     Pop-Location
     Write-Host "stylelint: $out"
     if ($LASTEXITCODE -eq 0) { exit 0 } else { exit 1 }
   }
   'c8' {
-    Push-Location $projectRoot
+    Push-Location -LiteralPath $projectRoot
     $out = (& cmd /c "npx c8 --version 2>&1") -join "`n"
     Pop-Location
     Write-Host "c8: $out"
     if ($LASTEXITCODE -eq 0) { exit 0 } else { exit 1 }
   }
   'jscpd' {
-    Push-Location $projectRoot
+    Push-Location -LiteralPath $projectRoot
     $out = (& cmd /c "npx jscpd --version 2>&1") -join "`n"
     Pop-Location
     Write-Host "jscpd: $out"

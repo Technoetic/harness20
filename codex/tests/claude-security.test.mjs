@@ -103,6 +103,44 @@ test('WebSearch and middle workflow project edits are eligible; WebFetch defers'
   assert.equal(run(root, 'auto-approve', { tool_name: 'WebFetch', tool_input: { url: 'https://example.com' } }).output, '');
   assert.equal(run(root, 'auto-approve', write('step_archive/progress.json')).output, '');
 });
+// 8.3 alias of an existing path's last component, or null when the volume creates no short names.
+function shortName(target) {
+  if (!windows) return null;
+  const result = spawnSync(`for %I in ("${target}") do @echo %~sI`, { shell: true, encoding: 'utf8', timeout: 15000 });
+  const alias = path.basename(result.stdout.trim());
+  return result.status === 0 && alias && alias.toLowerCase() !== path.basename(target).toLowerCase() ? alias : null;
+}
+test('Codex workflow state paths never receive write approval in an active Claude workflow', t => {
+  // A state.json there would silence the Claude Stop gates, just like a rewritten progress.json.
+  const root = fixture(t, { ...active, current_step: 40, completed_steps: Array.from({ length: 39 }, (_, i) => i + 1) });
+  assert.match(run(root, 'auto-approve', write('src/app.js')).output, /"allow"/);
+  const targets = ['step_archive/.harness50-codex/state.json', 'step_archive/.harness50-codex', 'step_archive/.harness50-codex/backups/reset-1/state.json',
+    'STEP_ARCHIVE/.Harness50-Codex/state.json', 'step_archive/.harness50-codex./state.json', 'step_archive/.harness50-codex/state.json::$DATA',
+    'STEP_ARCHIVE/PROGRESS.JSON', path.join(root, 'step_archive', '.harness50-codex', 'state.json')];
+  for (const target of targets) assert.equal(run(root, 'auto-approve', write(target)).output, '', target);
+  const codexDirectory = path.join(root, 'step_archive', '.harness50-codex');
+  fs.mkdirSync(codexDirectory);
+  for (const target of targets) assert.equal(run(root, 'auto-approve', write(target)).output, '', `${target} (existing directory)`);
+  for (const alias of [shortName(codexDirectory) && `step_archive/${shortName(codexDirectory)}/state.json`,
+    shortName(path.join(root, 'step_archive')) && `${shortName(path.join(root, 'step_archive'))}/.harness50-codex/state.json`]) {
+    if (alias) assert.equal(run(root, 'auto-approve', write(alias)).output, '', alias);
+  }
+  assert.match(run(root, 'auto-approve', write('step_archive/.harness50-codex-notes.md')).output, /"allow"/);
+});
+for (const [name, create] of Object.entries({
+  'running state': file => fs.writeFileSync(file, JSON.stringify({ schema_version: 1, workflow_id: 'wf', status: 'running', current_step: 30, completed_steps: Array.from({ length: 29 }, (_, i) => i + 1) })),
+  'empty object': file => fs.writeFileSync(file, '{}'),
+  'empty file': file => fs.writeFileSync(file, ''),
+  directory: file => fs.mkdirSync(file),
+})) {
+  test(`Codex state (${name}) turns autoapproval off next to an active progress.json`, t => {
+    const root = fixture(t);
+    fs.mkdirSync(path.join(root, 'step_archive', '.harness50-codex'));
+    create(path.join(root, 'step_archive', '.harness50-codex', 'state.json'));
+    assert.equal(run(root, 'auto-approve', write('src/app.js')).output, '');
+    assert.equal(run(root, 'auto-approve', { tool_name: 'WebSearch', tool_input: { query: 'css' } }).output, '');
+  });
+}
 test('dangling directory links cannot grant project write approval', t => {
   const root = fixture(t);
   const outside = fixture(t);

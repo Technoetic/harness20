@@ -44,6 +44,26 @@ function Write-ProgressAtomic($obj) {
     }
 }
 
+# Codex coexistence: step_archive/.harness50-codex/state.json means the Codex state manager
+# owns this workspace. Print one read-only context line (lib/codex-workflow.mjs) and leave
+# progress.json alone: no creation, migration or session count. Without that file the
+# legacy path below runs unchanged.
+$codexState = Join-Path (Join-Path $stepArchive ".harness50-codex") "state.json"
+if (Test-Path -LiteralPath $codexState) {
+    $codexLine = ""
+    if (Get-Command node -ErrorAction SilentlyContinue) {
+        # Capture into a variable (piping native output into Select-Object -First stops node in PS 5.1).
+        # The trailing "." keeps PS 5.1 from quoting a trailing backslash into the argument.
+        try {
+            $codexOut = @(& node (Join-Path $PSScriptRoot "lib/codex-workflow.mjs") (Join-Path $projectRoot ".") 2>$null)
+            if ($codexOut.Count -gt 0) { $codexLine = [string]$codexOut[0] }
+        } catch {}
+    }
+    if (-not $codexLine) { $codexLine = "[HARNESS] WARNING: step_archive/.harness50-codex/state.json exists but is unreadable or incomplete - Claude hooks will not create progress.json or block Stop here. Inspect it with the harness50 plugin's codex/scripts/harness-state.mjs show and ask the user before repairing or resetting it." }
+    Write-Host $codexLine
+    exit 0
+}
+
 Write-Host "=== Step Progress Loader ==="
 
 if (-not (Test-Path $progressFile)) {

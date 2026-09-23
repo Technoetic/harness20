@@ -8,6 +8,9 @@ try:
     event=json.loads(os.environ.get('RAW_STDIN') or '{}')
     root=os.environ.get('CLAUDE_PROJECT_DIR') or event.get('cwd') or os.getcwd()
     archive=os.path.join(root,'step_archive')
+    # Codex coexistence (mirrors step-auto-continue.ps1): the Codex state manager owns
+    # continuation when its state exists. Exit before any read or write.
+    if os.path.exists(os.path.join(archive,'.harness50-codex','state.json')): raise SystemExit(0)
     with open(os.path.join(archive,'progress.json'),encoding='utf-8-sig') as f: p=json.load(f)
     if p.get('paused') is True or p.get('status')=='paused': raise SystemExit(0)
     total=int(p['total_steps'])

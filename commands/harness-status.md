@@ -11,6 +11,10 @@ harness50: <completed>/50 완료 | current=stepNNN | r1=AA/50 r2=BB/50 r3=CC/50
 ```
 
 - progress.json 없으면: "harness50 비활성 — /webapp <주제> 로 시작"
+- 단, `step_archive/.harness50-codex/state.json`이 있으면 progress.json 대신 harness50 플러그인의
+  `node codex/scripts/harness-state.mjs show --workspace "<project-root>"` 결과(`status`, `current_step`,
+  완료 수)로 `harness50 (Codex): <status> | current=stepNNN | <completed>/50 완료`를 보고한다.
+  이 경우 progress.json 유무로 비활성이라고 판단하지 않는다.
 - Trust5 결과는 `step_archive/outputs/trust5_r{1,2,3}.md` 존재 시에만 표기
 
 추가 출력 금지. 1줄 보고만.

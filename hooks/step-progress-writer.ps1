@@ -35,6 +35,13 @@ try {
     Write-WriterLog "stdin parse FAILED: $_"
 }
 
+# Codex coexistence: the Codex state manager owns completion when its state exists.
+# Leave progress.json and its .bak untouched and never take the progress mutex.
+if (Test-Path -LiteralPath (Join-Path (Join-Path $stepArchive ".harness50-codex") "state.json")) {
+    Write-WriterLog "Codex workflow state present -> exit 0 (progress.json left unchanged)"
+    exit 0
+}
+
 if (-not (Test-Path $progressFile)) { exit 0 }
 
 # B-P2-1/6/7 fix: Mutex 락으로 progress.json 동시 쓰기 방지

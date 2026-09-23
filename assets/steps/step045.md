@@ -22,7 +22,7 @@ persistence: session
 
 E2E 시작 전 아래를 확인하고, 미비하면 사용자에게 묻지 않고 즉시 조치한다.
 
-1. 브라우저 검증 백엔드: 플러그인 체크아웃에서 `node scripts/verify-output.mjs --probe` — selected가 null이면 docs/BROWSER-TOOLS.md에 따라 백엔드를 준비한다 (최대 3회)
+1. 브라우저 검증 백엔드: 플러그인 체크아웃에서 `node scripts/verify-output.mjs --probe --workspace "<project-root>"` — Step 3이 `step_archive/outputs/browser-backend.json`에 고정한 백엔드가 있으면 selected는 그 백엔드뿐이다. selected가 null이면 출력의 error가 가리키는 그 백엔드만 docs/BROWSER-TOOLS.md에 따라 복구하고 (최대 3회) 다른 백엔드의 package나 browser binary를 설치하지 않는다. 잠금 파일이 없는 기존 프로젝트만 가용 백엔드를 준비한다
 2. 프로젝트가 선언한 E2E 러너(`npm run e2e`)와 그 설정 파일 존재 — 없으면 프로젝트 구조에 맞게 직접 생성한다. 러너 구현은 검사하지 않는다
 3. `dist/index.html` 존재 — 없으면 `npm.cmd run build`를 먼저 실행한다
 4. 별도 테스트 파일 매핑 단계가 없으므로, E2E 테스트 스펙은 이 단계에서 직접 작성한다
@@ -36,7 +36,7 @@ E2E 시작 전 아래를 확인하고, 미비하면 사용자에게 묻지 않�
 
 프로젝트 특성을 분석하여 테스트 범위와 검증 항목을 동적으로 결정한다.
 
-프로젝트가 선언한 E2E 러너(`npm run e2e`)를 사용하여 E2E 테스트를 수행한다. 브라우저 검증은 docs/BROWSER-TOOLS.md의 가용 백엔드(Aside CLI 또는 Playwright)로 수행한다.
+프로젝트가 선언한 E2E 러너(`npm run e2e`)를 사용하여 E2E 테스트를 수행한다. 브라우저 검증은 Step 3이 고정한 백엔드(`step_archive/outputs/browser-backend.json`, docs/BROWSER-TOOLS.md)로 수행하고, 잠금 파일이 없는 기존 프로젝트만 docs/BROWSER-TOOLS.md의 가용 백엔드(Aside CLI 또는 Playwright)를 쓴다. E2E 러너가 쓰는 브라우저도 고정 백엔드 범위 안에서 준비한다: Aside로 고정된 프로젝트의 러너는 Aside(`aside repl` 스크립트 등)로 브라우저를 구동하며 Playwright browser binary를 내려받지 않는다.
 
 단일 HTML 웹앱은 플러그인 `docs/ROUTING.md`의 모든 선언 경로를 검사한다. desktop과
 mobile에서 각 URL 직접 접속·새로고침, 실제 링크 이동, 뒤로/앞으로 가기와 알 수 없는

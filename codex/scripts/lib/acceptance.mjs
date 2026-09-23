@@ -555,6 +555,11 @@ function historicalReplayContract(contract, persistedEvidence) {
         : item
     )) };
   }
+  if (contract.number === 3 && !ids.has("browser-backend-lock")) {
+    // A Step 3 receipt written before the backend lock proves only the probe, smoke
+    // screenshot and report. Fresh completions still require the lock artifact.
+    return { ...contract, acceptance: contract.acceptance.filter(item => item.id !== "browser-backend-lock") };
+  }
   const finalVisualIds = ["final-desktop-screenshot", "final-mobile-screenshot", "final-visual-inspection"];
   if (contract.number === 50 && ![...finalVisualIds, ...runtimeReportIds(50)].some(id => ids.has(id))) {
     // These three declarations and visual_review were added together. A receipt

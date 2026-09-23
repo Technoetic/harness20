@@ -61,3 +61,15 @@ for (const [completed, current, round] of [[44, 45, 'r2'], [50, 50, 'r3'], [50, 
     assert.match(fs.readFileSync(path.join(f.project, `step_archive/outputs/trust5_${round}.md`), 'utf8'), /Verdict: INCOMPLETE/);
   });
 }
+test('quality hook leaves a Codex workspace to the Codex state manager despite a stale Claude milestone', t => {
+  const f = fixture(t, { ...active, current_step: 41, completed_steps: Array.from({ length: 40 }, (_, i) => i + 1) });
+  const state = path.join(f.project, 'step_archive/.harness50-codex/state.json');
+  fs.mkdirSync(path.dirname(state), { recursive: true });
+  fs.writeFileSync(state, '{"schema_version":1,"status":"running"}');
+  assert.equal(f.run(), '');
+  assert.equal(fs.existsSync(path.join(f.project, 'step_archive/outputs')), false);
+  // Only state.json hands the workspace back: after a Codex reset archives it, the milestone blocks again.
+  fs.rmSync(state);
+  assert.equal(JSON.parse(f.run()).decision, 'block');
+  assert.match(fs.readFileSync(path.join(f.project, 'step_archive/outputs/trust5_r1.md'), 'utf8'), /Verdict: INCOMPLETE/);
+});

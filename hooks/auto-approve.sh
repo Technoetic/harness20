@@ -126,6 +126,8 @@ except: pass' 2>/dev/null)"
       '/system32/|/windows/|/program files/'
       'harness50/hooks/(destructive-guard|auto-approve|permission-request-guard|step-auto-continue|hooks\.json)'
       'harness50/\.claude-plugin/plugin\.json$'
+      # Codex workflow state silences the Claude Stop gates; never auto-approve edits there.
+      '(^|/)step_archive/\.harness50-codex(/|$)'
     )
     for sp in "${SENSITIVE_PATH_PATTERNS[@]}"; do
       if printf '%s' "$FPATH_NORM" | grep -Eq "$sp"; then

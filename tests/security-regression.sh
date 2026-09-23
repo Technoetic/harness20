@@ -5,6 +5,7 @@
 #   - MUST_BLOCK: destructive-guard.sh가 exit 2로 차단해야 하는 위험 명령
 #   - MUST_DEFER: ordinary shell commands retain host permission checks.
 #   - GATE: progress.json 부재 시 auto-approve가 allow를 발급하지 않아야 함 (전역 자동승인 결함 방지)
+#   - CODEX STATE: .harness50-codex/ 편집과 Codex state.json 옆의 progress.json은 allow 미발급 (Stop 게이트 우회 방지)
 #
 # 사용: bash tests/security-regression.sh
 # 종료코드: 실패 0건이면 0, 하나라도 실패면 1.
@@ -91,6 +92,21 @@ for c in "${MUST_BLOCK[@]}"; do
   out="$(json_bash "$c" | bash "$AA" 2>/dev/null)"
   if printf '%s' "$out" | grep -q '"permissionDecision":"allow"'; then fail "위험 명령에 allow 발급됨: $c"; else ok; fi
 done
+
+json_write() { printf '{"tool_name":"Write","tool_input":{"file_path":"%s","content":"x"}}' "$1"; }
+
+echo "== CODEX STATE: Codex 상태 경로 편집 allow 미발급 + state.json 존재 시 auto-approve 미발화 =="
+out="$(json_write 'src/app.js' | bash "$AA" 2>/dev/null)"
+if printf '%s' "$out" | grep -q '"permissionDecision":"allow"'; then ok; else fail "기준선: 활성 워크플로의 일반 편집이 승인되지 않음"; fi
+for p in 'step_archive/.harness50-codex/state.json' 'step_archive/.harness50-codex/backups/reset-1/state.json' 'STEP_ARCHIVE/.Harness50-Codex/state.json' 'step_archive/progress.json'; do
+  out="$(json_write "$p" | bash "$AA" 2>/dev/null)"
+  if printf '%s' "$out" | grep -q '"permissionDecision":"allow"'; then fail "Stop 게이트를 끄는 상태 파일 편집에 allow 발급됨: $p"; else ok; fi
+done
+mkdir -p "$TMP/step_archive/.harness50-codex"
+echo '{}' > "$TMP/step_archive/.harness50-codex/state.json"
+out="$(json_write 'src/app.js' | bash "$AA" 2>/dev/null)"
+if printf '%s' "$out" | grep -q '"permissionDecision":"allow"'; then fail "Codex state.json 옆의 오래된 progress.json이 자동승인을 유지함"; else ok; fi
+rm -rf "$TMP/step_archive/.harness50-codex"
 
 echo "== GATE: progress.json 부재 시 auto-approve 미발화 =="
 rm -f "$TMP/step_archive/progress.json"

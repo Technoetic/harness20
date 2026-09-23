@@ -12,6 +12,14 @@ argument-hint: <주제 한 줄>
 요청하지 않은 경우 즉시 실행 절차에 들어가거나 TOPIC·progress를 만들지 않는다.
 웹앱 시작·재개 등 실제 제어 요청이 있을 때만 다음 절차를 수행한다.
 
+**Codex 작업 공간 분기:** `step_archive/.harness50-codex/state.json`이 있으면 Codex 상태
+관리자가 이 작업 공간을 소유한다. 아래 절차를 수행하지 않는다. TOPIC.md·progress.json을
+만들거나 덮어쓰지 않고, step001로 돌아가지도 않는다. SessionStart나 webapp-trigger가 알린
+Codex 단계부터 harness50 플러그인의 `codex/scripts/harness-state.mjs`(`show` → `resume` →
+`begin` → `complete`)와 `codex/skills/webapp/SKILL.md` 절차로 이어간다. 다른 주제는 별도
+작업 공간에서 시작한다. 상태 파일을 읽을 수 없으면 `show` 결과만 보고하고, 복구나 리셋은
+사용자가 결정한다.
+
 ## 즉시 실행 절차 (사용자 확인 없이)
 
 1. **harness-rules skill 로드** — 본 세션의 절대 헌법.

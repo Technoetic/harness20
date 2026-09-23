@@ -10,6 +10,15 @@ TOOL="${1:-}"
 PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
 cd "$PROJECT_ROOT" || exit 1
 
+# Step 3 locks the project's browser backend in step_archive/outputs/browser-backend.json.
+# Missing-tool hints then name only that backend (docs/BROWSER-TOOLS.md, "Backend lock (Step 3)").
+# The same node one-liner as validate-tools.ps1 prints the locked backend or nothing.
+# It reads the lock path from argv like the PowerShell hook; the cd above makes it project-relative.
+LOCK_FILE="step_archive/outputs/browser-backend.json"
+locked_backend() {
+  node -e "try{const j=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));if(j&&j.schema_version===1&&(j.selected==='playwright'||j.selected==='aside'))process.stdout.write(j.selected)}catch(e){}" "$LOCK_FILE" 2>/dev/null
+}
+
 case "$TOOL" in
   playwright)
     # Resolve the installed package (plugin browser-verifier/ first, then the project) instead of
@@ -18,10 +27,25 @@ case "$TOOL" in
     if node -e "const p=require.resolve('playwright/package.json',{paths:process.argv.slice(1)});console.log('playwright: '+require(p).version+' ('+require('path').dirname(p)+')')" "$BROWSER_VERIFIER" "$PROJECT_ROOT" 2>/dev/null; then
       exit 0
     else
-      echo "playwright: missing (cd browser-verifier && npm ci && npx playwright install chromium, or use the aside backend)"; exit 1
+      case "$(locked_backend)" in
+        aside) echo "playwright: missing (not needed: this project is locked to the aside backend by $LOCK_FILE; keep it and do not install Playwright or Chromium)" ;;
+        playwright) echo "playwright: missing (cd browser-verifier && npm ci && npx playwright install chromium; this project is locked to the playwright backend by $LOCK_FILE)" ;;
+        *) echo "playwright: missing (cd browser-verifier && npm ci && npx playwright install chromium, or use the aside backend)" ;;
+      esac
+      exit 1
     fi
     ;;
-  aside) aside --version ;;
+  aside)
+    aside --version
+    status=$?
+    if [ "$status" -ne 0 ]; then
+      case "$(locked_backend)" in
+        playwright) echo "aside: not needed: this project is locked to the playwright backend by $LOCK_FILE; keep it and do not install the Aside CLI" ;;
+        aside) echo "aside: this project is locked to the aside backend by $LOCK_FILE; start the Aside app and check aside --version in this shell; do not install Playwright or Chromium" ;;
+      esac
+    fi
+    exit "$status"
+    ;;
   axe)
     if node -e 'require.resolve("axe-core")' >/dev/null 2>&1; then
       echo "axe-core: OK"

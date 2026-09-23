@@ -19,6 +19,12 @@ LOCK_FILE="$STEP_ARCHIVE/.writer.lock"
 log() { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >>"$LOG_FILE" 2>/dev/null || true; }
 log "invoked"
 
+# Codex coexistence (mirrors step-progress-writer.ps1): the Codex state manager owns completion.
+# Leave progress.json untouched and never create the lock file.
+if [ -e "$STEP_ARCHIVE/.harness50-codex/state.json" ]; then
+  log "Codex workflow state present -> exit 0 (progress.json left unchanged)"
+  exit 0
+fi
 [ -f "$PROGRESS_FILE" ] || exit 0
 command -v python3 >/dev/null 2>&1 || { log "python3 missing"; exit 0; }
 

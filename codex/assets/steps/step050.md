@@ -79,6 +79,10 @@ finding이 하나라도 미해결이면 차단한다. 필수 입력, 필수 증�
 
 플러그인의 `docs/QUALITY.md`에 따라 실제 품질 검사와 브라우저 검사를 실행한다.
 브라우저 의존성은 안내서대로 별도 검증 체크아웃에 준비하며 훅에서 설치하지 않는다.
+`--backend` 없이 실행한 브라우저 검사는 3단계가 `step_archive/outputs/browser-backend.json`에
+고정한 backend를 사용한다. 고정 backend를 사용할 수 없다는 오류가 나면 그 backend만 복구하고
+다른 backend의 package나 browser binary를 설치하지 않는다. 잠금 파일이 없는 기존 작업공간은
+3단계 보고서의 selected backend를 `--backend`로 명시한다.
 
 ```text
 node "<plugin-root>/scripts/quality-gate.mjs" --workspace "<project-root>"

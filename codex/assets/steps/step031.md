@@ -43,6 +43,10 @@ manager의 명령을 제안하고 정상 권한 확인을 거쳐 실행한다. �
 시도하며, 매 시도 뒤 실제 resolve, version, 최소 smoke 결과와 exit code를 확인한다.
 세 번 안에 모두 검증되지 않거나 lockfile이 예상 밖으로 바뀌면 이 단계를 실패로 차단한다.
 
+브라우저 검증 backend는 프로젝트 의존성이 아니다. 3단계가 `step_archive/outputs/browser-backend.json`에
+고정한 backend를 그대로 유지하고 다른 backend의 package나 browser binary를 설치하지 않는다.
+잠금 파일이 없는 기존 작업공간은 3단계 보고서의 selected backend를 유지한다.
+
 `step_archive/step031_환경준비.md`에는 선택 설계 digest, 발견한 manifest와 lockfile,
 필수 의존성 근거, 실행한 정확한 명령과 exit code, resolve 경로, version, smoke 결과,
 변경된 선언 파일을 기록한다. 환경 변수 원문이나 credential은 기록하지 않는다.

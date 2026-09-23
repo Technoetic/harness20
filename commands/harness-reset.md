@@ -4,7 +4,12 @@ description: harness50 진행 상태 리셋 — progress.json을 current_step=1,
 
 # /harness-reset
 
-`step_archive/progress.json`을 다음 형식으로 덮어쓴다:
+먼저 `step_archive/.harness50-codex/state.json`이 있는지 확인한다. 있으면 이 작업 공간은
+Codex 상태 관리자가 소유하므로 progress.json을 만들거나 덮어쓰지 않고, 다음 1줄만 보고하고
+종료한다: `harness50: Codex workflow 작업 공간 — Claude progress는 리셋하지 않음. Codex workflow
+리셋은 Codex의 $harness50-reset으로 사용자가 직접 실행`.
+
+그 외에는 `step_archive/progress.json`을 다음 형식으로 덮어쓴다:
 
 ```json
 {

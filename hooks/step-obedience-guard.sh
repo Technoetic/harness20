@@ -12,6 +12,9 @@ PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-${EVENT_CWD:-$PWD}}"
 
 PROGRESS_FILE="$PROJECT_ROOT/step_archive/progress.json"
 ARCHIVED_DIR="$PROJECT_ROOT/step_archive/archived"
+# Codex coexistence (mirrors step-obedience-guard.ps1): no Claude step reminder while the
+# Codex state manager owns this workspace.
+if [ -e "$PROJECT_ROOT/step_archive/.harness50-codex/state.json" ]; then exit 0; fi
 [ -f "$PROGRESS_FILE" ] || exit 0
 
 # parse progress without jq dependency

@@ -30,7 +30,7 @@ disable-model-invocation: false
 
 ### 1단계: 구현물 스크린샷 촬영
 
-사용 가능한 브라우저 백엔드(Playwright 또는 Aside CLI — `docs/BROWSER-TOOLS.md`의 절차표 참조)로 현재 구현 상태를 3가지 뷰포트(desktop 1920x1080, tablet 768x1024, mobile 390x844)로 캡처한다. Aside에서는 고정 탭 뷰포트 대신 해당 크기의 iframe 호스트 페이지와 `clip` 스크린샷을 쓴다.
+Step 3이 `step_archive/outputs/browser-backend.json`에 고정한 브라우저 백엔드(잠금 파일이 없으면 사용 가능한 백엔드: Playwright 또는 Aside CLI — `docs/BROWSER-TOOLS.md`의 절차표 참조)로 현재 구현 상태를 3가지 뷰포트(desktop 1920x1080, tablet 768x1024, mobile 390x844)로 캡처한다. Aside에서는 고정 탭 뷰포트 대신 해당 크기의 iframe 호스트 페이지와 `clip` 스크린샷을 쓴다.
 
 저장 경로: step_archive/screenshots/eval-rN-{viewport}.png
 
