@@ -13,9 +13,10 @@ cd "$PROJECT_ROOT" || exit 1
 # Step 3 locks the project's browser backend in step_archive/outputs/browser-backend.json.
 # Missing-tool hints then name only that backend (docs/BROWSER-TOOLS.md, "Backend lock (Step 3)").
 # The same node one-liner as validate-tools.ps1 prints the locked backend or nothing.
+# It reads the lock path from argv like the PowerShell hook; the cd above makes it project-relative.
 LOCK_FILE="step_archive/outputs/browser-backend.json"
 locked_backend() {
-  node -e "try{const j=JSON.parse(require('fs').readFileSync('step_archive/outputs/browser-backend.json','utf8'));if(j&&j.schema_version===1&&(j.selected==='playwright'||j.selected==='aside'))process.stdout.write(j.selected)}catch(e){}" 2>/dev/null
+  node -e "try{const j=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));if(j&&j.schema_version===1&&(j.selected==='playwright'||j.selected==='aside'))process.stdout.write(j.selected)}catch(e){}" "$LOCK_FILE" 2>/dev/null
 }
 
 case "$TOOL" in

@@ -49,7 +49,30 @@ function sensitive(candidate) {
     /^\/(etc|var|boot)\//.test(p) || /\/(system32|windows|program files)\//.test(p) ||
     /\/\.config\/gcloud\//.test(p) || /\/\.docker\/config\.json$/.test(p);
 }
+// canonical() keeps each component as typed. Resolve case and 8.3 aliases of the existing
+// prefix too, so a differently spelled path cannot reach the workflow state below.
+function spelled(candidate) {
+  try { return fs.realpathSync.native(candidate); } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    const parent = path.dirname(candidate);
+    if (parent === candidate) throw error;
+    return path.join(spelled(parent), path.basename(candidate));
+  }
+}
+// Claude progress.json and everything under step_archive/.harness50-codex/ steer the Stop gates.
+// A Codex state.json there silences them, so edits to either never receive hook approval.
+function workflowState(candidate, root) {
+  const relative = path.relative(spelled(root), spelled(candidate)).replaceAll('\\', '/').toLowerCase();
+  return /^step_archive(?::[^/]*)?\/(?:progress\.json(?::[^/]*)?$|\.harness50-codex(?::[^/]*)?(?:\/|$))/.test(relative);
+}
+// Any entry at the Codex state path, even a directory or link, means the Codex state manager owns
+// the workspace. The Claude step hooks stand down there, and so does auto-approval, even next to a
+// stale or imported progress.json.
+function codexWorkspace(root) {
+  return fs.lstatSync(path.join(root, 'step_archive', '.harness50-codex', 'state.json'), { throwIfNoEntry: false }) !== undefined;
+}
 function active(root) {
+  if (codexWorkspace(root)) return false;
   const file = path.join(root, 'step_archive/progress.json');
   if (!within(physical(file), root) || !fs.statSync(file).isFile()) return false;
   const state = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
@@ -73,7 +96,7 @@ try {
     else if (edits.includes(event.tool_name)) {
       const candidate = canonical(event.tool_input?.file_path || event.tool_input?.notebook_path, root);
       if (within(candidate, root) && !sensitive(candidate) && singlyLinked(candidate) && candidate !== root &&
-          candidate !== path.join(root, 'step_archive/progress.json')) process.stdout.write('eligible');
+          !workflowState(candidate, root)) process.stdout.write('eligible');
     }
   } else if (mode === 'guard' && edits.includes(event.tool_name)) {
     const candidate = canonical(event.tool_input?.file_path || event.tool_input?.notebook_path, root);

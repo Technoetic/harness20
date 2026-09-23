@@ -5,6 +5,7 @@
 #   - MUST_BLOCK: destructive-guard.ps1이 exit 2로 차단 + auto-approve.ps1이 allow 미발급
 #   - MUST_DEFER: ordinary shell commands retain host permission checks.
 #   - GATE: progress.json 부재 시 auto-approve가 allow 미발급 (전역 자동승인 결함 방지)
+#   - CODEX STATE: .harness50-codex/ 편집과 Codex state.json 옆의 progress.json은 allow 미발급 (Stop 게이트 우회 방지)
 #
 # 사용: powershell -NoProfile -ExecutionPolicy Bypass -File tests/security-regression.ps1
 # 종료코드: 실패 0건이면 0, 하나라도 실패면 1.
@@ -79,6 +80,26 @@ foreach ($c in $MUST_BLOCK) {
   $r = Invoke-Hook $AA $c
   if ($r.out -match '"permissionDecision":"allow"') { Fail "위험 명령에 allow 발급됨: $c" } else { Ok }
 }
+
+function Invoke-WriteHook($hook, $path) {
+  $payload = (@{ tool_name = "Write"; tool_input = @{ file_path = $path; content = "x" } } | ConvertTo-Json -Compress)
+  $out = $payload | powershell.exe -NoProfile -ExecutionPolicy Bypass -File $hook 2>$null
+  return [pscustomobject]@{ rc = $LASTEXITCODE; out = ($out -join "`n") }
+}
+
+Write-Host "== CODEX STATE: Codex 상태 경로 편집 allow 미발급 + state.json 존재 시 auto-approve 미발화 =="
+$r = Invoke-WriteHook $AA 'src/app.js'
+if ($r.out -match '"permissionDecision":"allow"') { Ok } else { Fail "기준선: 활성 워크플로의 일반 편집이 승인되지 않음" }
+foreach ($p in @('step_archive/.harness50-codex/state.json', 'step_archive/.harness50-codex/backups/reset-1/state.json', 'STEP_ARCHIVE/.Harness50-Codex/state.json', 'step_archive/progress.json')) {
+  $r = Invoke-WriteHook $AA $p
+  if ($r.out -match '"permissionDecision":"allow"') { Fail "Stop 게이트를 끄는 상태 파일 편집에 allow 발급됨: $p" } else { Ok }
+}
+$codexDir = Join-Path $tmp "step_archive/.harness50-codex"
+New-Item -ItemType Directory -Path $codexDir -Force | Out-Null
+'{}' | Out-File -FilePath (Join-Path $codexDir "state.json") -Encoding UTF8
+$r = Invoke-WriteHook $AA 'src/app.js'
+if ($r.out -match '"permissionDecision":"allow"') { Fail "Codex state.json 옆의 오래된 progress.json이 자동승인을 유지함" } else { Ok }
+Remove-Item -LiteralPath $codexDir -Recurse -Force
 
 Write-Host "== GATE: progress.json 부재 시 auto-approve 미발화 =="
 Remove-Item (Join-Path $tmp "step_archive/progress.json") -Force

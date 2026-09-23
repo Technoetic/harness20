@@ -100,7 +100,9 @@ $sensitivePathPatternsNorm = @(
   '/windows/',
   '/program files/',
   'harness50/hooks/(destructive-guard|auto-approve|permission-request-guard|step-auto-continue|hooks\.json)',
-  'harness50/\.claude-plugin/plugin\.json$'
+  'harness50/\.claude-plugin/plugin\.json$',
+  # Codex workflow state silences the Claude Stop gates; never auto-approve edits there.
+  '(^|/)step_archive/\.harness50-codex(/|$)'
 )
 
 function Test-SensitivePath([string]$p) {

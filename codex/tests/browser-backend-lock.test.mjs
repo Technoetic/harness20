@@ -372,18 +372,24 @@ test("validate-tools hooks carry identical lock reads and hint texts", async () 
   assert.deepEqual(hints(sh, "$LOCK_FILE"), [true, true, true, true, true]);
 });
 
+// The project name carries spaces, Hangul and PowerShell wildcard brackets, and the hook runs from
+// another directory with CLAUDE_PROJECT_DIR set, as `powershell -File hooks/validate-tools.ps1` does.
 async function hookFixture(lock) {
   const base = await makeWorkspace();
   const plugin = join(base, "plugin");
-  const project = join(base, "project");
+  const project = join(base, "sp 작업 [30]");
+  const elsewhere = join(base, "elsewhere");
   await mkdir(join(plugin, "hooks"), { recursive: true });
   await mkdir(join(plugin, "browser-verifier"));
   await mkdir(project);
+  await mkdir(elsewhere);
   for (const name of ["validate-tools.ps1", "validate-tools.sh"]) {
     await copyFile(join(repoRoot, "hooks", name), join(plugin, "hooks", name));
   }
   if (lock) await writeLock(project, lock);
-  return { plugin, project };
+  // A decoy lock in the caller's directory must never be read instead of the project's.
+  await writeLock(elsewhere, validLock(lock?.selected === "aside" ? "playwright" : "aside"));
+  return { plugin, project, elsewhere };
 }
 
 async function runHook(fixture, tool) {
@@ -392,10 +398,10 @@ async function runHook(fixture, tool) {
     const system32 = join(process.env.SystemRoot ?? "C:\\Windows", "System32");
     return run(join(system32, "WindowsPowerShell", "v1.0", "powershell.exe"),
       ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", join(fixture.plugin, "hooks", "validate-tools.ps1"), "-Tool", tool],
-      { cwd: fixture.project, env: { ...envWithPath(nodeDirectory, system32), CLAUDE_PROJECT_DIR: fixture.project } });
+      { cwd: fixture.elsewhere, env: { ...envWithPath(nodeDirectory, system32), CLAUDE_PROJECT_DIR: fixture.project } });
   }
   return run("bash", [join(fixture.plugin, "hooks", "validate-tools.sh"), tool],
-    { cwd: fixture.project, env: { ...envWithPath(nodeDirectory, "/usr/bin", "/bin"), CLAUDE_PROJECT_DIR: fixture.project } });
+    { cwd: fixture.elsewhere, env: { ...envWithPath(nodeDirectory, "/usr/bin", "/bin"), CLAUDE_PROJECT_DIR: fixture.project } });
 }
 
 const lines = (output) => output.replace(/\r\n/g, "\n").trim().split("\n").map((line) => line.trimEnd());
@@ -407,14 +413,17 @@ test("validate-tools playwright hints follow the Step 3 lock", async (t) => {
     return;
   }
   assert.equal(baseline.code, 1, baseline.stderr);
+  assert.equal(baseline.stderr, "");
   assert.deepEqual(lines(baseline.stdout), [HOOK_LINES.playwrightDefault]);
 
   const lockedAside = await runHook(await hookFixture(validLock("aside")), "playwright");
   assert.equal(lockedAside.code, 1, lockedAside.stderr);
+  assert.equal(lockedAside.stderr, "");
   assert.deepEqual(lines(lockedAside.stdout), [HOOK_LINES.playwrightLockedAside]);
 
   const lockedPlaywright = await runHook(await hookFixture(validLock("playwright")), "playwright");
   assert.equal(lockedPlaywright.code, 1, lockedPlaywright.stderr);
+  assert.equal(lockedPlaywright.stderr, "");
   assert.deepEqual(lines(lockedPlaywright.stdout), [HOOK_LINES.playwrightLockedPlaywright]);
 
   const invalid = await runHook(await hookFixture({ ...validLock("aside"), schema_version: 2 }), "playwright");

@@ -95,7 +95,7 @@ The published repository includes both Claude Code and Codex adapters. 어느 �
 가져오기나 영수증 복구 결과가 이미 `completed`라면 이 구분을 유지해 결과를 보고하며,
 완료된 작업에 다시 `resume`을 호출하지 않습니다.
 
-Claude Code hooks defer to an existing Codex workflow. While `step_archive/.harness50-codex/state.json` exists, they never create, rewrite or advance Claude `progress.json`, never block Stop and never re-initialize TOPIC; SessionStart reports the Codex step in one line instead.
+Claude Code hooks defer to an existing Codex workflow. While `step_archive/.harness50-codex/state.json` exists, they never create, rewrite or advance Claude `progress.json`, never block Stop, never auto-approve Claude edits and never re-initialize TOPIC; SessionStart reports the Codex step in one line instead.
 같은 작업 공간을 Claude Code에서 열어도 진행 기준은 Codex 상태 관리자입니다. 이어서 진행하려면 `codex/skills/webapp/SKILL.md`의 상태 관리자 절차(`show`·`resume`·`begin`·`complete`)를 따르며, 대화 속 완료 보고는 단계를 진행시키지 않습니다. 리셋 뒤 `state.json`이 백업으로 옮겨지면 Claude 훅은 기존 동작으로 돌아갑니다.
 
 ## Hook trust gate / 후크 신뢰 게이트

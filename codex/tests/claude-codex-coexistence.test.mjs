@@ -87,12 +87,15 @@ function writeCodexState(project, value) {
   writeFileSync(join(directory, 'state.json'), typeof value === 'string' ? value : `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function invoke(plugin, variant, name, event, cwd) {
+// stripCR: Git Bash emulation only. Windows python ends lines with CRLF; auto-approve.sh compares
+// the parsed tool name exactly, so its emulation drops the CR like claude-security.test.mjs does.
+function invoke(plugin, variant, name, event, cwd, { stripCR = false } = {}) {
   const path = join(plugin, 'hooks', `${name}.${variant}`);
+  const python = stripCR ? 'python3(){ python "$@" | tr -d "\\r"; }' : 'python3(){ python "$@"; }';
   const [command, args] = variant === 'ps1'
     ? ['powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path]]
     : windows
-      ? [gitBash, ['-c', 'uname(){ echo Linux; }; python3(){ python "$@"; }; export -f uname python3; bash "$1"', 'fixture', path.replaceAll('\\', '/')]]
+      ? [gitBash, ['-c', `uname(){ echo Linux; }; ${python}; export -f uname python3; bash "$1"`, 'fixture', path.replaceAll('\\', '/')]]
       : ['bash', [path]];
   const result = spawnSync(command, args, {
     cwd,
@@ -124,7 +127,7 @@ function fixture(t, { name = 'Codex 작업 [30]' } = {}) {
     project,
     archive,
     progressFile,
-    run: (hook, event = {}, variant = defaultVariant) => invoke(plugin, variant, hook, { cwd: project, ...event }, other),
+    run: (hook, event = {}, variant = defaultVariant, options) => invoke(plugin, variant, hook, { cwd: project, ...event }, other, options),
     codex: value => writeCodexState(project, value),
     topic: () => {
       mkdirSync(join(archive, 'TOPIC'), { recursive: true });
@@ -377,28 +380,92 @@ test('without state.json (fresh or after a Codex reset) the Claude step hooks be
   writeFileSync(join(backups, 'state.json'), JSON.stringify(codexState()));
   writeFileSync(join(reset.archive, '.harness50-codex', 'import-error.json'), '{}');
 
-  const normalized = progress => ({
-    ...progress,
-    last_updated: '',
-    session_history: [].concat(progress.session_history ?? []).map(({ started_at: _s, ended_at: _e, ...rest }) => rest)
-  });
+  // The legacy PowerShell loader and writer take the machine-wide Global\step-progress-writer-mutex,
+  // which parallel test files share, and silently skip their write when WaitOne(5000) fails (the
+  // .sh writer does the same on a flock timeout). Compare only the workflow position, never the
+  // loader's session bookkeeping or migrated fields, which a skipped write leaves behind.
+  const readProgress = f => JSON.parse(readFileSync(f.progressFile, 'utf8').replace(/^\uFEFF/, ''));
+  const position = ({ total_steps, current_step, completed_steps, failed_steps }) => ({ total_steps, current_step, completed_steps, failed_steps });
+  // The writer's completion scan is idempotent, so rerun it (bounded, with a short pause) until the
+  // report lands. A writer that never advances still fails the assertions below.
+  const completeStepOne = f => {
+    let output;
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      output = f.run('step-progress-writer', { last_assistant_message: 'Step 001/3 완료' });
+      if (readProgress(f).completed_steps?.includes(1)) break;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500 * attempt);
+    }
+    return output;
+  };
   const observe = f => ({
     loader: f.run('step-progress-loader'),
     stop: f.run('step-auto-continue', { session_id: 'legacy' }),
-    writer: f.run('step-progress-writer', { last_assistant_message: 'Step 001/3 완료' }),
+    writer: completeStepOne(f),
     stopAfter: f.run('step-auto-continue', { session_id: 'legacy' }),
     // Git Bash emulation only: Windows python ends lines with CRLF, which the untouched legacy
     // printf in step-obedience-guard.sh rejects. Real POSIX hosts and PowerShell run it.
     guard: bashOnWindows ? null : f.run('step-obedience-guard', { prompt: 'continue' }),
-    progress: normalized(JSON.parse(readFileSync(f.progressFile, 'utf8')))
+    progress: position(readProgress(f))
   });
-  const [expected, actual] = [observe(plain), observe(reset)];
-  assert.deepEqual(actual, expected);
-  assert.match(expected.loader, /Current step: step001/);
-  assert.equal(JSON.parse(expected.stop).decision, 'block');
-  assert.match(JSON.parse(expected.stopAfter).reason, /step002/);
-  assert.deepEqual(expected.progress.completed_steps, [1]);
-  if (!bashOnWindows) assert.match(expected.guard, /step002/);
+  const [legacy, afterReset] = [observe(plain), observe(reset)];
+  for (const [name, observed] of Object.entries({ legacy, afterReset })) {
+    assert.match(observed.loader, /Current step: step001/, name);
+    assert.doesNotMatch(observed.loader, /Codex workflow|\.harness50-codex/, name);
+    assert.equal(JSON.parse(observed.stop).decision, 'block', name);
+    assert.match(JSON.parse(observed.stop).reason, /step001/, name);
+    assert.equal(JSON.parse(observed.stopAfter).decision, 'block', name);
+    assert.match(JSON.parse(observed.stopAfter).reason, /step002/, name);
+    if (!bashOnWindows) assert.match(observed.guard, /step002/, name);
+    assert.deepEqual(observed.progress, { total_steps: 3, current_step: 2, completed_steps: [1], failed_steps: [] }, name);
+  }
+  // Hook output does not depend on whether a contended write landed, so both fixtures match exactly.
+  assert.deepEqual(afterReset, legacy);
+});
+
+// Loader-created progress.json in the incident workspace: Claude step 1 of 50, nothing completed.
+const STALE_LOADER_PROGRESS = {
+  last_updated: '2026-09-23T00:00:00', current_step: 1, total_steps: 50, completed_steps: [], failed_steps: [],
+  skipped_steps: [], session_history: [], metrics: { total_sessions: 1, total_duration_minutes: 0, steps_per_session_avg: 0 }
+};
+
+test('Codex state turns Claude auto-approval off, even next to a stale progress.json', t => {
+  // No brackets here: auto-approve.ps1 checks progress.json with a wildcard Test-Path, so a
+  // bracketed project would never reach the approval baseline this test needs.
+  const f = fixture(t, { name: 'Codex 작업 approvals' });
+  mkdirSync(f.archive, { recursive: true });
+  writeFileSync(f.progressFile, JSON.stringify(STALE_LOADER_PROGRESS));
+  const variants = [defaultVariant];
+  if (windows && !bashOnWindows && existsSync(gitBash) && pythonAvailable()) variants.push('sh');
+  const approve = (event, variant) => f.run('auto-approve', event, variant, { stripCR: true });
+  const edit = { tool_name: 'Write', tool_input: { file_path: join(f.project, 'src', 'app.js'), content: 'x' } };
+  const search = { tool_name: 'WebSearch', tool_input: { query: 'css' } };
+  const allow = /"permissionDecision":"allow"/;
+
+  // Baseline: on its own the stale file still reads as an active Claude workflow.
+  for (const variant of variants) {
+    assert.match(approve(edit, variant), allow, variant);
+    assert.equal(approve({ ...edit, tool_input: { ...edit.tool_input, file_path: CODEX_STATE_RELATIVE } }, variant), '', variant);
+  }
+  const cases = {
+    'running state': () => f.codex(codexState()),
+    'broken state': () => f.codex('{broken'),
+    'directory named state.json': () => mkdirSync(join(f.archive, ...CODEX_STATE_RELATIVE.split('/').slice(1)), { recursive: true })
+  };
+  for (const [name, create] of Object.entries(cases)) {
+    rmSync(join(f.archive, '.harness50-codex'), { recursive: true, force: true });
+    create();
+    const before = f.snapshot();
+    for (const variant of variants) {
+      assert.equal(approve(edit, variant), '', `${name} (${variant})`);
+      assert.equal(approve(search, variant), '', `${name} (${variant})`);
+    }
+    assert.deepEqual(f.snapshot(), before, name);
+  }
+  // A Codex reset moves state.json into backups/: the previous behaviour returns.
+  rmSync(join(f.archive, '.harness50-codex'), { recursive: true, force: true });
+  mkdirSync(join(f.archive, '.harness50-codex', 'backups', 'reset-1'), { recursive: true });
+  writeFileSync(join(f.archive, '.harness50-codex', 'backups', 'reset-1', 'state.json'), JSON.stringify(codexState()));
+  for (const variant of variants) assert.match(approve(edit, variant), allow, `after reset (${variant})`);
 });
 
 test('hooks without node fall back to the probe warning text verbatim', () => {
