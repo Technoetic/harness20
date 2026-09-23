@@ -317,7 +317,7 @@ test("index records SHA-256 digests of the unmodified Claude source bytes", asyn
   assert.deepEqual(hashes, {
     step001: "2aee375edd23d80a0e1f87d5276d4be59435abfb2f02d16598e47ebb2b93eec5",
     step002: "3138e7a161fe488b3c1777da7e72820d1c5d3faa992380f1cbd73a74103b3e89",
-    step003: "51c62866e875fe23c47617901bc18ad0c7887183a9b4d058a5392d08fd130af5",
+    step003: "971e337ad3eba825d3260949ae19b8d9ddfcae37e9ebc7ea7dd8ea377e03a500",
     step004: "5d40b076c3d1cae5e13a64ad16488f73d46c7beae6e2756b9a091544bbd4db1e",
     step005: "902d5a5ce9f8eaff9121b54ececc9206955c50326b7c86ad26965f9bd9d0339b"
   });
@@ -434,11 +434,12 @@ test("preflight batch declares the exact Codex-native step contracts", async () 
       phase: "preflight",
       source: "assets/steps/step003.md",
       target: "codex/assets/steps/step003.md",
-      source_sha256: "51c62866e875fe23c47617901bc18ad0c7887183a9b4d058a5392d08fd130af5",
+      source_sha256: "971e337ad3eba825d3260949ae19b8d9ddfcae37e9ebc7ea7dd8ea377e03a500",
       inputs: ["step_archive/step001_preflight.md"],
       outputs: [
         "step_archive/step003_playwright_test.md",
-        "step_archive/screenshots/step003_playwright_smoke.png"
+        "step_archive/screenshots/step003_playwright_smoke.png",
+        "step_archive/outputs/browser-backend.json"
       ],
       requires: ["step001"],
       optional_requires: [],
@@ -451,6 +452,13 @@ test("preflight batch declares the exact Codex-native step contracts", async () 
           required: true,
           description: "Probes the validation checkout for an available browser backend (Playwright or Aside CLI) and succeeds only when one is selected.",
           command: "node scripts/verify-output.mjs --probe"
+        },
+        {
+          id: "browser-backend-lock",
+          kind: "artifact",
+          required: true,
+          description: "Stores the Step 3 browser backend lock (schema_version, selected, tool_version, probed_at) written by the probe with --lock.",
+          path: "step_archive/outputs/browser-backend.json"
         },
         {
           id: "browser-smoke-screenshot",
@@ -2593,7 +2601,7 @@ function assertStep35RoleContract(content) {
 }
 
 const EXPECTED_IMPLEMENTATION_TARGET_SHA256 = Object.freeze({
-  step031: "60aede81bf5c576fd1c77034b3266acea4d22e3893624223e06e7167398bd42d",
+  step031: "b62943f7f14298d4179b077c3e6efc7cac5a30a2e1b65d7337d8d42913eaa0be",
   step032: "96b2b78bbf8968198e43bbb2edba5f58ab41e9e01bef20d8d9270c73e44d54e7",
   step033: "f4521275e7f409d858c4fad64fe71645e924fdd9aa4ab9d957d28ccc1cb4a945",
   step034: "28ccaea5e66abc407ed9ad0f1543c2c989b9bcdd4648580e5e252131605d7892",
@@ -2657,7 +2665,7 @@ test("implementation batch declares the exact Codex-native evidence contracts", 
       phase: "implementation",
       source: "assets/steps/step031.md",
       target: "codex/assets/steps/step031.md",
-      source_sha256: "f825f56718e9399018639a61c4d09e6a4726639b0561976436976ca42372c094",
+      source_sha256: "148c8f75e79c31a42790ab0d95b70cea9ec86d7a9ecf4711a5571ac8e210c4c9",
       inputs: [
         "step_archive/outputs/step030_설계선택.md",
         "step_archive/step030_레이아웃설계_chunk1.md",
@@ -2886,7 +2894,7 @@ test("implementation source hashes bind the reviewed source steps 031 through 03
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(30, 38));
 
   assert.deepEqual(hashes, {
-    step031: "f825f56718e9399018639a61c4d09e6a4726639b0561976436976ca42372c094",
+    step031: "148c8f75e79c31a42790ab0d95b70cea9ec86d7a9ecf4711a5571ac8e210c4c9",
     step032: "8ad499b3f827f5a8028c94226f7b7960b324819487b01dca9562ef5999962696",
     step033: "1d92fd81e2ecf485817a5a78f8846b5376e40e3ab58cb45fad606c09a2a74659",
     step034: "f82ed6a8cd582b740d39d53e75b8b31b75b4b9b759b48d8d63add97cd24f4671",
@@ -4240,7 +4248,7 @@ const EXPECTED_E2E_ROWS = [
     phase: "e2e",
     source: "assets/steps/step045.md",
     target: "codex/assets/steps/step045.md",
-    source_sha256: "1b0357d2ee3ad49c86988dc507d0791fd0f516423f6eea6df3fb811285088f76",
+    source_sha256: "631828447c6154675d2f6b7a651717b9e211d1cc67ca62c829b65ecd20b34e9f",
     inputs: [
       "step_archive/TOPIC/TOPIC.md",
       "step_archive/step001_preflight.md",
@@ -4440,7 +4448,7 @@ const EXPECTED_E2E_ROWS = [
     phase: "e2e",
     source: "assets/steps/step050.md",
     target: "codex/assets/steps/step050.md",
-    source_sha256: "f0efe75ebf5fd255749a5b4440e6e276a5744e55df8d97cb8df17160ad49efd0",
+    source_sha256: "fe19984ab5614cc4c10db56a79a75ac3d5cd8af7a787849250e48767f794cd3d",
     inputs: [
       "step_archive/step038_smoke_test.md",
       "dist/index.html",
@@ -4510,12 +4518,12 @@ test("e2e source hashes bind reviewed source steps 045 through 050", async () =>
   const index = await loadIndex(repoRoot);
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(44, 50));
   assert.deepEqual(hashes, {
-    step045: "1b0357d2ee3ad49c86988dc507d0791fd0f516423f6eea6df3fb811285088f76",
+    step045: "631828447c6154675d2f6b7a651717b9e211d1cc67ca62c829b65ecd20b34e9f",
     step046: "c290f0b81e68da011996abaa3a6fb2dd753d5c7199b8f6acaab2b8b3f606d1d9",
     step047: "e35c1b210e06b1cb4742573941a789e166aa4a131a2cc012481b3747ffdc04be",
     step048: "b171cb98e9ca33de2e7ff5f58f721dd1590c5df213b8598268726125176982d0",
     step049: "3cebc468c5ed9c815e616d0070111a61adc55aa2015880728c242918d6c77c30",
-    step050: "f0efe75ebf5fd255749a5b4440e6e276a5744e55df8d97cb8df17160ad49efd0"
+    step050: "fe19984ab5614cc4c10db56a79a75ac3d5cd8af7a787849250e48767f794cd3d"
   });
 });
 
@@ -4529,12 +4537,12 @@ test("e2e acceptance descriptions reject placeholder-wide mutation", async () =>
 });
 
 const EXPECTED_E2E_TARGET_SHA256 = Object.freeze({
-  step045: "35acd2adc4ec472ac2fd20b95274ba24ba32ccc457ee2ee0e690a7d977aea898",
+  step045: "b90596f8a6ed79ad9f66a625772e9837f17e27e54eefa664f729eab5a13ea2f4",
   step046: "187a619f02da34101426d23f466182758b7d0b6bc0977ab3518c8c6bb2bfd93d",
   step047: "d2ed158f4fb15f52e21d76438776bbe0b1e5a0124a46eb4e7bd511c31398dfde",
   step048: "d858de0ea976dbce2a85c62ec71722964d2615528c2235fdf8e877b1d2a1558b",
   step049: "b151cd00e427077405015452618825bd5b7443c26b2dbe3c8eb08d3ec34e5518",
-  step050: "c803957f478a2159bc4f836cc3edc7b561a04fb90c5f3ab4edd16287863a2b60"
+  step050: "d267d4f2f588f42f04eebc51641319cebe52b7f090af0b629de0e85026d107bd"
 });
 
 async function assertE2eTargetDigests(root) {
@@ -4923,4 +4931,81 @@ test("e2e target digest seal rejects unsafe and benign byte mutations", async (t
     }
   }
   assert.deepEqual({ escaped, wrongDiagnostics }, { escaped: [], wrongDiagnostics: [] });
+});
+
+const BACKEND_LOCK_COMMAND = 'node scripts/verify-output.mjs --probe --lock --workspace "<project-root>"';
+const KEEP_LOCKED_BACKEND_SECTIONS = [
+  { number: 31, heading: "환경 확인과 설치" },
+  { number: 45, heading: "사전 준비와 시나리오 설계" },
+  { number: 50, heading: "최종 build와 완료 순서" }
+];
+
+function assertStep3BackendLockContract(content) {
+  const outputs = extractMarkdownSection(content, "입력과 산출물");
+  const execution = extractMarkdownSection(content, "실행");
+  const normalized = execution.replace(/\s+/g, " ");
+  assert.match(outputs, /^- 산출물: `step_archive\/outputs\/browser-backend\.json`$/m);
+  assert.ok(execution.includes(BACKEND_LOCK_COMMAND), "step003 must declare the exact lock command");
+  assert.match(normalized, /`--backend` 없이[^]*고정 backend만 사용[^]*다른 backend로 넘어가지 않는다/);
+  assert.match(normalized, /두 백엔드 중 하나만 준비[^]*이미 백엔드를 선택했으면 다른 backend의 package나 browser binary를 설치하지 않는다/);
+  assert.doesNotMatch(normalized, /독립적으로 실행|다른 backend[^.]{0,60}설치한다/);
+  assert.match(extractMarkdownSection(content, "완료 조건"), /^- `browser-backend-lock`: /m);
+}
+
+function assertKeepsLockedBackend(content, heading) {
+  const section = extractMarkdownSection(content, heading).replace(/\s+/g, " ");
+  assert.match(section, /3단계[^]*step_archive\/outputs\/browser-backend\.json[^]*다른 backend의 package나 browser binary를 설치하지 않는다/);
+  assert.doesNotMatch(section, /다른 backend[^.]{0,60}설치한다/);
+}
+
+test("step003 records the browser backend lock with the exact command and a single-backend rule", async () => {
+  const codex = await readFile(join(repoRoot, "codex", "assets", "steps", "step003.md"), "utf8");
+  assertStep3BackendLockContract(codex);
+  const claude = await readFile(join(repoRoot, "assets", "steps", "step003.md"), "utf8");
+  assert.ok(claude.includes(BACKEND_LOCK_COMMAND), "Claude step003 must name the same lock command");
+  assert.match(claude, /step_archive\/outputs\/browser-backend\.json/);
+  assert.match(claude.replace(/\s+/g, " "), /백엔드는 하나만 준비[^]*다른 백엔드의 package나 browser binary[^]*설치하지 않는다/);
+});
+
+test("steps 31, 45 and 50 keep the Step 3 browser backend in both hosts", async () => {
+  for (const { number, heading } of KEEP_LOCKED_BACKEND_SECTIONS) {
+    const id = `step${String(number).padStart(3, "0")}`;
+    const codex = await readFile(join(repoRoot, "codex", "assets", "steps", `${id}.md`), "utf8");
+    assertKeepsLockedBackend(codex, heading);
+    const claude = await readFile(join(repoRoot, "assets", "steps", `${id}.md`), "utf8");
+    assert.match(claude.replace(/\s+/g, " "), /browser-backend\.json[^]*다른 백엔드의 package나 browser binary[^]*설치하지 않는다/, id);
+  }
+  const claude31 = await readFile(join(repoRoot, "assets", "steps", "step031.md"), "utf8");
+  assert.ok(claude31.includes('node scripts/verify-output.mjs --probe --backend <selected> --lock --workspace "<project-root>"'),
+    "Claude step031 must backfill a missing lock from the Step 3 report");
+});
+
+test("browser backend lock checks reject removed or inverted clauses", async () => {
+  const step3 = await readFile(join(repoRoot, "codex", "assets", "steps", "step003.md"), "utf8");
+  const step3Mutations = {
+    commandRemoved: step3.replace(BACKEND_LOCK_COMMAND, "node scripts/verify-output.mjs --probe"),
+    outputRemoved: step3.replace(/^- 산출물: `step_archive\/outputs\/browser-backend\.json`$/m, "- 산출물: 없음"),
+    installAllowed: step3.replace("선택했으면 다른 backend의 package나 browser binary를 설치하지 않는다", "선택했으면 다른 backend의 package나 browser binary를 설치한다"),
+    independentInstall: step3.replace("두 백엔드 중 하나만 준비한다", "두 백엔드를 독립적으로 실행한다"),
+    fallbackAllowed: step3.replace("다른 backend로 넘어가지 않는다", "다른 backend로 넘어간다"),
+    completionRemoved: step3.replace(/^- `browser-backend-lock`: .*$/m, "- 고정 파일은 선택 사항이다.")
+  };
+  for (const [name, mutation] of Object.entries(step3Mutations)) {
+    assert.notEqual(mutation, step3, `step003 mutation did not change content: ${name}`);
+    assert.throws(() => assertStep3BackendLockContract(mutation), undefined, `step003 lock mutation escaped: ${name}`);
+  }
+
+  for (const { number, heading } of KEEP_LOCKED_BACKEND_SECTIONS) {
+    const id = `step${String(number).padStart(3, "0")}`;
+    const original = await readFile(join(repoRoot, "codex", "assets", "steps", `${id}.md`), "utf8");
+    const mutations = {
+      clauseRemoved: original.replace(/다른 backend의 package나 browser binary를 설치하지 않는다\./, "필요한 도구를 준비한다."),
+      installAllowed: original.replace(/다른 backend의 package나 browser binary를 설치하지 않는다/, "다른 backend의 package나 browser binary를 설치한다"),
+      lockRemoved: original.replaceAll("`step_archive/outputs/browser-backend.json`", "보고서")
+    };
+    for (const [name, mutation] of Object.entries(mutations)) {
+      assert.notEqual(mutation, original, `${id} mutation did not change content: ${name}`);
+      assert.throws(() => assertKeepsLockedBackend(mutation, heading), undefined, `${id} lock mutation escaped: ${name}`);
+    }
+  }
 });

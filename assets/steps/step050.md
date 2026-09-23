@@ -38,7 +38,7 @@ persistence: session
 
 브라우저 페이지가 드러내는 **모든 오류 표면**(console.error, window error, unhandledrejection, 요청 실패/차단, 크래시)을 수집한다. 수집 방법은 백엔드별로 docs/BROWSER-TOOLS.md 절차표('Console and page errors' 행)를 따른다 — Aside는 page.on 이벤트가 오지 않으므로 주입 브리지가 `document.documentElement.dataset`에 기록한 값을 evaluate로 읽는다.
 
-어떤 이벤트를 수집할지 사전에 결정하지 않는다. 실행 시점에 선택한 백엔드의 문서(docs/BROWSER-TOOLS.md) 및 프로젝트 특성을 보고 판단한다.
+어떤 이벤트를 수집할지 사전에 결정하지 않는다. Step 3이 `step_archive/outputs/browser-backend.json`에 고정한 백엔드(잠금 파일이 없는 기존 프로젝트는 step003 보고서의 selected 백엔드)의 문서(docs/BROWSER-TOOLS.md) 및 프로젝트 특성을 보고 판단한다.
 
 **판정 기준만 명시한다:**
 - 에러성 이벤트 → **FAIL 판정 대상**
@@ -118,6 +118,10 @@ node "<validation-checkout>/scripts/verify-output.mjs" --workspace "<project-roo
 ```
 
 브라우저 도구는 품질 안내서에 따라 별도 체크아웃에 설치하며 훅이 자동 설치하지 않는다.
+`--backend` 없이 실행한 브라우저 검사는 Step 3이 `step_archive/outputs/browser-backend.json`에
+고정한 백엔드를 사용한다. 고정 백엔드를 사용할 수 없다는 오류가 나면 그 백엔드만 복구하고
+다른 백엔드의 package나 browser binary를 설치하지 않는다. 잠금 파일이 없는 기존 프로젝트는
+step003 보고서의 selected 백엔드를 `--backend`로 명시한다.
 두 명령이 종료 코드 0이고 현재 dist SHA-256과 브라우저 보고서가 일치해야 한다.
 브라우저 보고서는 schema version 3이며 HTML의 `harness50-routes` manifest와 모든
 경로의 desktop/mobile 측정 결과가 일치해야 한다. 기본 `viewports`와

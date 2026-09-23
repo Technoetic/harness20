@@ -52,6 +52,13 @@ browser binary가 없으면 로컬 package가 제공하는 installer만 최대 3
 설치 시도한다. 각 시도의 exact command, exit code와 결과를 기록하며, 세 번 안에
 준비되지 않으면 차단한다.
 
+3단계가 `step_archive/outputs/browser-backend.json`에 브라우저 검증 backend를 고정했으면
+browser readiness와 E2E 러너는 그 고정 backend만 사용한다. 준비되지 않았으면 그 backend만
+복구하고 다른 backend의 package나 browser binary를 설치하지 않는다. 위 installer 시도도
+고정 backend가 쓰는 browser에만 적용한다. 예를 들어 Aside로 고정된 작업공간의 러너는
+Aside로 브라우저를 구동하며 Playwright browser binary를 내려받지 않는다. 잠금 파일이
+없는 기존 작업공간은 3단계 보고서의 selected backend를 유지한다.
+
 topic, design, built application과 실제 user flow를 읽고 성공 흐름, 실패 흐름, 상태
 전이와 project-specific edge case 최소 2개를 포함하는 시나리오 manifest를 작성한다.
 고정된 예제나 존재하지 않는 화면을 발명하지 않는다.

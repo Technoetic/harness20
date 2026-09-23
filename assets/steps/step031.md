@@ -37,6 +37,12 @@ persistence: session
 
 `dependency-checker.ps1`의 자동 검증 결과를 확인하고, 필요 시 패키지를 설치한다.
 
+## 브라우저 검증 백엔드 유지
+
+브라우저 검증 백엔드는 프로젝트 의존성이 아니다. Step 3이 `step_archive/outputs/browser-backend.json`에 고정한 백엔드를 그대로 유지하고, 다른 백엔드의 package나 browser binary(Playwright·Chromium 또는 Aside CLI)를 설치하지 않는다.
+
+잠금 파일이 없는 기존 프로젝트는 `step_archive/step003_playwright_test.md`에 기록된 selected 값으로 검증 체크아웃에서 `node scripts/verify-output.mjs --probe --backend <selected> --lock --workspace "<project-root>"`를 한 번 실행해 고정한다. 그 백엔드를 지금 사용할 수 없으면 그 백엔드만 복구한다.
+
 ## Self-Calibration
 
 실행 완료 후 다음을 스스로 평가하라:
