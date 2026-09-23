@@ -152,6 +152,15 @@ function fixture(t, { name = 'Codex 작업 [30]' } = {}) {
 // ---------------------------------------------------------------------------------------------
 // Probe (node only)
 
+// The bracketed name exercises PowerShell wildcard path handling. The plain name makes sure the
+// Codex gates themselves are tested: a hook that still looks up progress.json with a wildcard
+// Test-Path misses it under [ ], so an ungated .ps1 hook would pass that run for the wrong reason.
+const PROJECT_NAMES = ['Codex 작업 [30]', 'Codex 작업 30'];
+function testEachName(title, options, fn) {
+  if (typeof options === 'function') [fn, options] = [options, {}];
+  for (const name of PROJECT_NAMES) test(`${title} (project "${name}")`, options, t => fn(t, name));
+}
+
 test('the probe reports absent, running, paused, blocked and completed Codex state as one ASCII line', t => {
   const root = tempRoot(t, 'h50-probe-');
   assert.deepEqual(probe(root), { kind: 'absent' });
@@ -280,8 +289,8 @@ test('the probe stays aligned with the Codex state schema and path', t => {
 // ---------------------------------------------------------------------------------------------
 // Hooks
 
-test('incident: Codex state at step 30 without progress.json keeps every Claude step hook passive', t => {
-  const f = fixture(t);
+testEachName('incident: Codex state at step 30 without progress.json keeps every Claude step hook passive', (t, name) => {
+  const f = fixture(t, { name });
   f.topic();
   f.codex(codexState());
   const before = f.snapshot();
@@ -306,8 +315,8 @@ test('incident: Codex state at step 30 without progress.json keeps every Claude 
   assert.deepEqual(f.snapshot(), before);
 });
 
-test('a stale Claude progress.json next to Codex state is never rewritten or advanced', t => {
-  const f = fixture(t);
+testEachName('a stale Claude progress.json next to Codex state is never rewritten or advanced', (t, name) => {
+  const f = fixture(t, { name });
   f.claudeProgress();
   f.topic();
   f.codex(codexState({ completed: 3 }));
@@ -333,8 +342,8 @@ const invalidHookStates = {
   'directory named state.json': null
 };
 for (const [name, bytes] of Object.entries(invalidHookStates)) {
-  test(`invalid Codex state (${name}) fails safe: warning, no progress.json, no Stop block`, t => {
-    const f = fixture(t);
+  testEachName(`invalid Codex state (${name}) fails safe: warning, no progress.json, no Stop block`, (t, project) => {
+    const f = fixture(t, { name: project });
     if (bytes === null) mkdirSync(join(f.archive, '.harness50-codex', 'state.json'), { recursive: true });
     else f.codex(bytes());
     const before = f.snapshot();
@@ -349,8 +358,8 @@ for (const [name, bytes] of Object.entries(invalidHookStates)) {
   });
 }
 
-test('a completed Codex workflow is reported without continuation or Stop blocking', t => {
-  const f = fixture(t);
+testEachName('a completed Codex workflow is reported without continuation or Stop blocking', (t, name) => {
+  const f = fixture(t, { name });
   f.codex(codexState({ status: 'completed', completed: 50 }));
   const before = f.snapshot();
   assert.match(f.run('step-progress-loader'), /^\[HARNESS\] Codex workflow wf-incident is completed at step 50\/50 \(50\/50 complete\)/);
@@ -359,8 +368,8 @@ test('a completed Codex workflow is reported without continuation or Stop blocki
   assert.deepEqual(f.snapshot(), before);
 });
 
-test('the webapp trigger never re-initializes a Codex workspace', t => {
-  const f = fixture(t);
+testEachName('the webapp trigger never re-initializes a Codex workspace', (t, name) => {
+  const f = fixture(t, { name });
   f.topic();
   f.codex(codexState());
   const before = f.snapshot();
@@ -490,10 +499,10 @@ function pythonAvailable() {
   return result.status === 0;
 }
 
-test('PowerShell and bash hooks print the same Codex context', {
+testEachName('PowerShell and bash hooks print the same Codex context', {
   skip: !windows || !existsSync(gitBash) || !pythonAvailable() ? 'needs Windows PowerShell, Git Bash and python' : false
-}, t => {
-  const f = fixture(t);
+}, (t, name) => {
+  const f = fixture(t, { name });
   f.topic();
   f.codex(codexState());
   const before = f.snapshot();
