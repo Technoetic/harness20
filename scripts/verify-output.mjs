@@ -9,6 +9,7 @@ import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { physicalWorkspace, readSafe, writeSafe, sha256 } from './lib/quality-files.mjs';
 import { readRouteManifestBytes, ROUTE_ENTRY_PATH, UNKNOWN_ROUTE_PATH } from './lib/route-contract.mjs';
+import { readBackendLock, resolveBackend, writeBackendLock } from './lib/browser-backend-lock.mjs';
 
 export const ENTRY = 'http://harness50.local/index.html';
 export const ARTIFACT = 'dist/index.html';
@@ -25,7 +26,6 @@ export function passes(metrics) {
 
 const BACKENDS = ['auto', 'playwright', 'aside'];
 const BACKEND_MODULES = { playwright: '../browser-verifier/backend-playwright.mjs', aside: './lib/browser-backend-aside.mjs' };
-const MISSING_TOOLS = 'Browser tools missing: install browser-verifier (cd browser-verifier && npm ci && npx playwright install chromium) or the Aside CLI (aside --version)';
 const MISSING_PLAYWRIGHT = 'Browser tools missing: run npm ci in the plugin checkout, then npx playwright install chromium';
 
 function loadBackend(name) {
@@ -42,24 +42,44 @@ function validateBackend(backend) {
   return backend;
 }
 
-// Reports which backends can run here without launching a browser.
-export async function probeBackends(backend = process.env.HARNESS50_BROWSER_BACKEND || 'auto') {
+// Reports which backends can run here without launching a browser. Without a workspace the
+// output is `{ backends, selected, tool_version }` and `auto` uses the historical order. With a
+// workspace, `auto` honours its Step 3 lock (see ./lib/browser-backend-lock.mjs) and the result
+// adds `lock` (plus `error` when nothing may run); `lock: true` also records the selection.
+export async function probeBackends(backend = process.env.HARNESS50_BROWSER_BACKEND || 'auto', { workspaceRoot, lock: record = false } = {}) {
   validateBackend(backend);
+  if (record && workspaceRoot === undefined) throw new Error('--lock requires --workspace "<project-root>"');
+  const root = workspaceRoot === undefined ? null : await physicalWorkspace(workspaceRoot);
+  // `auto` fails closed on an invalid lock; an explicit backend ignores (and may replace) it.
+  const current = root === null ? null : backend === 'auto' ? await readBackendLock(root) : await readBackendLock(root).catch(() => 'invalid');
   const backends = { playwright: await backendAvailable('playwright'), aside: await backendAvailable('aside') };
-  const selected = backend === 'auto' ? (backends.playwright ? 'playwright' : backends.aside ? 'aside' : null) : backends[backend] ? backend : null;
+  let selected = null, error = null;
+  if (backend !== 'auto') {
+    selected = backends[backend] ? backend : null;
+  } else {
+    try { selected = await resolveBackend('auto', current, name => backends[name]); }
+    catch (reason) { error = reason.message; }
+  }
   let tool_version = null;
   if (selected) {
     try { const module = await loadBackend(selected); tool_version = typeof module.toolVersion === 'function' ? (await module.toolVersion()) ?? null : null; }
     catch { tool_version = null; }
   }
-  return { backends, selected, tool_version };
+  if (root === null) return { backends, selected, tool_version };
+  const result = { backends, selected, tool_version, lock: current };
+  if (record) {
+    result.previous = current;
+    if (selected) result.lock = await writeBackendLock(root, { selected, tool_version });
+  }
+  if (!selected) result.error = error ?? `Browser backend ${backend} is not available`;
+  return result;
 }
 
-async function selectBackend(backend) {
-  if (backend !== 'auto') return { name: backend, module: await loadBackend(backend) };
-  if (await backendAvailable('playwright')) return { name: 'playwright', module: await loadBackend('playwright') };
-  if (await backendAvailable('aside')) return { name: 'aside', module: await loadBackend('aside') };
-  throw new Error(MISSING_TOOLS);
+async function selectBackend(backend, root) {
+  if (backend !== 'auto') return { name: backend, module: await loadBackend(backend), source: 'explicit' };
+  const lock = await readBackendLock(root);
+  const name = await resolveBackend('auto', lock, backendAvailable);
+  return { name, module: await loadBackend(name), source: lock ? 'lock' : 'auto-order' };
 }
 
 export async function verifyOutput(workspaceRoot, { timeoutMs = 60000, executablePath, backend = process.env.HARNESS50_BROWSER_BACKEND || 'auto' } = {}) {
@@ -75,8 +95,9 @@ export async function verifyOutput(workspaceRoot, { timeoutMs = 60000, executabl
     const routing = readRouteManifestBytes(bytes);
     report.routing = routing;
     report.artifact_sha256 = sha256(bytes);
-    const { name, module } = await selectBackend(backend);
+    const { name, module, source } = await selectBackend(backend, root);
     selected = name;
+    report.backend_selection = { requested: backend, source, backend: name };
     await module.run({ root, bytes, routing, report, timeoutMs, executablePath, viewports: VIEWPORTS, entry: ENTRY, origin: ORIGIN,
       routeUrl, passes, screenshotPath, readSafe, writeSafe, sha256, ROUTE_ENTRY_PATH, UNKNOWN_ROUTE_PATH });
     if (sha256(await readSafe(root, ARTIFACT)) !== report.artifact_sha256) throw new Error('HTML changed during browser verification');
@@ -105,8 +126,12 @@ if (isMainModule()) {
   const timeout = timeoutOffset === -1 ? undefined : args[timeoutOffset + 1];
   // --timeout is validated by verifyOutput (integer 1000..120000 ms; per chunk under the Aside backend).
   const timeoutMs = timeout === undefined ? undefined : /^\d{1,7}$/.test(timeout) ? Number(timeout) : NaN;
+  const probe = args.includes('--probe');
+  const lock = args.includes('--lock');
   if (!root || (executableOffset !== -1 && !executablePath) || (backendOffset !== -1 && !backend) || (timeoutOffset !== -1 && !timeout)) { console.error('--workspace, --executable-path, --backend and --timeout require values'); process.exitCode = 1; }
-  else if (args.includes('--probe')) probeBackends(backend).then(result => {
+  // The lock always lands in an explicitly named project, never in the checkout's own directory.
+  else if (lock && (!probe || offset === -1)) { console.error('--lock records the Step 3 backend: use --probe --lock --workspace "<project-root>" [--backend playwright|aside]'); process.exitCode = 1; }
+  else if (probe) probeBackends(backend, offset === -1 ? {} : { workspaceRoot: root, lock }).then(result => {
     console.log(JSON.stringify(result, null, 2));
     process.exitCode = result.selected ? 0 : 1;
   }).catch(error => { console.error(error.message); process.exitCode = 1; });

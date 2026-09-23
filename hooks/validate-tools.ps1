@@ -10,6 +10,18 @@ $stepArchive = Join-Path $projectRoot "step_archive"
 $outDir = Join-Path $stepArchive "research-scripts"
 if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir -Force | Out-Null }
 
+# Step 3 locks the project's browser backend in step_archive/outputs/browser-backend.json.
+# Missing-tool hints then name only that backend (docs/BROWSER-TOOLS.md, "Backend lock (Step 3)").
+# The same node one-liner as validate-tools.sh prints the locked backend or nothing.
+$lockFile = "step_archive/outputs/browser-backend.json"
+function Get-LockedBrowserBackend {
+  $js = "try{const j=JSON.parse(require('fs').readFileSync('step_archive/outputs/browser-backend.json','utf8'));if(j&&j.schema_version===1&&(j.selected==='playwright'||j.selected==='aside'))process.stdout.write(j.selected)}catch(e){}"
+  Push-Location $projectRoot
+  try { $locked = ((& node -e $js 2>$null) -join '').Trim() } catch { $locked = '' }
+  Pop-Location
+  return $locked
+}
+
 switch ($Tool.ToLower()) {
   'playwright' {
     # Resolve the installed package (plugin browser-verifier/ first, then the project) instead of
@@ -19,14 +31,24 @@ switch ($Tool.ToLower()) {
     Push-Location $projectRoot
     $out = (& cmd /c "node -e ""$js"" ""$browserVerifier"" ""$projectRoot"" 2>&1") -join "`n"
     Pop-Location
-    if ($LASTEXITCODE -eq 0) { Write-Host "playwright: $out"; exit 0 } else { Write-Host "playwright: missing (cd browser-verifier && npm ci && npx playwright install chromium, or use the aside backend)"; exit 1 }
+    if ($LASTEXITCODE -eq 0) { Write-Host "playwright: $out"; exit 0 }
+    $locked = Get-LockedBrowserBackend
+    if ($locked -eq 'aside') { Write-Host "playwright: missing (not needed: this project is locked to the aside backend by $lockFile; keep it and do not install Playwright or Chromium)" }
+    elseif ($locked -eq 'playwright') { Write-Host "playwright: missing (cd browser-verifier && npm ci && npx playwright install chromium; this project is locked to the playwright backend by $lockFile)" }
+    else { Write-Host "playwright: missing (cd browser-verifier && npm ci && npx playwright install chromium, or use the aside backend)" }
+    exit 1
   }
   'aside' {
     Push-Location $projectRoot
     $out = (& cmd /c "aside --version 2>&1") -join "`n"
+    $asideExit = $LASTEXITCODE
     Pop-Location
     Write-Host "aside: $out"
-    if ($LASTEXITCODE -eq 0) { exit 0 } else { exit 1 }
+    if ($asideExit -eq 0) { exit 0 }
+    $locked = Get-LockedBrowserBackend
+    if ($locked -eq 'playwright') { Write-Host "aside: not needed: this project is locked to the playwright backend by $lockFile; keep it and do not install the Aside CLI" }
+    elseif ($locked -eq 'aside') { Write-Host "aside: this project is locked to the aside backend by $lockFile; start the Aside app and check aside --version in this shell; do not install Playwright or Chromium" }
+    exit 1
   }
   'axe' {
     Push-Location $projectRoot
