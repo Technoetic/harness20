@@ -67,6 +67,24 @@ if (-not $matched) { exit 0 }
 
 Write-Log "TRIGGER matched. prompt head: $($prompt.Substring(0,[Math]::Min(80,$prompt.Length)))"
 
+# Codex coexistence: an existing Codex workflow is resumed, never re-initialized
+# (codex/skills/webapp/SKILL.md). Leave TOPIC.md, progress.json and step_archive/ untouched.
+$codexState = Join-Path (Join-Path $stepArchive ".harness50-codex") "state.json"
+if (Test-Path -LiteralPath $codexState) {
+  Write-Log "Codex workflow state present -> trigger skipped"
+  $codexLine = ""
+  if (Get-Command node -ErrorAction SilentlyContinue) {
+    try {
+      $codexOut = @(& node (Join-Path $PSScriptRoot "lib/codex-workflow.mjs") (Join-Path $projectRoot ".") 2>$null)
+      if ($codexOut.Count -gt 0) { $codexLine = [string]$codexOut[0] }
+    } catch {}
+  }
+  if (-not $codexLine) { $codexLine = "[HARNESS] WARNING: step_archive/.harness50-codex/state.json exists but is unreadable or incomplete - Claude hooks will not create progress.json or block Stop here. Inspect it with the harness50 plugin's codex/scripts/harness-state.mjs show and ask the user before repairing or resetting it." }
+  Write-Output "[HARNESS] webapp trigger skipped: a Codex workflow owns this workspace, so step_archive/TOPIC/TOPIC.md and progress.json were left unchanged. Resume that workflow, or use a separate workspace for a different topic."
+  Write-Output $codexLine
+  exit 0
+}
+
 # 1) step_archive 부트스트랩
 if (-not (Test-Path $stepArchive)) { New-Item -ItemType Directory -Path $stepArchive -Force | Out-Null }
 if (-not (Test-Path $archivedDir)) { New-Item -ItemType Directory -Path $archivedDir -Force | Out-Null }

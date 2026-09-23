@@ -36,6 +36,10 @@ try {
 $projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($inputJson.cwd) { [string]$inputJson.cwd } else { (Get-Location).Path }
 $progressFile = Join-Path $projectRoot "step_archive\progress.json"
 
+# Codex coexistence: when step_archive/.harness50-codex/state.json exists, the Codex state
+# manager owns continuation. Exit before any read or write: no block, no stall .state, no log.
+if (Test-Path -LiteralPath (Join-Path $projectRoot "step_archive\.harness50-codex\state.json")) { exit 0 }
+
 if (-not (Test-Path $progressFile)) {
     Write-HookLog "progress.json missing -> exit 0"
     exit 0

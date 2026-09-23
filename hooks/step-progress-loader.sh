@@ -15,6 +15,20 @@ PROGRESS_FILE="$STEP_ARCHIVE/progress.json"
 ARCHIVED_DIR="$STEP_ARCHIVE/archived"
 
 [ -d "$STEP_ARCHIVE" ] || exit 0
+
+# Codex coexistence (mirrors step-progress-loader.ps1): step_archive/.harness50-codex/state.json
+# means the Codex state manager owns this workspace. Print one read-only context line
+# (lib/codex-workflow.mjs) and never rewrite progress.json. Without that file nothing changes.
+if [ -e "$STEP_ARCHIVE/.harness50-codex/state.json" ]; then
+  CODEX_LINE=""
+  if command -v node >/dev/null 2>&1; then
+    CODEX_LINE="$(node "$(dirname "${BASH_SOURCE[0]}")/lib/codex-workflow.mjs" "$PROJECT_ROOT" 2>/dev/null || true)"
+  fi
+  [ -n "$CODEX_LINE" ] || CODEX_LINE="[HARNESS] WARNING: step_archive/.harness50-codex/state.json exists but is unreadable or incomplete - Claude hooks will not create progress.json or block Stop here. Inspect it with the harness50 plugin's codex/scripts/harness-state.mjs show and ask the user before repairing or resetting it."
+  printf '%s\n' "$CODEX_LINE"
+  exit 0
+fi
+
 [ -f "$PROGRESS_FILE" ] || exit 0
 
 if ! command -v python3 >/dev/null 2>&1; then

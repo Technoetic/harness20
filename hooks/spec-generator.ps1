@@ -33,6 +33,8 @@ $projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif (
 $progressFile = Join-Path $projectRoot "step_archive\progress.json"
 $specDir = Join-Path $projectRoot "step_archive\specs"
 
+# Codex coexistence: no Claude SPEC files while the Codex state manager owns this workspace.
+if (Test-Path -LiteralPath (Join-Path $projectRoot "step_archive\.harness50-codex\state.json")) { exit 0 }
 if (-not (Test-Path $progressFile)) { exit 0 }
 if (-not (Test-Path $specDir)) { New-Item -ItemType Directory -Path $specDir -Force | Out-Null }
 

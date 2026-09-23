@@ -22,6 +22,9 @@ $stepArchive = Join-Path $projectRoot "step_archive"
 $archivedDir = Join-Path $stepArchive "archived"
 $progressFile = Join-Path $stepArchive "progress.json"
 
+# Codex coexistence: no Claude step reminder while the Codex state manager owns this workspace.
+if (Test-Path -LiteralPath (Join-Path (Join-Path $stepArchive ".harness50-codex") "state.json")) { exit 0 }
+
 if (-not (Test-Path $progressFile)) { exit 0 }
 
 try {

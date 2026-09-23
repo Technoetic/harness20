@@ -16,6 +16,9 @@ ARCHIVED_DIR="$PROJECT_ROOT/step_archive/archived"
 LOG_FILE="$(dirname "${BASH_SOURCE[0]}")/spec-generator.log"
 log() { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >>"$LOG_FILE" 2>/dev/null || true; }
 
+# Codex coexistence (mirrors spec-generator.ps1): no Claude SPEC files while the Codex state
+# manager owns this workspace.
+if [ -e "$PROJECT_ROOT/step_archive/.harness50-codex/state.json" ]; then exit 0; fi
 [ -f "$PROGRESS_FILE" ] || exit 0
 command -v python3 >/dev/null 2>&1 || exit 0
 mkdir -p "$SPEC_DIR"
