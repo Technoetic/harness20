@@ -672,7 +672,7 @@ step045 E2E는 프로젝트의 `npm run e2e`를 실행한다 — 러너(Playwrig
 |:---|:---|:---|
 | **UserPromptSubmit** | webapp-trigger → step-obedience-guard | 트리거 패턴 감지 시 부트스트랩. 그 외엔 다음 step 강제 |
 | **SessionStart** | step-progress-loader | progress.json 로드 + 다음 step 지시 주입 |
-| **PreToolUse** | destructive-guard + auto-approve | 위험 차단 + 화이트리스트 자동 승인 (병렬, exit 2 우선) |
+| **PreToolUse** | destructive-guard + auto-approve | 위험 차단(Bash) + 편집·WebSearch 자동 승인 (병렬, exit 2 우선) |
 | **PermissionRequest** | permission-request-guard | `updatedInput` 변조 방어용 최후 검증 (deny+exit 2) |
 | **PostToolUse** | mx-tag-validator + lsp-autofix | @MX 태그 검증 + Biome/Stylelint 자동수정 |
 | **Stop** | step-progress-writer → spec-generator → trust5-validator → step-auto-continue | progress 갱신 → SPEC 생성 → r1/r2/r3 평가 → 미완료면 block JSON |

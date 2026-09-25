@@ -224,6 +224,11 @@ if ($blocked) {
     }
   } | ConvertTo-Json -Depth 5 -Compress
   [Console]::Out.Write($out)
+  if ($toolName -eq "Bash") {
+    [Console]::Error.WriteLine("Harness50 denied this permission request because the command text matches a destructive pattern (quoted strings and heredoc bodies included).")
+    [Console]::Error.WriteLine("If the match is only inside a commit message or PR/issue body, write that text to a file with the Write tool and pass the file: git commit -F <file>, gh pr create --body-file <file>.")
+    [Console]::Error.WriteLine("Do not move commands into a script to get past this check. If the command itself must run, ask the user to run it.")
+  }
   # 이중 안전: 공식 문서 명시 "exit 2 → Denies the permission"
   exit 2
 }

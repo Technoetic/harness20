@@ -214,6 +214,11 @@ if [ "$BLOCKED" -eq 1 ]; then
   cat <<EOF
 {"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny","reason":"$REASON"}}}
 EOF
+  if [ "$TOOL" = Bash ]; then
+    echo "Harness50 denied this permission request because the command text matches a destructive pattern (quoted strings and heredoc bodies included)." 1>&2
+    echo "If the match is only inside a commit message or PR/issue body, write that text to a file with the Write tool and pass the file: git commit -F <file>, gh pr create --body-file <file>." 1>&2
+    echo "Do not move commands into a script to get past this check. If the command itself must run, ask the user to run it." 1>&2
+  fi
   # 이중 안전: exit 2 → Denies the permission (공식 문서)
   exit 2
 fi

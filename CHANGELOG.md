@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Register the Claude `auto-approve` hook only for edits and WebSearch (`Write|Edit|MultiEdit|NotebookEdit|WebSearch`). Bash and WebFetch were never eligible for approval (`hooks/lib/approval-policy.mjs`), so decisions are unchanged, and a Bash call no longer starts PowerShell and Node just to defer.
+- `hooks/run-hook.mjs` now gives every hook a budget shorter than its `hooks/hooks.json` timeout. A hook that runs past it is stopped with its whole process tree (`taskkill /T /F` on Windows, where a Node started by PowerShell would otherwise keep the output pipe open) and exits 1 without a decision, which leaves the normal permission flow in place. On 2026-09-25 the host timeout did not end two `auto-approve` runs that stayed alive for 15 and 32 minutes. PowerShell hooks also start with `-NonInteractive`.
+- The `destructive-guard` block message and the Bash deny of `permission-request-guard` now say that the whole command text is checked, including quoted strings and heredoc bodies, and name the file route for message text: write it with the Write tool, then pass `git commit -F <file>` or `gh pr create --body-file <file>`. They also say not to move a blocked command into a script and to ask the user when the command itself must run.
+
 ## 2.9.0 — 2026-09-23
 
 - Lock the Step 3 browser backend. `node scripts/verify-output.mjs --probe --lock --workspace "<project-root>"` records the choice in `step_archive/outputs/browser-backend.json` (`schema_version`, `selected`, `tool_version`, `probed_at`). An explicit `--backend` or `HARNESS50_BROWSER_BACKEND` still wins. Otherwise `auto` uses only the locked backend and fails with a message naming only that backend instead of silently switching to Playwright once Playwright is installed. Projects without a lock keep the Playwright → Aside order. An invalid, BOM-prefixed, oversized or aliased lock fails closed with a repair hint. Plain `--probe` output is unchanged. `--probe --workspace` adds `lock` and `error`, and `--lock` requires an explicit workspace. The browser report records `backend_selection`.

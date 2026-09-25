@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { PROJECT_NAMES, installPlugin, runClaudeHook, tempRoot } from './helpers/claude-hooks.mjs';
 
 const repo = fileURLToPath(new URL('../../', import.meta.url));
 const windows = process.platform === 'win32';
@@ -17,7 +18,8 @@ function fixture(t, state = active) {
   if (state !== null) fs.writeFileSync(path.join(root, 'step_archive/progress.json'), typeof state === 'string' ? state : JSON.stringify(state));
   return root;
 }
-function run(root, hook, event, env = {}, cwd = root) {
+// Runs a hook from the repository without judging its stderr; run() requires stderr to be empty.
+function runRaw(root, hook, event, env = {}, cwd = root) {
   const script = path.join(repo, 'hooks', hook + (windows && !bashOnWindows ? '.ps1' : '.sh'));
   const shell = bashOnWindows ? 'C:/Program Files/Git/bin/bash.exe' : windows ? 'powershell.exe' : 'bash';
   const args = bashOnWindows ? ['-c', 'uname(){ echo Linux; }; python3(){ python "$@" | tr -d "\\r"; }; export -f uname python3; bash "$1"', 'fixture', script.replaceAll('\\', '/')] : windows ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script] : [script];
@@ -26,8 +28,12 @@ function run(root, hook, event, env = {}, cwd = root) {
     env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8', CLAUDE_PROJECT_DIR: root, ...env },
   });
   assert.equal(result.error, undefined);
+  return { status: result.status, output: result.stdout.trim(), stderr: result.stderr };
+}
+function run(root, hook, event, env = {}, cwd = root) {
+  const result = runRaw(root, hook, event, env, cwd);
   assert.equal(result.stderr, '', result.stderr);
-  return { status: result.status, output: result.stdout.trim() };
+  return { status: result.status, output: result.output };
 }
 const write = (file_path) => ({ tool_name: 'Write', tool_input: { file_path, content: 'example' } });
 test('shipping hook allows an ordinary project write in bootstrap state', t => {
@@ -57,7 +63,10 @@ test('existing destructive command denial remains (payload never executed)', t =
   const root = fixture(t);
   const event = { tool_name: 'Bash', tool_input: { command: 'rm -rf /' } };
   assert.equal(run(root, 'auto-approve', event).output, '');
-  assert.equal(run(root, 'permission-request-guard', event).status, 2);
+  // A Bash deny explains the file route on stderr (see the guard wording tests below).
+  const guard = runRaw(root, 'permission-request-guard', event);
+  assert.equal(guard.status, 2);
+  assert.match(guard.stderr, /Do not move commands into a script/);
 });
 test('event cwd is used when project environment is absent', t => {
   const root = fixture(t);
@@ -158,4 +167,50 @@ test('missing Node runtime cannot grant approval', t => {
   assert.equal(result.error, undefined);
   assert.equal(result.status, 0);
   assert.equal(result.stdout.trim(), '');
+});
+
+// The guards read the whole command text, quoted strings and heredoc bodies included. A block
+// caused by message text should point at the file route instead of inviting a workaround.
+// Windows runs the .ps1 hooks and POSIX (or H50_TEST_BASH=1) the .sh hooks, so each wording set
+// is checked where it ships.
+const bodyCommand = 'gh pr create --title t --body "Never run git reset --hard on shared branches"';
+const heredocCommand = "gh pr create --title t --body-file - <<'EOF'\n- `git reset --hard` counts as deletion\nEOF";
+function installedGuard(t) {
+  const root = tempRoot(t, 'h50-guard-');
+  const plugin = installPlugin(root);
+  const project = path.join(root, PROJECT_NAMES[0]);
+  fs.mkdirSync(project);
+  const run = (hook, event) => runClaudeHook(plugin, hook, event, { cwd: project, env: { CLAUDE_PROJECT_DIR: project }, stripCR: true });
+  return { plugin, project, run };
+}
+function assertFileRoute(stderr) {
+  assert.match(stderr, /--body-file <file>/);
+  assert.match(stderr, /git commit -F <file>/);
+  assert.match(stderr, /Do not move commands into a script/);
+}
+test('destructive-guard blocks quoted body text but names the file route', t => {
+  const { run } = installedGuard(t);
+  const bash = command => run('destructive-guard', { tool_name: 'Bash', tool_input: { command } });
+  for (const command of [bodyCommand, heredocCommand]) {
+    const result = bash(command);
+    assert.equal(result.status, 2, command);
+    assertFileRoute(result.stderr);
+  }
+  for (const command of ['git reset --hard HEAD~1', 'bash -c "git reset --hard"', 'git commit -m "$(git reset --hard)"', 'rm -rf /']) {
+    assert.equal(bash(command).status, 2, command);
+  }
+  // Known boundary: --force alone in a message is not one of the patterns.
+  assert.equal(bash('git commit -m "docs: explain why we avoid --force"').status, 0);
+});
+test('permission-request-guard explains the file route for Bash denies only', t => {
+  const { plugin, project, run } = installedGuard(t);
+  const bash = run('permission-request-guard', { hook_event_name: 'PermissionRequest', tool_name: 'Bash', tool_input: { command: bodyCommand } });
+  assert.equal(bash.status, 2);
+  assert.match(bash.stdout, /"behavior":"deny"/);
+  assertFileRoute(bash.stderr);
+  fs.symlinkSync(path.join(plugin, 'hooks'), path.join(project, 'plugin'), windows ? 'junction' : 'dir');
+  const edit = run('permission-request-guard', { hook_event_name: 'PermissionRequest', ...write('plugin/auto-approve.ps1') });
+  assert.equal(edit.status, 2);
+  assert.match(edit.stdout, /"deny"/);
+  assert.equal(edit.stderr, '');
 });

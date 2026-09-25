@@ -39,7 +39,7 @@
         ]
       },
       {
-        "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit|WebFetch|WebSearch",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|WebSearch",
         "hooks": [
           {
             "type": "command",
