@@ -11,6 +11,7 @@ argument-hint: <주제 한 줄>
 요청됐으면 아래 **Jev-first 요청 라우팅**으로 답하고 종료한다. workflow 제어를
 요청하지 않은 경우 즉시 실행 절차에 들어가거나 TOPIC·progress를 만들지 않는다.
 웹앱 시작·재개 등 실제 제어 요청이 있을 때만 다음 절차를 수행한다.
+자연어 요청은 자동 시작하지 않는다(시작은 `/webapp <주제>`).
 
 **Codex 작업 공간 분기:** `step_archive/.harness50-codex/state.json`이 있으면 Codex 상태
 관리자가 이 작업 공간을 소유한다. 아래 절차를 수행하지 않는다. TOPIC.md·progress.json을
@@ -27,6 +28,8 @@ Codex 단계부터 harness50 플러그인의 `codex/scripts/harness-state.mjs`(`
 
 2. **TOPIC.md 작성** — `step_archive/TOPIC/TOPIC.md`에 다음 형식으로 쓴다.
    `webapp-trigger` hook이 자동 처리하지 않은 경우의 폴백.
+   훅 출력에 `webapp trigger skipped` 줄이 있으면 TOPIC.md·progress.json을 쓰지 않고 그 줄의
+   안내만 전한 뒤 끝낸다. 이 대체 작성은 `step_archive/TOPIC/TOPIC.md`가 없을 때만 한다.
 
    ```markdown
    ---

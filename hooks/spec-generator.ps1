@@ -36,7 +36,6 @@ $specDir = Join-Path $projectRoot "step_archive\specs"
 # Codex coexistence: no Claude SPEC files while the Codex state manager owns this workspace.
 if (Test-Path -LiteralPath (Join-Path $projectRoot "step_archive\.harness50-codex\state.json")) { exit 0 }
 if (-not (Test-Path -LiteralPath $progressFile)) { exit 0 }
-if (-not (Test-Path -LiteralPath $specDir)) { New-Item -ItemType Directory -Path $specDir -Force | Out-Null }
 
 try {
     $progress = Get-Content -LiteralPath $progressFile -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -132,6 +131,8 @@ $fence
 Read step_archive/archived/step$stepNum.md → 본문 실행
 "@
 
+    # specs/ appears only when a SPEC is actually written.
+    if (-not (Test-Path -LiteralPath $specDir)) { New-Item -ItemType Directory -Path $specDir -Force | Out-Null }
     $spec | Out-File -LiteralPath $specFile -Encoding UTF8 -Force
     # BOM 제거
     $bytes = [System.IO.File]::ReadAllBytes($specFile)

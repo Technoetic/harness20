@@ -8,6 +8,7 @@ import { makeWorkspace } from './helpers/workspace.mjs';
 
 const repo = fileURLToPath(new URL('../../', import.meta.url));
 const dispatcher = path.join(repo, 'hooks/run-hook.mjs');
+const activity = path.join(repo, 'hooks/lib/harness-activity.mjs');
 const expected = {
   SessionStart: [['', 'step-progress-loader', 30]],
   UserPromptSubmit: [['', 'webapp-trigger', 10], ['', 'step-obedience-guard', 5]],
@@ -40,6 +41,8 @@ test('dispatcher rejects missing, unknown, traversal, and extra hook arguments',
 test('dispatcher runs only native shell and preserves stdin, output, and exit code', async () => {
   const root = await makeWorkspace();
   fs.copyFileSync(dispatcher, path.join(root, 'run-hook.mjs'));
+  fs.mkdirSync(path.join(root, 'lib'));
+  fs.copyFileSync(activity, path.join(root, 'lib', 'harness-activity.mjs'));
   const windows = process.platform === 'win32';
   // Only the native counterpart exists; attempting the other platform fails.
   fs.writeFileSync(path.join(root, windows ? 'destructive-guard.ps1' : 'destructive-guard.sh'), windows
@@ -66,6 +69,79 @@ test('dispatcher budgets cover every registration and stay below the manifest ti
   assert.deepEqual(Object.keys(budgets).sort(), [...timeouts.keys()].sort());
   for (const [name, timeout] of timeouts) {
     assert.ok(budgets[name] >= timeout * 1000 - 2000 && budgets[name] < timeout * 1000, `${name}: ${budgets[name]} ms for a ${timeout} s host timeout`);
+  }
+});
+
+// The activity gate: a fake script for every registered hook records its stdin in <name>.ran, so
+// a sentinel file shows exactly which hooks the dispatcher started.
+const GUARDS = ['destructive-guard', 'permission-request-guard'];
+const ACTIVITY_GATED = ['step-progress-loader', 'step-obedience-guard', 'auto-approve', 'mx-tag-validator', 'lsp-autofix',
+  'step-progress-writer', 'spec-generator', 'trust5-validator', 'step-auto-continue'];
+async function gatedDispatcher({ withLib = true } = {}) {
+  const root = await makeWorkspace();
+  const hooks = path.join(root, 'plugin', 'hooks');
+  fs.mkdirSync(hooks, { recursive: true });
+  fs.copyFileSync(dispatcher, path.join(hooks, 'run-hook.mjs'));
+  if (withLib) {
+    fs.mkdirSync(path.join(hooks, 'lib'));
+    fs.copyFileSync(activity, path.join(hooks, 'lib', 'harness-activity.mjs'));
+  }
+  const windows = process.platform === 'win32';
+  for (const name of [...GUARDS, ...ACTIVITY_GATED, 'webapp-trigger']) {
+    fs.writeFileSync(path.join(hooks, name + (windows ? '.ps1' : '.sh')), windows
+      ? `$raw = [Console]::In.ReadToEnd()\n[System.IO.File]::WriteAllText((Join-Path $PSScriptRoot '${name}.ran'), $raw)\n`
+      : `cat > "$(dirname "$0")/${name}.ran"\n`);
+  }
+  const empty = path.join(root, 'empty');
+  const active = path.join(root, 'active');
+  fs.mkdirSync(empty);
+  fs.mkdirSync(path.join(active, 'step_archive', 'archived'), { recursive: true });
+  fs.writeFileSync(path.join(active, 'step_archive', 'progress.json'), JSON.stringify({ current_step: 1, total_steps: 50, completed_steps: [] }));
+  fs.writeFileSync(path.join(active, 'step_archive', 'archived', 'step001.md'), '# Step 1\n');
+  const call = (name, event) => {
+    const sentinel = path.join(hooks, `${name}.ran`);
+    fs.rmSync(sentinel, { force: true });
+    // A test runner started inside Claude Code inherits CLAUDE_PROJECT_DIR, so it is cleared here.
+    const result = spawnSync(process.execPath, [path.join(hooks, 'run-hook.mjs'), name], {
+      input: event, encoding: 'utf8', timeout: 20000, env: { ...process.env, CLAUDE_PROJECT_DIR: '' }
+    });
+    assert.equal(result.error, undefined, name);
+    assert.equal(result.status, 0, `${name}: ${result.stderr}`);
+    assert.equal(result.stdout, '', name);
+    assert.equal(result.stderr, '', name);
+    return fs.existsSync(sentinel) ? fs.readFileSync(sentinel, 'utf8') : null;
+  };
+  return { empty, active, call };
+}
+test('dispatcher starts activity-gated hooks only in a project with an active run', async () => {
+  const f = await gatedDispatcher();
+  for (const name of ACTIVITY_GATED) {
+    assert.equal(f.call(name, JSON.stringify({ cwd: f.empty, prompt: 'hello' })), null, `${name} in an empty project`);
+    const event = JSON.stringify({ cwd: f.active, session_id: 's', note: 'bytes pass through' });
+    assert.equal(f.call(name, event), event, `${name} in an active project`);
+  }
+  for (const name of GUARDS) {
+    const event = JSON.stringify({ cwd: f.empty, tool_name: 'Bash' });
+    assert.equal(f.call(name, event), event, `${name} in an empty project`);
+  }
+});
+test('dispatcher starts webapp-trigger only for an explicit /webapp command', async () => {
+  const f = await gatedDispatcher();
+  const explicit = JSON.stringify({ cwd: f.empty, prompt: '/webapp x' });
+  assert.equal(f.call('webapp-trigger', explicit), explicit);
+  for (const prompt of ['hello', '회사 매출 대시보드 만들어줘', '/webapp', '/webappx y', 'please /webapp x']) {
+    assert.equal(f.call('webapp-trigger', JSON.stringify({ cwd: f.active, prompt })), null, prompt);
+  }
+  assert.equal(f.call('webapp-trigger', '{broken'), null);
+});
+test('dispatcher without hooks/lib starts only the two guards', async () => {
+  const f = await gatedDispatcher({ withLib: false });
+  for (const name of [...ACTIVITY_GATED, 'webapp-trigger']) {
+    assert.equal(f.call(name, JSON.stringify({ cwd: f.active, prompt: '/webapp x' })), null, name);
+  }
+  for (const name of GUARDS) {
+    const event = JSON.stringify({ cwd: f.active, tool_name: 'Bash' });
+    assert.equal(f.call(name, event), event, name);
   }
 });
 

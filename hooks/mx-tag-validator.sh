@@ -30,7 +30,8 @@ esac
 
 PROGRESS_FILE="$PROJECT_ROOT/step_archive/progress.json"
 [ -f "$PROGRESS_FILE" ] || exit 0
-CUR="$(python3 -c "import json;print(int(json.load(open('$PROGRESS_FILE',encoding='utf-8')).get('current_step',1)))" 2>/dev/null || echo 1)"
+# The path goes in as an argument, never pasted into the Python source.
+CUR="$(python3 -c 'import json,sys;print(int(json.load(open(sys.argv[1],encoding="utf-8")).get("current_step",1)))' "$PROGRESS_FILE" 2>/dev/null || echo 1)"
 [ "$CUR" -lt 15 ] && exit 0
 
 case "$FP" in

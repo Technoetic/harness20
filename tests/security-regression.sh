@@ -6,6 +6,8 @@
 #   - MUST_DEFER: ordinary shell commands retain host permission checks.
 #   - GATE: progress.json 부재 시 auto-approve가 allow를 발급하지 않아야 함 (전역 자동승인 결함 방지)
 #   - CODEX STATE: .harness50-codex/ 편집과 Codex state.json 옆의 progress.json은 allow 미발급 (Stop 게이트 우회 방지)
+#   - EXEC-LINKED: 실행과 연결되는 파일(.husky/, .mcp.json, package.json, CLAUDE.md, CI, 편집기 설정) 편집은 활성 중에도 allow 미발급
+#   - STALE: 현재 단계 본문이 없는 progress.json(옛 로더가 만든 파일)은 allow 미발급
 #
 # 사용: bash tests/security-regression.sh
 # 종료코드: 실패 0건이면 0, 하나라도 실패면 1.
@@ -34,6 +36,9 @@ ok()   { PASS=$((PASS+1)); }
 TMP="$(mktemp -d)"
 mkdir -p "$TMP/step_archive"
 echo '{"current_step":1,"completed_steps":[],"total_steps":50}' > "$TMP/step_archive/progress.json"
+# 활성 실행은 현재 단계 본문이 있어야 한다 (/webapp 부트스트랩과 같은 배치)
+mkdir -p "$TMP/step_archive/archived"
+echo '# Step 1' > "$TMP/step_archive/archived/step001.md"
 export CLAUDE_PROJECT_DIR="$TMP"
 cleanup() { rm -rf "$TMP"; }
 trap cleanup EXIT
@@ -108,11 +113,23 @@ out="$(json_write 'src/app.js' | bash "$AA" 2>/dev/null)"
 if printf '%s' "$out" | grep -q '"permissionDecision":"allow"'; then fail "Codex state.json 옆의 오래된 progress.json이 자동승인을 유지함"; else ok; fi
 rm -rf "$TMP/step_archive/.harness50-codex"
 
+echo "== EXEC-LINKED: 실행과 연결되는 파일 편집은 활성 중에도 allow 미발급 =="
+for p in '.husky/pre-commit' '.mcp.json' 'package.json' 'CLAUDE.md' '.github/workflows/ci.yml' '.vscode/tasks.json'; do
+  out="$(json_write "$p" | bash "$AA" 2>/dev/null)"
+  if printf '%s' "$out" | grep -q '"permissionDecision":"allow"'; then fail "실행과 연결되는 파일 편집에 allow 발급됨: $p"; else ok; fi
+done
+
+echo "== STALE: 현재 단계 본문이 없는 progress.json은 allow 미발급 =="
+rm -f "$TMP/step_archive/archived/step001.md"
+out="$(json_write 'src/app.js' | bash "$AA" 2>/dev/null)"
+if printf '%s' "$out" | grep -q '"permissionDecision":"allow"'; then fail "본문 없는 progress.json(옛 로더 산출물)이 자동승인을 유지함"; else ok; fi
+
 echo "== GATE: progress.json 부재 시 auto-approve 미발화 =="
 rm -f "$TMP/step_archive/progress.json"
 out="$(json_bash 'npm run build' | bash "$AA" 2>/dev/null)"
 if printf '%s' "$out" | grep -q '"permissionDecision":"allow"'; then fail "하네스 비활성인데 전역 자동승인 발생"; else ok; fi
 echo '{"current_step":1,"completed_steps":[],"total_steps":50}' > "$TMP/step_archive/progress.json"
+echo '# Step 1' > "$TMP/step_archive/archived/step001.md"
 
 echo
 echo "결과: PASS=$PASS FAIL=$FAIL"

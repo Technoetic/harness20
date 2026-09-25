@@ -21,7 +21,6 @@ log() { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >>"$LOG_FILE" 2>/
 if [ -e "$PROJECT_ROOT/step_archive/.harness50-codex/state.json" ]; then exit 0; fi
 [ -f "$PROGRESS_FILE" ] || exit 0
 command -v python3 >/dev/null 2>&1 || exit 0
-mkdir -p "$SPEC_DIR"
 
 export PROGRESS_FILE SPEC_DIR ARCHIVED_DIR
 python3 - <<'PY'
@@ -82,6 +81,8 @@ def gen(n):
 ## RUN-COMMAND
 Read step_archive/archived/step{num}.md → 본문 실행
 """
+    # specs/ appears only when a SPEC is actually written (mirrors spec-generator.ps1).
+    os.makedirs(spec_dir, exist_ok=True)
     open(spec_path,"w",encoding="utf-8").write(content)
     return True
 

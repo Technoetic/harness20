@@ -34,16 +34,39 @@ if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
       else process.exit(128 + constants.signals[signal]);
     });
   }
-  child = spawn(windows ? 'powershell.exe' : 'bash', windows
-    ? ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script]
-    : [script], { stdio: 'inherit', shell: false, windowsHide: true });
-  child.once('error', error => {
+  // The whole event is read before the activity gate, still under the watchdog: a caller that
+  // never closes stdin is stopped by the budget above.
+  const chunks = [];
+  for await (const chunk of process.stdin) chunks.push(chunk);
+  const raw = Buffer.concat(chunks);
+  // hooks/lib/harness-activity.mjs decides whether the project has an active run for this hook.
+  // Without that module only the two guards start; every other hook fails closed.
+  let run;
+  try {
+    const { shouldRunHook } = await import('./lib/harness-activity.mjs');
+    run = shouldRunHook(name, raw.toString('utf8'));
+  } catch {
+    run = name === 'destructive-guard' || name === 'permission-request-guard';
+  }
+  if (!run) {
+    // No shell, no output, no files. The watchdog is cleared so no late timeout line appears.
     clearTimeout(watchdog);
-    console.error(`Harness50: could not start registered hook (${error.code || 'spawn error'})`);
-    process.exitCode = 1;
-  });
-  child.once('close', (code, signal) => {
-    clearTimeout(watchdog);
-    process.exitCode = timedOut ? 1 : code ?? (signal ? 128 + (constants.signals[signal] || 1) : 1);
-  });
+    process.exitCode = 0;
+  } else {
+    child = spawn(windows ? 'powershell.exe' : 'bash', windows
+      ? ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script]
+      : [script], { stdio: ['pipe', 'inherit', 'inherit'], shell: false, windowsHide: true });
+    child.once('error', error => {
+      clearTimeout(watchdog);
+      console.error(`Harness50: could not start registered hook (${error.code || 'spawn error'})`);
+      process.exitCode = 1;
+    });
+    child.once('close', (code, signal) => {
+      clearTimeout(watchdog);
+      process.exitCode = timedOut ? 1 : code ?? (signal ? 128 + (constants.signals[signal] || 1) : 1);
+    });
+    // A hook may exit without reading its input; the broken pipe is not an error.
+    child.stdin.on('error', () => {});
+    child.stdin.end(raw);
+  }
 }

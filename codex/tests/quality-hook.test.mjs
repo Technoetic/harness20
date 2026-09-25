@@ -38,7 +38,11 @@ function fixture(t, state = active) {
   };
   return { project, run };
 }
-for (const [name, state] of Object.entries({ missing: null, paused: { ...active, paused: true }, cancelled: { ...active, status: 'cancelled' }, invalidCurrent: { ...active, current_step: 1 }, malformedCurrent: { ...active, current_step: '39' }, wrongTotal: { ...active, total_steps: 100 }, nullCompleted: { ...active, completed_steps: null } })) {
+// gap: a legal first-unfinished-step run (hooks/lib/harness-activity.mjs) that the milestone rule
+// still releases, because a milestone needs a gap-free prefix. missingTotal: total_steps is required.
+const { total_steps: _total, ...missingTotal } = active;
+for (const [name, state] of Object.entries({ missing: null, paused: { ...active, paused: true }, cancelled: { ...active, status: 'cancelled' }, invalidCurrent: { ...active, current_step: 1 }, malformedCurrent: { ...active, current_step: '39' }, wrongTotal: { ...active, total_steps: 100 }, nullCompleted: { ...active, completed_steps: null },
+  gap: { ...active, current_step: 38, completed_steps: [...Array.from({ length: 37 }, (_, i) => i + 1), 39] }, missingTotal })) {
   test(`quality hook releases ${name} workflow without writing a verdict`, t => {
     const f = fixture(t, state);
     assert.equal(f.run(), '');

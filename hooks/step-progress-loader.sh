@@ -46,9 +46,8 @@ try:
 except Exception: raise SystemExit(0)
 
 import glob
-actual=len({os.path.basename(x) for d in [a_dir,os.path.dirname(a_dir)] for x in glob.glob(os.path.join(d,"step???.md"))})
-if actual>0 and actual!=p.get("total_steps"):
-    p["total_steps"]=actual
+# Report only (mirrors the .ps1 loader): rewriting total_steps could flip the run's activity.
+actual=len({os.path.basename(x) for d in [a_dir,os.path.dirname(a_dir)] for x in glob.glob(os.path.join(glob.escape(d),"step???.md"))})
 p.setdefault("trust5_results",{"r1":None,"r2":None,"r3":None})
 p.setdefault("metrics",{"total_sessions":0,"total_duration_minutes":0,"steps_per_session_avg":0})
 p["metrics"]["total_sessions"]=int(p["metrics"].get("total_sessions",0))+1
@@ -61,6 +60,8 @@ done=len(p.get("completed_steps") or [])
 cur=next((n for n in range(1,int(p.get("total_steps",50))+1) if n not in (p.get("completed_steps") or [])),int(p.get("total_steps",50)))
 total=int(p.get("total_steps",50))
 print("=== harness50: Step Progress Loader ===")
+if actual>0 and actual!=p.get("total_steps"):
+    print(f"WARNING: total_steps mismatch (progress.json={p.get('total_steps', '')}, filesystem={actual}).")
 print(f"Progress: {done}/{total} completed")
 print(f"Current step: step{cur:03d}")
 if done<total:

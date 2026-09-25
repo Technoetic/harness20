@@ -26,7 +26,6 @@ function Write-ProgressAtomic($obj) {
     try { $acquired = $mutex.WaitOne(5000) } catch {}
     if (-not $acquired) { $mutex.Dispose(); return }
     try {
-        New-Item -ItemType Directory -Path $stepArchive -Force | Out-Null
         $json = $obj | ConvertTo-Json -Depth 32
         if ([string]::IsNullOrWhiteSpace($json) -or $json -eq 'null') { return }
         $tempFile = "$progressFile.tmp.$PID"
@@ -64,64 +63,10 @@ if (Test-Path -LiteralPath $codexState) {
     exit 0
 }
 
+# The loader never creates progress.json or step_archive/: only an explicit /webapp <topic>
+# starts a run (webapp-trigger). Without a progress file there is nothing to resume.
+if (-not (Test-Path -LiteralPath $progressFile -PathType Leaf)) { exit 0 }
 Write-Host "=== Step Progress Loader ==="
-
-if (-not (Test-Path $progressFile)) {
-    Write-Host "No progress file found. Starting fresh."
-    Write-Host "Next step: step001"
-
-    # F1 guard (2026-06-10): 직전 런의 stall 상태 파일이 남아 있으면 SoT 불일치 경고 후 리셋
-    $staleStates = @(Get-ChildItem -Path $stepArchive -Filter "step-auto-continue*.state" -ErrorAction SilentlyContinue)
-    if ($staleStates.Count -gt 0) {
-        Write-Host "WARNING: progress.json absent but stale auto-continue state found (previous run remnant). Resetting state files."
-        $staleStates | Remove-Item -ErrorAction SilentlyContinue
-    }
-
-    # total_steps 동적 계산 (F5 fix: flat + archived/ 이중 스캔, 파일명 unique 기준 —
-    # 구버전 flat 전용 스캔은 archived/ 배치에서 0을 반환해 fallback 107 우연 일치에 의존했음)
-    $stepFiles = @(Get-ChildItem -Path $stepArchive -Filter "step???.md" -ErrorAction SilentlyContinue)
-    $archivedInit = Join-Path $stepArchive "archived"
-    if (Test-Path $archivedInit) {
-        $stepFiles += @(Get-ChildItem -Path $archivedInit -Filter "step???.md" -ErrorAction SilentlyContinue)
-    }
-    $detected = @($stepFiles | ForEach-Object { $_.Name } | Sort-Object -Unique).Count
-    $totalStepsDetected = if ($detected -gt 0) { $detected } else { 50 }
-    Write-Host "Detected total_steps from filesystem: $totalStepsDetected"
-
-    # 초기 progress.json 생성 (MoAI-ADK 벤치마킹 필드 포함)
-    $initial = @{
-        last_updated = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss')
-        current_step = 1
-        total_steps = $totalStepsDetected
-        completed_steps = @()
-        failed_steps = @()
-        skipped_steps = @()
-        session_history = @()
-        eval_rounds = @{
-            r1 = @{ step = 49;  result = $null; score = $null }
-            r2 = @{ step = 69;  result = $null; score = $null }
-            r3 = @{ step = 104; result = $null; score = $null }
-        }
-        trust5_results = @{
-            r1 = $null
-            r2 = $null
-            r3 = $null
-        }
-        moai_features = @{
-            spec_generated_count = 0
-            mx_tag_warnings = 0
-            lsp_autofixes = 0
-        }
-        metrics = @{
-            total_sessions = 0
-            total_duration_minutes = 0
-            steps_per_session_avg = 0
-        }
-    }
-
-    Write-ProgressAtomic $initial
-    exit 0
-}
 
 # 기존 progress.json이 있어도 total_steps가 실제 파일 수와 다르면 경고
 try { $existingProgress = Get-Content -LiteralPath $progressFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop } catch { exit 0 }
@@ -134,10 +79,9 @@ if (Test-Path -LiteralPath $archivedDir2) {
 }
 $actualTotal = @($stepFiles | ForEach-Object { $_.Name } | Sort-Object -Unique).Count
 $needsRewrite = $false
+# Report only: rewriting total_steps could turn an inactive run active (or the reverse).
 if ($actualTotal -gt 0 -and $actualTotal -ne [int]$existingProgress.total_steps) {
-    Write-Host "WARNING: total_steps mismatch (progress.json=$($existingProgress.total_steps), filesystem=$actualTotal). Auto-correcting."
-    $existingProgress.total_steps = $actualTotal
-    $needsRewrite = $true
+    Write-Host "WARNING: total_steps mismatch (progress.json=$($existingProgress.total_steps), filesystem=$actualTotal)."
 }
 
 # MoAI-ADK 벤치마킹: 누락 필드 자동 추가 (마이그레이션)

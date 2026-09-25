@@ -9,6 +9,9 @@ Codex 상태 관리자가 소유하므로 progress.json을 만들거나 덮어�
 종료한다: `harness50: Codex workflow 작업 공간 — Claude progress는 리셋하지 않음. Codex workflow
 리셋은 Codex의 $harness50-reset으로 사용자가 직접 실행`.
 
+`step_archive/progress.json`이 없으면 만들지 않고 `harness50: 리셋할 진행 기록 없음 — /webapp <주제>로 시작`
+1줄 보고 후 종료한다.
+
 그 외에는 `step_archive/progress.json`을 다음 형식으로 덮어쓴다:
 
 ```json
@@ -39,6 +42,6 @@ Codex 상태 관리자가 소유하므로 progress.json을 만들거나 덮어�
 
 ## 출력
 
-1줄 보고: `harness50 리셋 완료 — step001부터 재시작 가능`
+1줄 보고: `harness50 리셋 완료 — step001부터 재시작 가능 (새 주제는 리셋 후 /webapp <주제>)`
 
 추가 출력·확인 질문 금지.

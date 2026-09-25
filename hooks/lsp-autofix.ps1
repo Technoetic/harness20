@@ -11,7 +11,10 @@
 #   - fail-open (exit 0). 진단 실패 시 경고만 로그.
 #   - 자동수정은 Biome `check --write` (2.x 정식 플래그 — 구 `--apply`는 2.x에서 제거되어
 #     100% 실패했음, 2026-06-10 수정). --unsafe 수정은 미적용 (안전 수정만, 의도적 결정).
-#   - 대상 파일이 src/ 아래일 때만 동작. step_archive/, .claude/, node_modules/ 제외.
+#   - 대상 파일이 프로젝트 루트의 src/ 아래일 때만 동작. step_archive/, .claude/, node_modules/ 제외.
+#   - 활성 워크플로에서만 실행된다(run-hook.mjs의 lsp-autofix 게이트).
+#   - 프로젝트 node_modules에 설치된 biome·stylelint만 `npx --no-install`로 실행한다.
+#     로컬 설치가 없으면 내려받지 않고 "skipped" 로그만 남긴다(npx 캐시의 패키지도 쓰지 않음).
 
 param()
 
@@ -63,48 +66,66 @@ if (($jsExts -notcontains $ext) -and ($cssExts -notcontains $ext)) { exit 0 }
 # 전부 미스되어 src/ 파일이 조용히 스킵되던 결함 — 구분자 통일 후 필터)
 $filePath = $filePath -replace '/', '\'
 
-# 경로 필터 (src/ 만 대상)
-if ($filePath -notmatch '\\src\\') { exit 0 }
-if ($filePath -match '\\(node_modules|\.git|step_archive|\.claude)\\') { exit 0 }
-
 $projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { [System.IO.Directory]::GetCurrentDirectory() }
 
-# Biome 자동수정 (JS/TS)
+# 경로 필터: projectRoot 기준 상대 경로가 src\ 로 시작하는 파일만 대상 (프로젝트 밖 파일 제외).
+# 상대 경로 입력은 projectRoot 기준으로 해석한다.
+try {
+    $rootFull = [System.IO.Path]::GetFullPath($projectRoot).TrimEnd('\') + '\'
+    $fileFull = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($rootFull, $filePath))
+} catch { exit 0 }
+if (-not $fileFull.StartsWith($rootFull + 'src\', [System.StringComparison]::OrdinalIgnoreCase)) { exit 0 }
+$relativePath = $fileFull.Substring($rootFull.Length)
+if (('\' + $relativePath) -match '\\(node_modules|\.git|step_archive|\.claude)\\') { exit 0 }
+
+# Biome 자동수정 (JS/TS) — 프로젝트에 설치된 @biomejs/biome가 있을 때만
 if ($jsExts -contains $ext) {
-    try {
-        Push-Location -LiteralPath $projectRoot
-        $biomeOut = (& cmd /c "npx biome check --write ""$filePath"" 2>&1") -join "`n"
-        Pop-Location
-        if ($LASTEXITCODE -eq 0) {
-            Write-LspLog "biome OK: $filePath"
-        } else {
-            Write-LspLog "biome diagnostics (non-fatal): $filePath"
-            # 출력 처음 5줄만 stderr로
-            $head = ($biomeOut -split "`n" | Select-Object -First 5) -join "`n"
-            [Console]::Error.WriteLine("[LSP-AUTOFIX] biome: $filePath")
-            [Console]::Error.WriteLine($head)
+    $biomePkg = Join-Path $projectRoot 'node_modules\@biomejs\biome\package.json'
+    if (-not (Test-Path -LiteralPath $biomePkg -PathType Leaf)) {
+        Write-LspLog "biome skipped (no local @biomejs/biome): $filePath"
+    } else {
+        try {
+            try {
+                Push-Location -LiteralPath $projectRoot
+                $biomeOut = (& cmd /c "npx --no-install @biomejs/biome check --write ""$filePath"" 2>&1") -join "`n"
+            } finally { Pop-Location }
+            if ($LASTEXITCODE -eq 0) {
+                Write-LspLog "biome OK: $filePath"
+            } else {
+                Write-LspLog "biome diagnostics (non-fatal): $filePath"
+                # 출력 처음 5줄만 stderr로
+                $head = ($biomeOut -split "`n" | Select-Object -First 5) -join "`n"
+                [Console]::Error.WriteLine("[LSP-AUTOFIX] biome: $filePath")
+                [Console]::Error.WriteLine($head)
+            }
+        } catch {
+            Write-LspLog "biome FAILED: $_"
         }
-    } catch {
-        Write-LspLog "biome FAILED: $_"
     }
 }
 
-# Stylelint 자동수정 (CSS)
+# Stylelint 자동수정 (CSS) — 프로젝트에 설치된 stylelint가 있을 때만
 if ($cssExts -contains $ext) {
-    try {
-        Push-Location -LiteralPath $projectRoot
-        $slOut = (& cmd /c "npx stylelint --fix ""$filePath"" 2>&1") -join "`n"
-        Pop-Location
-        if ($LASTEXITCODE -eq 0) {
-            Write-LspLog "stylelint OK: $filePath"
-        } else {
-            Write-LspLog "stylelint diagnostics (non-fatal): $filePath"
-            $slHead = ($slOut -split "`n" | Select-Object -First 5) -join "`n"
-            [Console]::Error.WriteLine("[LSP-AUTOFIX] stylelint: $filePath")
-            [Console]::Error.WriteLine($slHead)
+    $stylelintPkg = Join-Path $projectRoot 'node_modules\stylelint\package.json'
+    if (-not (Test-Path -LiteralPath $stylelintPkg -PathType Leaf)) {
+        Write-LspLog "stylelint skipped (no local stylelint): $filePath"
+    } else {
+        try {
+            try {
+                Push-Location -LiteralPath $projectRoot
+                $slOut = (& cmd /c "npx --no-install stylelint --fix ""$filePath"" 2>&1") -join "`n"
+            } finally { Pop-Location }
+            if ($LASTEXITCODE -eq 0) {
+                Write-LspLog "stylelint OK: $filePath"
+            } else {
+                Write-LspLog "stylelint diagnostics (non-fatal): $filePath"
+                $slHead = ($slOut -split "`n" | Select-Object -First 5) -join "`n"
+                [Console]::Error.WriteLine("[LSP-AUTOFIX] stylelint: $filePath")
+                [Console]::Error.WriteLine($slHead)
+            }
+        } catch {
+            Write-LspLog "stylelint FAILED: $_"
         }
-    } catch {
-        Write-LspLog "stylelint FAILED: $_"
     }
 }
 

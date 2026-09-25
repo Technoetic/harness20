@@ -11,11 +11,18 @@ const repo = fileURLToPath(new URL('../../', import.meta.url));
 const windows = process.platform === 'win32';
 const bashOnWindows = windows && process.env.H50_TEST_BASH === '1';
 const active = { current_step: 1, total_steps: 50, completed_steps: [] };
-function fixture(t, state = active) {
+// A run is active only next to the body of its current step, as after /webapp <topic>.
+function stepBody(root, step) {
+  fs.mkdirSync(path.join(root, 'step_archive', 'archived'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'step_archive', 'archived', `step${String(step).padStart(3, '0')}.md`), `# Step ${step}\n`);
+}
+function fixture(t, state = active, { body = true } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'h50-security-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.mkdirSync(path.join(root, 'step_archive'));
   if (state !== null) fs.writeFileSync(path.join(root, 'step_archive/progress.json'), typeof state === 'string' ? state : JSON.stringify(state));
+  const step = state?.current_step;
+  if (body && Number.isInteger(step) && step >= 1 && step <= 50) stepBody(root, step);
   return root;
 }
 // Runs a hook from the repository without judging its stderr; run() requires stderr to be empty.
@@ -77,6 +84,7 @@ test('Unicode event cwd survives the PowerShell to Node pipe', t => {
   const root = path.join(parent, '프로젝트');
   fs.mkdirSync(path.join(root, 'step_archive'), { recursive: true });
   fs.writeFileSync(path.join(root, 'step_archive/progress.json'), JSON.stringify(active));
+  stepBody(root, 1);
   assert.match(run(root, 'auto-approve', { ...write('src/app.js'), cwd: root }, { CLAUDE_PROJECT_DIR: '' }, repo).output, /"allow"/);
 });
 test('hard links to protected files do not grant write approval', t => {
@@ -155,6 +163,38 @@ test('dangling directory links cannot grant project write approval', t => {
   const outside = fixture(t);
   fs.symlinkSync(path.join(outside, 'missing'), path.join(root, 'dangling'), windows ? 'junction' : 'dir');
   assert.equal(run(root, 'auto-approve', write('dangling/file.txt')).output, '');
+});
+test('an active-looking progress.json without its step body is stale and defers', t => {
+  // The shape an older SessionStart loader created in any folder it opened.
+  assert.equal(run(fixture(t, active, { body: false }), 'auto-approve', write('src/app.js')).output, '');
+  assert.equal(run(fixture(t, { ...active, current_step: 3, completed_steps: [1, 2] }, { body: false }), 'auto-approve', write('src/app.js')).output, '');
+});
+test('approval follows the first unfinished step, and total_steps must be present', t => {
+  // The writer's QA gate can leave a gap and move current_step back to it.
+  assert.match(run(fixture(t, { ...active, current_step: 3, completed_steps: [1, 2, 4] }), 'auto-approve', write('src/app.js')).output, /"allow"/);
+  const { total_steps, ...withoutTotal } = active;
+  assert.equal(total_steps, 50);
+  assert.equal(run(fixture(t, withoutTotal), 'auto-approve', write('src/app.js')).output, '');
+});
+// Files that a later git operation, install, editor, CI run or agent session executes or follows.
+const EXECUTION_LINKED = ['.mcp.json', 'CLAUDE.md', 'docs/CLAUDE.md', 'CLAUDE.local.md', 'AGENTS.md', '.husky/pre-commit',
+  '.githooks/pre-push', '.vscode/tasks.json', '.devcontainer/devcontainer.json', '.github/workflows/ci.yml', 'package.json',
+  'packages/a/package.json', 'package-lock.json', '.yarnrc.yml', '.pnpmfile.cjs', '.envrc', 'lefthook.yml', '.pre-commit-config.yaml',
+  'node_modules/x/index.js', 'harness50.quality.json', 'step_archive/tools/html-bundler.ps1', 'PACKAGE.JSON', '.HUSKY/pre-commit',
+  ...(windows ? ['package.json::$DATA'] : [])];
+test('execution-linked files never receive hook approval in an active workflow', t => {
+  const root = fixture(t);
+  assert.match(run(root, 'auto-approve', write('src/app.js')).output, /"allow"/);
+  for (const target of EXECUTION_LINKED) assert.equal(run(root, 'auto-approve', write(target)).output, '', target);
+  for (const target of ['src/app.js', 'src/package-helper.js', 'docs/claude-notes.md', '.github/ISSUE_TEMPLATE/bug.md', 'vite.config.js']) {
+    assert.match(run(root, 'auto-approve', write(target)).output, /"allow"/, target);
+  }
+});
+test('the guard mode leaves execution-linked edits to the normal prompt instead of denying them', t => {
+  const root = fixture(t);
+  const guard = run(root, 'permission-request-guard', { hook_event_name: 'PermissionRequest', ...write('package.json') });
+  assert.equal(guard.status, 0);
+  assert.equal(guard.output, '');
 });
 test('missing Node runtime cannot grant approval', t => {
   const root = fixture(t);

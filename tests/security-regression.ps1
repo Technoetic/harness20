@@ -6,6 +6,8 @@
 #   - MUST_DEFER: ordinary shell commands retain host permission checks.
 #   - GATE: progress.json 부재 시 auto-approve가 allow 미발급 (전역 자동승인 결함 방지)
 #   - CODEX STATE: .harness50-codex/ 편집과 Codex state.json 옆의 progress.json은 allow 미발급 (Stop 게이트 우회 방지)
+#   - EXEC-LINKED: 실행과 연결되는 파일(.husky/, .mcp.json, package.json, CLAUDE.md, CI, 편집기 설정) 편집은 활성 중에도 allow 미발급
+#   - STALE: 현재 단계 본문이 없는 progress.json(옛 로더가 만든 파일)은 allow 미발급
 #
 # 사용: powershell -NoProfile -ExecutionPolicy Bypass -File tests/security-regression.ps1
 # 종료코드: 실패 0건이면 0, 하나라도 실패면 1.
@@ -23,6 +25,9 @@ function Fail($m) { Write-Host "  x FAIL: $m"; $script:fail++ }
 $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("h50reg_" + [guid]::NewGuid().ToString("N").Substring(0,8))
 New-Item -ItemType Directory -Path (Join-Path $tmp "step_archive") -Force | Out-Null
 '{"current_step":1,"completed_steps":[],"total_steps":50}' | Out-File -FilePath (Join-Path $tmp "step_archive/progress.json") -Encoding UTF8
+# 활성 실행은 현재 단계 본문이 있어야 한다 (/webapp 부트스트랩과 같은 배치)
+New-Item -ItemType Directory -Path (Join-Path $tmp "step_archive/archived") -Force | Out-Null
+'# Step 1' | Out-File -LiteralPath (Join-Path $tmp "step_archive/archived/step001.md") -Encoding UTF8
 $env:CLAUDE_PROJECT_DIR = $tmp
 
 function Invoke-Hook($hook, $cmd) {
@@ -100,6 +105,17 @@ New-Item -ItemType Directory -Path $codexDir -Force | Out-Null
 $r = Invoke-WriteHook $AA 'src/app.js'
 if ($r.out -match '"permissionDecision":"allow"') { Fail "Codex state.json 옆의 오래된 progress.json이 자동승인을 유지함" } else { Ok }
 Remove-Item -LiteralPath $codexDir -Recurse -Force
+
+Write-Host "== EXEC-LINKED: 실행과 연결되는 파일 편집은 활성 중에도 allow 미발급 =="
+foreach ($p in @('.husky/pre-commit', '.mcp.json', 'package.json', 'CLAUDE.md', '.github/workflows/ci.yml', '.vscode/tasks.json')) {
+  $r = Invoke-WriteHook $AA $p
+  if ($r.out -match '"permissionDecision":"allow"') { Fail "실행과 연결되는 파일 편집에 allow 발급됨: $p" } else { Ok }
+}
+
+Write-Host "== STALE: 현재 단계 본문이 없는 progress.json은 allow 미발급 =="
+Remove-Item -LiteralPath (Join-Path $tmp "step_archive/archived/step001.md") -Force
+$r = Invoke-WriteHook $AA 'src/app.js'
+if ($r.out -match '"permissionDecision":"allow"') { Fail "본문 없는 progress.json(옛 로더 산출물)이 자동승인을 유지함" } else { Ok }
 
 Write-Host "== GATE: progress.json 부재 시 auto-approve 미발화 =="
 Remove-Item (Join-Path $tmp "step_archive/progress.json") -Force

@@ -453,7 +453,11 @@ testEachName('Codex state turns Claude auto-approval off, even next to a stale p
   const search = { tool_name: 'WebSearch', tool_input: { query: 'css' } };
   const allow = /"permissionDecision":"allow"/;
 
-  // Baseline: on its own the stale file still reads as an active Claude workflow.
+  // The loader-created file alone has no step body next to it: it is stale, never an active run.
+  assert.equal(approve(edit), '');
+  // With the step body a /webapp run has, the same progress.json reads as an active Claude workflow.
+  mkdirSync(join(f.archive, 'archived'), { recursive: true });
+  writeFileSync(join(f.archive, 'archived', 'step001.md'), '# Step 1\n');
   assert.match(approve(edit), allow);
   assert.equal(approve({ ...edit, tool_input: { ...edit.tool_input, file_path: CODEX_STATE_RELATIVE } }), '');
   const cases = {

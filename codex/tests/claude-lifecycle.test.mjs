@@ -73,6 +73,27 @@ testEachProject('Stop is project scoped, bounded, sticky on stall, and resets af
   assert.match(JSON.parse(f.run('step-auto-continue', event)).reason, /step002/);
   f.state([1, 2, 3], 3); assert.equal(f.run('step-auto-continue', event), '');
 });
+testEachProject('the loader never creates progress.json and natural language never bootstraps', (t, name) => {
+  const f = fixture(t, name);
+  assert.equal(f.run('step-progress-loader', { cwd: f.project }), '');
+  assert.equal(f.run('step-progress-loader', {}, '', f.project), '');
+  assert.ok(!existsSync(join(f.project, 'step_archive')), 'SessionStart must not create step_archive/');
+  for (const prompt of ['회사 매출 대시보드 만들어줘', '웹앱 튜토리얼 만들어줘', '@step_archive/archived/step001.md 절대 복종', '/webapp']) {
+    assert.equal(f.run('webapp-trigger', { cwd: f.project, prompt }), '', prompt);
+  }
+  assert.ok(!existsSync(join(f.project, 'step_archive')), 'a natural-language prompt must not bootstrap');
+});
+testEachProject('/webapp leaves a run with completed steps unchanged', (t, name) => {
+  const f = fixture(t, name); f.state([1], 2);
+  mkdirSync(join(f.project, 'step_archive', 'TOPIC'));
+  writeFileSync(join(f.project, 'step_archive', 'TOPIC', 'TOPIC.md'), '---\ntopic: first\n---\n');
+  const bytes = () => ['progress.json', 'TOPIC/TOPIC.md'].map(file => readFileSync(join(f.project, 'step_archive', file)));
+  const before = bytes();
+  const lines = f.run('webapp-trigger', { cwd: f.project, prompt: '/webapp x' }).split(/\r?\n/);
+  assert.equal(lines.length, 1, lines.join('\n'));
+  assert.match(lines[0], /^\[HARNESS\] webapp trigger skipped: step_archive\/progress\.json already records 1\/50 completed steps/);
+  assert.deepEqual(bytes(), before);
+});
 testEachProject('Stop uses process cwd fallback and releases missing, paused, malformed state', (t, name) => {
   const f = fixture(t, name);
   assert.equal(f.run('step-auto-continue', { cwd: f.project }), '');

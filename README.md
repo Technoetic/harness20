@@ -196,7 +196,7 @@ v2.4.0은 Claude·Codex의 제품 QA에 [실패·검증 인계 보고서](docs/Q
 | `/webapp 논문 인용 네트워크` | force-directed 인용 관계망 + 시간축 애니메이션 + 검색·필터 + 영향력 노드 강조 |
 | `/webapp 저자 연구 활동 대시보드` | h-index·인용 추이 KPI + 공저자 네트워크 + 키워드 워드클라우드 + 연도별 라인 |
 | `/webapp Literature Review 대시보드` | 논문 분류 매트릭스 + 갭 분석 다이어그램 + 읽기 큐 카드 + 태그 클라우드 |
-| 자연어 `"... 대시보드 만들어줘"` | 위 넷과 동일. 트리거 패턴 7종 모두 지원 |
+| 자연어 요청 | 자동 시작하지 않음 — `/webapp <주제>`로 시작 |
 
 산출물 = **단일 HTML 파일** (Helvetica Neue / 8 배수 grid / accent 1색 / radius {0,4,8,12,16} / 터치 44pt / ARIA 필수).
 
@@ -287,7 +287,7 @@ flowchart TB
 활성 작업의 프로젝트 내부 파일 편집과 WebSearch만 제한적으로 자동 승인합니다. 셸 명령과 WebFetch는 호스트의 권한 정책을 따르며, 알려진 위험 명령과 민감 경로는 계속 차단합니다.
 
 > [!IMPORTANT]
-> **auto-approve는 유효한 진행 상태에서만 발화합니다.** 완료 단계가 연속되고 현재 단계가 일치해야 합니다. 파일이 없거나 JSON이 손상됐거나 일시정지·완료 상태라면 정상 권한 흐름을 따릅니다. 경로는 `..`, 버전이 포함된 플러그인 캐시, 디렉터리 링크를 포함해 검사합니다.
+> **auto-approve는 유효한 진행 상태에서만 발화합니다.** 완료 단계는 1~50 사이의 중복 없는 정수이고, 현재 단계는 첫 번째 빈 단계이며, `total_steps`는 50이고, 그 단계의 본문 파일(`step_archive/archived/stepNNN.md` 또는 `step_archive/stepNNN.md`)이 있어야 합니다. 파일이 없거나 JSON이 손상됐거나 일시정지·중지·완료 상태라면 정상 권한 흐름을 따릅니다. `.mcp.json`·`CLAUDE.md`·`.husky/`·`package.json`처럼 실행과 연결되는 파일은 진행 중에도 자동 승인에서 빠집니다. 경로는 `..`, 버전이 포함된 플러그인 캐시, 디렉터리 링크를 포함해 검사합니다.
 >
 > 아래 감사 기록은 이전 버전의 이력입니다. 현재 회귀 검사는 [`tests/security-regression.sh`](tests/security-regression.sh)와 [`codex/tests/claude-security.test.mjs`](codex/tests/claude-security.test.mjs)에서 위험 명령 차단, 일반 셸 명령의 권한 위임, 비활성 상태와 경로 우회를 확인합니다. 경로 검사는 파일시스템 샌드박스를 대신하지 않습니다.
 
@@ -604,16 +604,10 @@ step045 E2E는 프로젝트의 `npm run e2e`를 실행한다 — 러너(Playwrig
 /webapp 논문 트렌드 분석 대시보드
 ```
 
-또는 자연어:
+자연어 요청만으로는 시작하지 않습니다. 요구사항을 한 번에 못박고 싶을 때는 첫 줄에 `/webapp <주제>`를 두고 다음 줄부터 요구사항을 적습니다:
 
 ```text
-논문 분야별 트렌드를 보여주는 대시보드를 만들어줘
-```
-
-또는 요구사항을 한 번에 못박고 싶을 때 — 트리거 매칭 신뢰도가 가장 높습니다:
-
-```text
-주제: 논문 트렌드 분석 대시보드
+/webapp 논문 트렌드 분석 대시보드
 
 연구자가 한눈에 분야별 흐름을 짚을 수 있는
 인터랙티브 대시보드를 한 편 만들어줘.
@@ -635,7 +629,7 @@ step045 E2E는 프로젝트의 `npm run e2e`를 실행한다 — 러너(Playwrig
 
 ```text
 /harness-reset
-→ harness50 리셋 완료 — step001부터 재시작 가능
+→ harness50 리셋 완료 — step001부터 재시작 가능 (새 주제는 리셋 후 /webapp <주제>)
 ```
 
 `/harness-reset`은 `step_archive/archived/`, `specs/`, `outputs/`는 보존. progress.json만 초기화.
@@ -670,14 +664,24 @@ step045 E2E는 프로젝트의 `npm run e2e`를 실행한다 — 러너(Playwrig
 
 | 이벤트 | 실행 hook | 역할 |
 |:---|:---|:---|
-| **UserPromptSubmit** | webapp-trigger → step-obedience-guard | 트리거 패턴 감지 시 부트스트랩. 그 외엔 다음 step 강제 |
-| **SessionStart** | step-progress-loader | progress.json 로드 + 다음 step 지시 주입 |
+| **UserPromptSubmit** | webapp-trigger → step-obedience-guard | `/webapp <주제>`일 때만 부트스트랩(완료 기록이 있는 progress는 건너뜀). 활성 실행에서는 다음 step 알림 |
+| **SessionStart** | step-progress-loader | 진행 중인 실행에서만 progress.json 로드 + 다음 step 지시 주입(새로 만들지 않음) |
 | **PreToolUse** | destructive-guard + auto-approve | 위험 차단(Bash) + 편집·WebSearch 자동 승인 (병렬, exit 2 우선) |
 | **PermissionRequest** | permission-request-guard | `updatedInput` 변조 방어용 최후 검증 (deny+exit 2) |
 | **PostToolUse** | mx-tag-validator + lsp-autofix | @MX 태그 검증 + Biome/Stylelint 자동수정 |
 | **Stop** | step-progress-writer → spec-generator → trust5-validator → step-auto-continue | progress 갱신 → SPEC 생성 → r1/r2/r3 평가 → 미완료면 block JSON |
 
 `step_archive/.harness50-codex/state.json`이 있는 Codex 작업 공간에서는 step 훅(loader·writer·auto-continue·obedience-guard·webapp-trigger·spec-generator·trust5-validator)이 progress.json과 TOPIC.md를 만들거나 바꾸지 않고 Stop도 막지 않으며, Claude 편집을 자동 승인하지도 않습니다. SessionStart는 `hooks/lib/codex-workflow.mjs`가 읽은 Codex 진행 단계를 한 줄로만 알립니다([마이그레이션과 리셋](#migration-and-reset--마이그레이션과-리셋)).
+
+**활성 조건.** Claude Code 훅은 `hooks/lib/harness-activity.mjs` 한 곳의 판정을 따릅니다. 다음을 모두 만족할 때만 진행 중인 실행입니다: `step_archive/.harness50-codex/state.json` 항목이 없음, `step_archive/progress.json`이 프로젝트 안의 1MB 이하 일반 파일, `paused`가 없거나 false, `status`가 없거나 active·running·in_progress, `total_steps`가 50, 완료 단계가 1~50의 중복 없는 정수, 현재 단계가 첫 번째 빈 단계, 그 단계의 본문 파일이 있음. `hooks/run-hook.mjs`가 셸을 띄우기 전에 이 판정을 한 번 하므로, 무관한 폴더에서는 훅이 파일을 만들거나 승인·block·지시 주입을 하지 않습니다.
+
+- destructive-guard와 permission-request-guard는 설치 범위 전체(모든 폴더)에서 실행됩니다.
+- webapp-trigger는 첫 줄이 `/webapp <주제>`(또는 `/harness50:webapp <주제>`)일 때만 실행됩니다.
+- step-progress-loader는 진행 중인 실행과 Codex 작업 공간(한 줄 안내)에서 실행됩니다.
+- trust5-validator는 진행 중일 때와 50단계를 모두 마친 뒤에 실행됩니다.
+- 나머지 훅(step-obedience-guard·auto-approve·mx-tag-validator·lsp-autofix·step-progress-writer·spec-generator·step-auto-continue)은 진행 중인 실행에서만 실행됩니다.
+- 진행 중에도 실행과 연결되는 파일은 자동 승인에서 빠집니다. 예: `.mcp.json`, `CLAUDE.md`, `AGENTS.md`, `.husky/`, `.github/workflows/`, `package.json`, lockfile, `harness50.quality.json`, `node_modules/`, `step_archive/tools/`.
+- lsp-autofix는 프로젝트 `node_modules`에 biome·stylelint가 있을 때만 `npx --no-install`로 실행합니다.
 
 ---
 

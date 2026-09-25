@@ -1,9 +1,12 @@
 ﻿# webapp-trigger.ps1 — UserPromptSubmit hook
-# 사용자 prompt가 "웹앱 튜토리얼 생성" 트리거 패턴이면:
+# /webapp 명시 명령만 발급, 완료 기록이 있는 progress는 덮어쓰지 않음.
+# 첫 줄이 `/webapp <주제>`(또는 `/harness50:webapp <주제>`)인 prompt에서만:
 #   1) step_archive/ 부트스트랩 (없으면 생성, step001~050 복사)
 #   2) TOPIC/TOPIC.md 작성 (사용자 prompt 원문 보존)
 #   3) progress.json 초기화 (current_step=1)
 #   4) stdout으로 system-reminder 주입 → step001 즉시 진입 강제
+# 자연어 요청은 아무것도 하지 않는다. 완료 단계가 기록됐거나 읽을 수 없는 progress.json이
+# 있으면 lib/harness-activity.mjs precheck-webapp의 한 줄만 알리고 아무것도 바꾸지 않는다.
 
 param()
 
@@ -46,24 +49,9 @@ try { $j = $raw | ConvertFrom-Json } catch { exit 0 }
 $prompt = [string]$j.prompt
 if (-not $prompt) { exit 0 }
 
-# 트리거 패턴 — /webapp 명시 트리거 + 자연어(대시보드/웹앱/튜토리얼 생성 요청).
-# (H1 수정: README가 광고하는 "...대시보드를 만들어줘" 자연어 진입을 실제로 지원)
-$triggers = @(
-  '튜토리얼.*(생성|만들어|제작)',
-  '인터랙티브.*필수.*초보자',
-  '@step_archive/archived/step001\.md',
-  '^/webapp\s+',
-  'webapp\s+생성',
-  '웹앱.*튜토리얼',
-  '인터렉티브.*필수',
-  '대시보드.*(만들어|만들|생성|제작|구현)',
-  '(웹앱|웹\s*앱|웹\s*페이지|web\s*app).*(만들어|만들|생성|제작|구현)'
-)
-$matched = $false
-foreach ($p in $triggers) {
-  if ($prompt -match $p) { $matched = $true; break }
-}
-if (-not $matched) { exit 0 }
+# 트리거 — 첫 줄의 명시 명령 `/webapp <주제>` 또는 `/harness50:webapp <주제>`만 (대소문자 구분).
+# 자연어 요청은 자동 시작하지 않는다. lib/harness-activity.mjs의 EXPLICIT_WEBAPP와 같은 규칙.
+if (-not ($prompt -cmatch '^[ \t]*/(harness50:)?webapp[ \t]+\S')) { exit 0 }
 
 Write-Log "TRIGGER matched. prompt head: $($prompt.Substring(0,[Math]::Min(80,$prompt.Length)))"
 
@@ -82,6 +70,21 @@ if (Test-Path -LiteralPath $codexState) {
   if (-not $codexLine) { $codexLine = "[HARNESS] WARNING: step_archive/.harness50-codex/state.json exists but is unreadable or incomplete - Claude hooks will not create progress.json or block Stop here. Inspect it with the harness50 plugin's codex/scripts/harness-state.mjs show and ask the user before repairing or resetting it." }
   Write-Output "[HARNESS] webapp trigger skipped: a Codex workflow owns this workspace, so step_archive/TOPIC/TOPIC.md and progress.json were left unchanged. Resume that workflow, or use a separate workspace for a different topic."
   Write-Output $codexLine
+  exit 0
+}
+
+# Never overwrite a run that recorded completed steps, or a progress.json that cannot be read.
+# lib/harness-activity.mjs precheck-webapp answers 'issue' when a new topic may start; any other
+# line is printed as is. Without node nothing is checked, so nothing is changed either.
+$preLine = ""
+try {
+  $pre = @(& node (Join-Path $PSScriptRoot 'lib/harness-activity.mjs') precheck-webapp (Join-Path $projectRoot '.') 2>$null)
+  if ($pre.Count -gt 0) { $preLine = [string]$pre[0] }
+} catch {}
+if ($preLine -ne 'issue') {
+  if (-not $preLine) { $preLine = '[HARNESS] webapp trigger skipped: node is unavailable, so existing progress could not be checked and nothing was changed.' }
+  Write-Log "precheck -> trigger skipped"
+  Write-Output $preLine
   exit 0
 }
 
@@ -107,7 +110,7 @@ foreach ($b in @("html-bundler.ps1", "html-bundler.sh")) {
   if (Test-Path -LiteralPath $bSrc) { Copy-Item -LiteralPath $bSrc -Destination (Join-Path $toolsDir $b) -Force }
 }
 
-# 2) TOPIC.md 작성 (덮어쓰기 — 신규 요청은 신규 주제)
+# 2) TOPIC.md 작성 (덮어쓰기 — 완료 기록이 없을 때의 신규 요청은 신규 주제)
 $today = Get-Date -Format "yyyy-MM-dd"
 $topicBody = @"
 ---
