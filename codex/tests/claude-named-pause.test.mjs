@@ -1,6 +1,8 @@
 // Claude named pause (harness-rules 2-1). scripts/harness-pause.mjs is the only writer of paused and
 // pause_* in step_archive/progress.json. While a run is paused the Stop hook stays silent, the
-// SessionStart loader and the prompt guard say where it stopped, and nothing else changes it.
+// SessionStart loader and the prompt guard say where it stopped, and the progress writer only
+// records the completion lines of the turn that paused. /harness-reset (the same CLI's reset) starts
+// a new run boundary that waits in a user-request pause.
 // The texts the model reads (the hooks, the constitution, the commands) agree with
 // scripts/lib/pause-state.mjs.
 //
@@ -10,13 +12,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { existsSync, linkSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, linkSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { classifyProgress } from '../../hooks/lib/harness-activity.mjs';
 import {
-  HISTORY_MAX, MODEL_PAUSE_REASONS, NAMED_PAUSE, PAUSE_KEYS, PAUSE_REASONS, PAUSED_TEMPLATE,
-  applyPause, applyResume, isPaused, pausedLine
+  HISTORY_MAX, MODEL_PAUSE_REASONS, NAMED_PAUSE, PAUSE_KEYS, PAUSE_REASONS, PAUSED_TEMPLATE, RESET_NOTE,
+  applyPause, applyResume, isPaused, pausedLine, pausedStep
 } from '../../scripts/lib/pause-state.mjs';
 import { bashOnWindows, installPlugin, nativeVariant, repo, runClaudeHook, runDispatcher, tempRoot, tree, windows } from './helpers/claude-hooks.mjs';
 
@@ -537,6 +539,254 @@ testEachName('H10 /webapp replaces a paused run without completed steps and keep
   assert.deepEqual(f.bytes(), before);
 });
 
+// A transcript line as Claude Code writes it: one assistant text block with an ISO UTC timestamp
+// (timestamp null leaves the key out).
+const assistantLine = (text, timestamp = new Date().toISOString()) =>
+  `${JSON.stringify({ type: 'assistant', ...(timestamp === null ? {} : { timestamp }), message: { role: 'assistant', content: [{ type: 'text', text }] } })}\n`;
+const writeBody = (f, step) => writeFileSync(join(f.archive, 'archived', `step${pad(step)}.md`), `# Step ${step}\n## Task\n`);
+// The PowerShell writer skips its write when another test file holds the machine-wide
+// Global\step-progress-writer-mutex; the completion scan is idempotent, so rerun it (bounded)
+// until done() holds. Returns the progress read after the last run.
+function writeUntil(f, run, done) {
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    run();
+    if (done(f.read())) break;
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500 * attempt);
+  }
+  return f.read();
+}
+
+testEachName('H11 the Stop of the turn that paused records its completions; PAUSED and resume name the first unfinished step', (t, name) => {
+  // Through the installed dispatcher, so the activity gate of every hook is part of the test.
+  const f = setup(t, name, { plugin: true, total: 50, state: { completed_steps: [1], current_step: 2 } });
+  for (const step of [4, 5]) writeBody(f, step);
+  const transcript = join(f.base, 'turn.jsonl');
+  const dispatch = (hookName, event) => {
+    const result = runDispatcher(f.plugin, hookName, { cwd: f.project, ...event }, { cwd: f.base, timeoutMs: 60000 });
+    assert.equal(result.status, 0, `${hookName}: ${result.stderr}`);
+    assert.equal(result.stderr, '', hookName);
+    return result.stdout.replace(/\r\n/g, '\n').trim();
+  };
+  // One turn: steps 2 and 3 are reported, step 4 is blocked, the model pauses, then reports it.
+  appendFileSync(transcript, assistantLine('Step 002/50 완료') + assistantLine('Step 003/50 완료'));
+  const evidence = f.evidence('step004_blocked.md', '# blocked\nAPI key missing\n');
+  const paused = f.cli('pause', { reason: 'required-input-missing', evidence, note: 'API 키를 설정해 주세요' });
+  assert.equal(paused.json.paused_step, 2, 'the CLI runs before the Stop writer of the same turn');
+  const report = 'Step 004/50 멈춤 | 사유: required-input-missing | 사용자가 할 일: API 키를 설정해 주세요 | 재개: /harness-resume';
+  appendFileSync(transcript, assistantLine(report));
+  const stopEvent = { hook_event_name: 'Stop', session_id: 'h11', stop_hook_active: false, transcript_path: transcript, last_assistant_message: report };
+  const pauseFields = Object.fromEntries(['paused', ...PAUSE_KEYS].map(key => [key, f.read()[key]]));
+
+  const after = writeUntil(f, () => dispatch('step-progress-writer', stopEvent), progress => progress.completed_steps.includes(3));
+  assert.deepEqual(after.completed_steps, [1, 2, 3]);
+  assert.equal(after.current_step, 4);
+  for (const [key, value] of Object.entries(pauseFields)) assert.deepEqual(after[key], value, key);
+  assert.equal(dispatch('step-auto-continue', stopEvent), '', 'the pause still holds');
+
+  assert.equal(pausedStep(after), 4);
+  assert.equal(dispatch('step-progress-loader', { hook_event_name: 'SessionStart', source: 'startup' }), `=== Paused at step004 ===\n${pausedLine(after)}`);
+  assert.ok(pausedLine(after).startsWith('[HARNESS] PAUSED at step004/50 (reason=required-input-missing, since '), pausedLine(after));
+  assert.equal(dispatch('step-obedience-guard', { hook_event_name: 'UserPromptSubmit', prompt: '키는 어디에 넣어?' }), pausedLine(after));
+  const status = f.cli('status').json;
+  assert.equal(status.paused_step, 4);
+  assert.equal(status.next_step, 4);
+  const resumed = f.cli('resume').json;
+  assert.equal(resumed.next_step, 4);
+  assert.equal(resumed.resumed_from.step, 4);
+  assert.deepEqual(f.read().completed_steps, [1, 2, 3]);
+});
+
+test('H12 the paused step is never before the first unfinished step', () => {
+  const base = { total_steps: 5, paused: true };
+  assert.equal(pausedStep({ ...base, completed_steps: [1, 2, 3], paused_step: 2 }), 4);
+  assert.equal(pausedStep({ ...base, completed_steps: [1], paused_step: 4 }), 4);
+  assert.equal(pausedStep({ ...base, completed_steps: [1, 2], paused_step: 9 }), 3);
+  assert.equal(pausedStep({ ...base, completed_steps: [1, 2], paused_step: '4' }), 3);
+  const resumed = applyResume({ ...base, completed_steps: [1, 2, 3], paused_step: 2, pause_reason: 'user-request' });
+  assert.equal(resumed.resumedFrom.step, 4);
+});
+
+test('H13 the loader and the prompt guard print max(paused_step, first unfinished step)', t => {
+  const f = setup(t, NAMES[1], { plugin: true, state: { completed_steps: [1, 2], current_step: 3, paused: true, pause_reason: 'required-tool-failed', paused_step: 1 } });
+  const seen = {};
+  for (const variant of VARIANTS) {
+    const expected = pausedLine(f.read());
+    assert.ok(expected.startsWith('[HARNESS] PAUSED at step003/3 (reason=required-tool-failed).'), expected);
+    assert.equal(loader(f, variant), `=== Paused at step003 ===\n${expected}`, variant);
+    assert.equal(guard(f, '왜 멈췄어?', variant), expected, variant);
+    seen[variant] = expected;
+  }
+  if (VARIANTS.length === 2) assert.deepEqual(seen.sh, seen.ps1);
+});
+
+testEachName('R1 reset replaces progress.json with a paused run at step 1 and keeps the step bodies, TOPIC and outputs', (t, name) => {
+  const f = setup(t, name, { state: { completed_steps: [1, 2], current_step: 3, x_extra: 1, pause_history: [{ reason: 'user-request', step: 1 }] } });
+  mkdirSync(join(f.archive, 'TOPIC'));
+  writeFileSync(join(f.archive, 'TOPIC', 'TOPIC.md'), '---\ntopic: alpha\n---\n');
+  mkdirSync(join(f.archive, 'outputs'));
+  writeFileSync(join(f.archive, 'outputs', 'trust5_r1.md'), 'Verdict: PASS\n');
+  const others = () => tree(f.project).filter(([key]) => key !== 'step_archive/progress.json');
+  const before = others();
+  const started = Date.now();
+  const reset = f.cli('reset');
+  assert.equal(reset.status, 0);
+  assert.deepEqual(reset.json, { action: 'reset', changed: true, paused: true, reason: 'user-request', paused_step: 1, next_step: 1, completed: 0, total: 50 });
+  const after = f.read();
+  assert.deepEqual(Object.keys(after).sort(), ['completed_steps', 'current_step', 'failed_steps', 'last_updated', 'metrics', 'pause_evidence', 'pause_note', 'pause_reason',
+    'paused', 'paused_at', 'paused_step', 'run_started_at', 'session_history', 'skipped_steps', 'total_steps'].sort());
+  assert.deepEqual({ ...after, last_updated: 'x', paused_at: 'x', run_started_at: 'x' }, {
+    current_step: 1, completed_steps: [], skipped_steps: [], failed_steps: [], total_steps: 50,
+    metrics: { total_duration_minutes: 0, total_sessions: 0, steps_per_session_avg: 0 }, session_history: [],
+    run_started_at: 'x', paused: true, pause_reason: 'user-request', paused_step: 1, paused_at: 'x', pause_note: RESET_NOTE, pause_evidence: null, last_updated: 'x'
+  });
+  assert.match(after.run_started_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  assert.ok(Date.parse(after.run_started_at) >= started - 1, after.run_started_at);
+  assert.equal(after.paused_at, after.run_started_at);
+  assert.deepEqual(others(), before, 'step bodies, TOPIC.md and outputs are left alone');
+  const written = readFileSync(f.progressFile, 'utf8');
+  assert.notEqual(written.charCodeAt(0), 0xfeff);
+  assert.ok(written.endsWith('}\n'));
+
+  // An unreadable progress.json is replaced too: the /webapp skip line sends the user here for it.
+  f.write('{broken');
+  assert.equal(f.cli('reset').json.next_step, 1);
+  assert.equal(f.read().pause_note, RESET_NOTE);
+});
+
+test('R2 reset creates nothing and refuses Codex, linked and malformed input', t => {
+  const base = tempRoot(t, 'h50-reset-refuse-');
+  const empty = join(base, 'empty');
+  mkdirSync(empty);
+  const none = cli(['reset', '--workspace', empty]);
+  assert.equal(none.status, 2);
+  assert.equal(none.error.code, 'PAUSE_NO_WORKFLOW');
+  assert.equal(existsSync(join(empty, 'step_archive')), false);
+
+  const codex = join(base, 'codex');
+  mkdirSync(join(codex, 'step_archive', '.harness50-codex'), { recursive: true });
+  writeFileSync(join(codex, 'step_archive', 'progress.json'), JSON.stringify(PROGRESS));
+  writeFileSync(join(codex, 'step_archive', '.harness50-codex', 'state.json'), '{}');
+  const before = tree(codex);
+  const refused = cli(['reset', '--workspace', codex]);
+  assert.equal(refused.status, 2);
+  assert.equal(refused.error.code, 'PAUSE_CODEX_WORKSPACE');
+  assert.deepEqual(tree(codex), before);
+
+  const f = setup(t, NAMES[1]);
+  const hash = f.hash();
+  for (const args of [['reset', '--workspace', f.project, '--note', 'x'], ['reset', '--workspace', f.project, '--reason', 'user-request'], ['reset']]) {
+    const result = cli(args);
+    assert.equal(result.status, 64, args.join(' '));
+    assert.equal(f.hash(), hash, args.join(' '));
+  }
+  linkSync(f.progressFile, join(f.project, 'copy.json'));
+  const linked = f.cli('reset');
+  assert.equal(linked.status, 2);
+  assert.equal(linked.error.code, 'PAUSE_STATE_INVALID');
+  assert.equal(f.hash(), hash);
+});
+
+testEachName('R3 /webapp alpha, three steps, /harness-reset, same-session Stop, /webapp beta', (t, name) => {
+  // One session (one transcript) from the first topic to the second. Native hook variant; with
+  // H50_TEST_BASH=1 on Windows the .sh hooks run.
+  const base = tempRoot(t, 'h50-reset-flow-');
+  const plugin = installPlugin(base);
+  const project = join(base, name);
+  mkdirSync(project);
+  const f = { base, project, archive: join(project, 'step_archive'), progressFile: join(project, 'step_archive', 'progress.json') };
+  f.read = () => JSON.parse(readFileSync(f.progressFile, 'utf8').replace(BOM, ''));
+  const hook = (hookName, event) => {
+    const result = runClaudeHook(plugin, hookName, { cwd: project, ...event }, { cwd: base });
+    assert.equal(result.status, 0, `${hookName}: ${result.stderr}`);
+    assert.equal(result.stderr.trim(), '', hookName);
+    return result.stdout.replace(/\r\n/g, '\n').trim();
+  };
+  const topic = () => readFileSync(join(f.archive, 'TOPIC', 'TOPIC.md'), 'utf8');
+  const transcript = join(base, 'session.jsonl');
+  const say = text => appendFileSync(transcript, assistantLine(text));
+  const stopEvent = last => ({ hook_event_name: 'Stop', session_id: 'same', stop_hook_active: false, transcript_path: transcript, last_assistant_message: last });
+  const prompt = text => ({ hook_event_name: 'UserPromptSubmit', prompt: text });
+
+  assert.match(hook('webapp-trigger', prompt('/webapp alpha')), /<harness50-trigger>/);
+  const alpha = f.read();
+  assert.match(alpha.run_started_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/);
+  assert.match(topic(), /\/webapp alpha/);
+  for (const step of ['001', '002', '003']) say(`Step ${step}/50 완료`);
+  const recorded = writeUntil(f, () => hook('step-progress-writer', stopEvent('Step 003/50 완료')), progress => progress.completed_steps.includes(3));
+  assert.deepEqual(recorded.completed_steps, [1, 2, 3]);
+  assert.match(hook('webapp-trigger', prompt('/webapp beta')), /already records 3\/50 completed steps/);
+
+  const reset = cli(['reset', '--workspace', project]);
+  assert.equal(reset.status, 0);
+  const afterReset = f.read();
+  assert.ok(Date.parse(afterReset.run_started_at) >= Date.parse(alpha.run_started_at));
+  const done = 'harness50 리셋 완료 — 새 주제는 /webapp <주제>, 현재 주제를 1단계부터 다시 하려면 /harness-resume';
+  say(done);
+  // The Stop of the reset turn: the old completion lines stay behind the new boundary and the
+  // user-request pause keeps Stop from continuing the old topic.
+  assert.equal(hook('step-progress-writer', stopEvent(done)), '');
+  assert.deepEqual(f.read(), afterReset, 'the writer leaves the reset run unchanged');
+  assert.equal(hook('step-auto-continue', stopEvent(done)), '');
+  assert.match(hook('step-progress-loader', { hook_event_name: 'SessionStart', source: 'resume' }), /^=== Paused at step001 ===\n\[HARNESS\] PAUSED at step001\/50 \(reason=user-request, since /);
+  assert.equal(hook('step-obedience-guard', prompt('다음은?')), pausedLine(afterReset));
+  // webapp-trigger answers /webapp <topic>; the guard adds no contradicting PAUSED line.
+  assert.equal(hook('step-obedience-guard', prompt('/webapp beta')), '');
+  assert.match(topic(), /\/webapp alpha/, 'reset leaves TOPIC.md alone');
+  assert.equal(readdirSync(join(f.archive, 'archived')).filter(file => /^step\d{3}\.md$/.test(file)).length, 50);
+
+  assert.match(hook('webapp-trigger', prompt('/webapp beta')), /<harness50-trigger>/);
+  assert.match(topic(), /\/webapp beta/);
+  assert.doesNotMatch(topic(), /alpha/);
+  const beta = f.read();
+  for (const key of ['paused', ...PAUSE_KEYS]) assert.equal(Object.hasOwn(beta, key), false, key);
+  assert.ok(Date.parse(beta.run_started_at) >= Date.parse(afterReset.run_started_at));
+  // Same session again: the alpha completions stay behind the beta boundary.
+  hook('step-progress-writer', stopEvent('Step 001/50 시작'));
+  assert.deepEqual(f.read().completed_steps, []);
+  assert.match(JSON.parse(hook('step-auto-continue', stopEvent('Step 001/50 시작'))).reason, /step001/);
+});
+
+test('R4 a run without run_started_at (2.9.0 and earlier) still counts the whole transcript', t => {
+  const f = setup(t, NAMES[1], { plugin: true, total: 50 });
+  const transcript = join(f.base, 'old.jsonl');
+  appendFileSync(transcript, assistantLine('Step 001/50 완료', '2020-01-01T00:00:00.000Z') + assistantLine('Step 002/50 완료', '2020-01-01T00:00:01Z'));
+  const seen = {};
+  for (const variant of VARIANTS) {
+    f.write({ ...PROGRESS, total_steps: 50 });
+    const after = writeUntil(f, () => f.hook('step-progress-writer', { hook_event_name: 'Stop', session_id: 'r4', transcript_path: transcript }, variant), progress => progress.completed_steps.includes(2));
+    assert.deepEqual(after.completed_steps, [1, 2], variant);
+    assert.equal(Object.hasOwn(after, 'run_started_at'), false, variant);
+    seen[variant] = after.completed_steps;
+  }
+  if (VARIANTS.length === 2) assert.deepEqual(seen.sh, seen.ps1);
+});
+
+test('R5 run_started_at compares instants, not text, and counts entries without a usable timestamp', t => {
+  const f = setup(t, NAMES[1], { plugin: true, total: 50 });
+  for (let step = 4; step <= 8; step += 1) writeBody(f, step);
+  const transcript = join(f.base, 'edge.jsonl');
+  appendFileSync(transcript, [
+    assistantLine('Step 001/50 완료', '2026-09-26T01:02:03.4999999Z'), // just before: left out
+    assistantLine('Step 002/50 완료', '2026-09-26T01:02:03.50000Z'), // the same instant: counted (text order says before)
+    assistantLine('Step 003/50 완료', '2026-09-26T10:02:03.499+09:00'), // 01:02:03.499Z, before: left out (text order says after)
+    assistantLine('Step 004/50 완료', '2026-09-26T01:02:03Z'), // before: left out (text order says after)
+    assistantLine('Step 005/50 완료', '2026-09-26T01:02:03.5000001Z'), // same microsecond: counted
+    assistantLine('Step 006/50 완료', null), // no timestamp: counted
+    assistantLine('Step 007/50 완료', 'not a time') // unparsable: counted
+  ].join(''));
+  const seen = {};
+  for (const variant of VARIANTS) {
+    f.write({ ...PROGRESS, total_steps: 50, run_started_at: '2026-09-26T01:02:03.500Z' });
+    // last_assistant_message carries no timestamp and belongs to the stopping turn: always counted.
+    const event = { hook_event_name: 'Stop', session_id: 'r5', transcript_path: transcript, last_assistant_message: 'Step 008/50 완료' };
+    const after = writeUntil(f, () => f.hook('step-progress-writer', event, variant), progress => progress.completed_steps.includes(8));
+    assert.deepEqual(after.completed_steps, [2, 5, 6, 7, 8], variant);
+    assert.equal(after.run_started_at, '2026-09-26T01:02:03.500Z', variant);
+    seen[variant] = after.completed_steps;
+  }
+  if (VARIANTS.length === 2) assert.deepEqual(seen.sh, seen.ps1);
+});
+
 test('P3 the pause CLI is never auto-approved, even in an active run', t => {
   const f = setup(t, NAMES[1], { total: 50 });
   for (const command of [
@@ -596,10 +846,18 @@ test('D1 the pause codes, judgement and sentences agree across the rules, pause-
   assert.deepEqual(literal(NAMED_PAUSE, /named pause \(([^;]+);/, 'NAMED_PAUSE').split(' | '), [...MODEL_PAUSE_REASONS]);
 
   // Every hook copy uses the canonical judgement.
-  for (const file of ['hooks/step-auto-continue.sh', 'hooks/step-progress-loader.sh', 'hooks/step-obedience-guard.sh']) {
+  for (const file of ['hooks/step-auto-continue.sh', 'hooks/step-progress-loader.sh', 'hooks/step-obedience-guard.sh', 'hooks/step-progress-writer.sh']) {
     assert.ok(text(file).includes("('paused' in p and p['paused'] is not False) or p.get('status')=='paused'"), file);
   }
-  for (const file of ['hooks/step-auto-continue.ps1', 'hooks/step-progress-loader.ps1', 'hooks/step-obedience-guard.ps1']) {
+  // ... and the same paused step: max(paused_step, first unfinished) (pause-state pausedStep).
+  for (const file of ['hooks/step-progress-loader.sh', 'hooks/step-obedience-guard.sh']) {
+    assert.ok(text(file).includes('step=max(step,first) if isinstance(step,int) and not isinstance(step,bool) and 1<=step<=total else first'), file);
+  }
+  for (const file of ['hooks/step-progress-loader.ps1', 'hooks/step-obedience-guard.ps1']) {
+    assert.ok(text(file).includes('$pausedStepValue -le $pauseTotal -and $pausedStepValue -gt $pauseFirst) { $pauseStep = [int]$pausedStepValue }'), file);
+  }
+  assert.match(text('commands/harness-status.md'), /첫 미완료 Step보다 작으면 첫 미완료 Step/);
+  for (const file of ['hooks/step-auto-continue.ps1', 'hooks/step-progress-loader.ps1', 'hooks/step-obedience-guard.ps1', 'hooks/step-progress-writer.ps1']) {
     assert.match(text(file), /\$hasPaused = @\(\$(\w+)\.PSObject\.Properties\.Name\) -ccontains 'paused'\n\$isPaused = \(\$hasPaused -and -not \(\$\1\.paused -is \[bool\] -and -not \$\1\.paused\)\) -or \(\$\1\.status -is \[string\] -and \$\1\.status -ceq 'paused'\)/, file);
   }
 
@@ -629,6 +887,13 @@ test('D3 the pause commands and the step documents describe the same procedure',
     assert.ok(source.includes('.harness50-codex'), file);
   }
   assert.ok(text('commands/harness-pause.md').includes('--reason user-request'));
+  // The note is quoted with single quotes, so $(...), backticks and $VAR stay text in bash and PowerShell.
+  for (const file of ['commands/harness-pause.md', 'skills/harness-rules/SKILL.md']) {
+    assert.ok(text(file).includes("--note '<"), file);
+    assert.ok(!text(file).includes('--note "<'), file);
+  }
+  assert.ok(text('commands/harness-reset.md').includes('scripts/harness-pause.mjs" reset --workspace "<project-root>"'));
+  assert.ok(!/"completed_steps": \[\]/.test(text('commands/harness-reset.md')), 'harness-reset.md no longer writes the template itself');
   for (const file of ['commands/webapp.md', 'agents/step-executor.md', 'skills/evaluator/SKILL.md', 'commands/harness-reset.md']) {
     assert.ok(text(file).includes('§2-1') || text(file).includes('/harness-resume'), file);
   }

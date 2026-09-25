@@ -2,7 +2,9 @@
 // runs them) in folders that have no active Harness50 run: nothing may be created, approved,
 // blocked or injected there. Only an explicit /webapp <topic> starts a run. A paused run (named
 // pause, harness-rules 2-1) is the one exception that speaks: the loader and the prompt guard
-// print where it stopped, and still nothing is written.
+// print where it stopped. The progress writer also starts there, to record completion lines of the
+// turn that paused (claude-named-pause P1); its Stop here carries the pause report instead, so it
+// has nothing to record and still nothing is written.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -30,8 +32,10 @@ function registrations() {
     groups.flatMap(group => group.hooks.map(hook => / ([a-z0-9-]+)$/.exec(hook.command)[1]))]));
 }
 
-// Synthetic events for each hook event, all with the project as cwd.
-function events(project) {
+// Synthetic events for each hook event, all with the project as cwd. A paused run's last message is
+// the pause report (harness-rules 2-1), which is not a completion line.
+const PAUSE_REPORT = 'Step 001/50 멈춤 | 사유: user-request | 사용자가 할 일: 회의 후 재개 | 재개: /harness-resume';
+function events(project, kind) {
   const tool = (tool_name, tool_input) => ({ tool_name, tool_input, cwd: project });
   const tools = [
     tool('Bash', { command: 'npm test' }),
@@ -52,7 +56,7 @@ function events(project) {
       tool('Edit', { file_path: join(project, 'src', 'style.css'), old_string: 'x', new_string: 'y' }),
       tool('Write', { file_path: join(project, 'src', '[id].js'), content: 'x' })
     ].map(event => ({ hook_event_name: 'PostToolUse', ...event })),
-    Stop: [{ hook_event_name: 'Stop', session_id: 's', stop_hook_active: false, last_assistant_message: 'Step 001/50 완료', cwd: project }]
+    Stop: [{ hook_event_name: 'Stop', session_id: 's', stop_hook_active: false, last_assistant_message: kind === 'paused' ? PAUSE_REPORT : 'Step 001/50 완료', cwd: project }]
   };
 }
 
@@ -155,7 +159,7 @@ for (const [kind, prepare] of Object.entries(WORKSPACES)) {
     writeFileSync(join(f.project, 'src', '[id].js'), 'export const id = 1;\n');
     if (prepare(f.project, f.base, t) === 'skip') return;
     const before = { project: tree(f.project), outside: existsSync(join(f.base, 'outside')) ? tree(join(f.base, 'outside')) : null, hooks: hookList(f.plugin) };
-    const byEvent = events(f.project);
+    const byEvent = events(f.project, kind);
     const tasks = [];
     for (const [event, hooks] of Object.entries(registrations())) {
       for (const hook of hooks.filter(hook => !guards.has(hook))) {

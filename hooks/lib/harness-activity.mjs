@@ -15,7 +15,8 @@
 // reads as stale and never turns hooks on.
 // A named pause (scripts/harness-pause.mjs, harness-rules 2-1) is judged on the same rules with
 // the pause flag removed: 'paused' only when that run would be active, else finished, stale,
-// stopped or invalid. Only the loader and the prompt guard start for a paused run.
+// stopped or invalid. Only the loader, the prompt guard and the progress writer start for a paused
+// run.
 //
 // It never writes and never imports codex/: installed copies and hook fixtures may ship hooks/
 // without it. The CLI prints one ASCII line and always exits 0.
@@ -29,9 +30,11 @@ export const MAX_PROGRESS_BYTES = 1024 * 1024;
 // First line only: '^' without the m flag anchors at the start of the prompt. Case-sensitive.
 export const EXPLICIT_WEBAPP = /^[ \t]*\/(?:harness50:)?webapp[ \t]+\S/;
 // Which run phases start each registered hook. 'always' runs everywhere the plugin is installed;
-// 'explicit-webapp' runs only for a '/webapp <topic>' prompt. In a paused run only the loader and
-// the prompt guard start, to say where the run stopped; Stop, approval, quality, SPEC, MX, LSP and
-// the writer stay off until /harness-resume.
+// 'explicit-webapp' runs only for a '/webapp <topic>' prompt. In a paused run the loader and the
+// prompt guard start, to say where the run stopped, and the writer starts to record the completion
+// lines the model reported in the turn it paused (harness-rules 2-1 lets it finish steps first). The
+// writer never tells the model to continue, so the pause keeps its meaning. Stop continuation,
+// approval, quality, SPEC, MX and LSP stay off until /harness-resume.
 export const HOOK_GATES = Object.freeze({
   'destructive-guard': 'always',
   'permission-request-guard': 'always',
@@ -42,7 +45,7 @@ export const HOOK_GATES = Object.freeze({
   'auto-approve': Object.freeze(['active']),
   'mx-tag-validator': Object.freeze(['active']),
   'lsp-autofix': Object.freeze(['active']),
-  'step-progress-writer': Object.freeze(['active']),
+  'step-progress-writer': Object.freeze(['active', 'paused']),
   'spec-generator': Object.freeze(['active']),
   'step-auto-continue': Object.freeze(['active'])
 });
@@ -168,7 +171,9 @@ export function shouldRunHook(name, raw, env = process.env, cwd = process.cwd())
 }
 
 // 'issue' lets '/webapp <topic>' bootstrap a new run. Anything else is the one line the trigger
-// prints instead: recorded progress and unreadable progress are never overwritten.
+// prints instead: recorded progress and unreadable progress are never overwritten. A run without
+// completed steps is replaced whether or not it is paused, so '/harness-reset' (which leaves a
+// user-request pause) followed by '/webapp <topic>' starts the new topic.
 export function webappPrecheck(root) {
   if (codexOwned(root)) return CODEX_SKIP_LINE;
   let state;

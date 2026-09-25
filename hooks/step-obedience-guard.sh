@@ -22,11 +22,12 @@ if [ -e "$PROJECT_ROOT/step_archive/.harness50-codex/state.json" ]; then exit 0;
 command -v python3 >/dev/null 2>&1 || exit 0
 
 # The commands that control the run itself (/harness-pause, /harness-resume, /harness-status,
-# /harness-reset) get no reminder, paused or not (mirrors step-obedience-guard.ps1).
+# /harness-reset) get no reminder, paused or not (mirrors step-obedience-guard.ps1). An explicit
+# /webapp <topic> gets no PAUSED line (below).
 CONTROL="$(printf '%s' "$RAW" | python3 -c 'import json,re,sys
 d=json.load(sys.stdin)
 p=d.get("prompt") if isinstance(d,dict) else None
-print("control" if isinstance(p,str) and re.match(r"\s*/(harness50:)?harness-(pause|resume|status|reset)(\s|$)",p) else "")' 2>/dev/null || true)"
+print("control" if isinstance(p,str) and re.match(r"\s*/(harness50:)?harness-(pause|resume|status|reset)(\s|$)",p) else "webapp" if isinstance(p,str) and re.match(r"[ \t]*/(harness50:)?webapp[ \t]+\S",p) else "")' 2>/dev/null || true)"
 case "$CONTROL" in control*) exit 0 ;; esac
 
 # The fourth field is '-' or the validated PAUSED line of a named pause (harness-rules 2-1); read
@@ -39,9 +40,10 @@ CODES=('permission-denied','required-tool-failed','required-input-missing','user
 PAUSED='[HARNESS] PAUSED at step{STEP}/{TOTAL} (reason={REASON}{SINCE}). Automatic continuation is off: do not run steps. Tell the user why (pause_note in step_archive/progress.json) and handle their message. Resume only when the user explicitly asks: /harness-resume.'
 def paused_line(p,total,first):
     # Validated values only: a known code, a step inside 1..total, an ISO paused_at. pause_note and
-    # pause_evidence are never printed.
+    # pause_evidence are never printed. The step is max(paused_step, first unfinished): the Stop
+    # writer records the completions of the turn that paused after the pause itself.
     step=p.get('paused_step')
-    if not (isinstance(step,int) and not isinstance(step,bool) and 1<=step<=total): step=first
+    step=max(step,first) if isinstance(step,int) and not isinstance(step,bool) and 1<=step<=total else first
     code=p.get('pause_reason') if p.get('pause_reason') in CODES else 'unknown'
     at=p.get('paused_at')
     since=', since '+at if isinstance(at,str) and re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,3})?Z',at) else ''
@@ -69,8 +71,11 @@ esac
 [ "$DONE" -ge "$TOTAL" ] && exit 0
 [ "$NEXT" = "0" ] && exit 0
 
-# Named pause: that one line only, no step reminder (mirrors step-obedience-guard.ps1).
+# Named pause: that one line only, no step reminder (mirrors step-obedience-guard.ps1). An explicit
+# /webapp <topic> is answered by webapp-trigger, which runs for the same prompt (in parallel); a
+# PAUSED line would contradict that answer.
 if [ -n "$PAUSED_LINE" ] && [ "$PAUSED_LINE" != "-" ]; then
+  case "$CONTROL" in webapp*) exit 0 ;; esac
   printf '%s\n' "$PAUSED_LINE"
   exit 0
 fi

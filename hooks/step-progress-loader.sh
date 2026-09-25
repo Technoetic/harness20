@@ -47,9 +47,10 @@ PAUSED='[HARNESS] PAUSED at step{STEP}/{TOTAL} (reason={REASON}{SINCE}). Automat
 NAMED='Early stop only as a named pause (permission-denied | required-tool-failed | required-input-missing; harness-rules 2-1): save evidence under step_archive/, run node "<plugin-root>/scripts/harness-pause.mjs" pause --workspace "<project-root>" --reason <code> --evidence <step_archive/file> --note "<user action>", then end the turn with the pause report.'
 def paused_line(p,total,first):
     # Validated values only: a known code, a step inside 1..total, an ISO paused_at. pause_note and
-    # pause_evidence are never printed.
+    # pause_evidence are never printed. The step is max(paused_step, first unfinished): the Stop
+    # writer records the completions of the turn that paused after the pause itself.
     step=p.get('paused_step')
-    if not (isinstance(step,int) and not isinstance(step,bool) and 1<=step<=total): step=first
+    step=max(step,first) if isinstance(step,int) and not isinstance(step,bool) and 1<=step<=total else first
     code=p.get('pause_reason') if p.get('pause_reason') in CODES else 'unknown'
     at=p.get('paused_at')
     since=', since '+at if isinstance(at,str) and re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,3})?Z',at) else ''

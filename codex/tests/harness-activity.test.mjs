@@ -173,7 +173,7 @@ const EXPECTED = {
   'auto-approve': ['active'],
   'mx-tag-validator': ['active'],
   'lsp-autofix': ['active'],
-  'step-progress-writer': ['active'],
+  'step-progress-writer': ['paused', 'active'],
   'spec-generator': ['active'],
   'step-auto-continue': ['active']
 };

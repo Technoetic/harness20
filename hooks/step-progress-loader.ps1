@@ -90,7 +90,9 @@ if ($isPaused) {
     if ($pauseFirst -gt 0) {
         $pauseStep = $pauseFirst
         $pausedStepValue = $existingProgress.paused_step
-        if (($pausedStepValue -is [int] -or $pausedStepValue -is [long]) -and $pausedStepValue -ge 1 -and $pausedStepValue -le $pauseTotal) { $pauseStep = [int]$pausedStepValue }
+        # max(paused_step, first unfinished): the Stop writer records the completions of the turn
+        # that paused after the pause itself (scripts/lib/pause-state.mjs pausedStep).
+        if (($pausedStepValue -is [int] -or $pausedStepValue -is [long]) -and $pausedStepValue -ge 1 -and $pausedStepValue -le $pauseTotal -and $pausedStepValue -gt $pauseFirst) { $pauseStep = [int]$pausedStepValue }
         $pauseCode = 'unknown'
         if ($existingProgress.pause_reason -is [string] -and $pauseCodes -ccontains $existingProgress.pause_reason) { $pauseCode = $existingProgress.pause_reason }
         $pauseSince = ''

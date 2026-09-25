@@ -118,8 +118,17 @@ log "TOPIC.md written"
 
 # progress.json
 NOW="$(date '+%Y-%m-%dT%H:%M:%S')"
+# run_started_at (UTC ISO 8601) is the run boundary: step-progress-writer counts only transcript
+# entries from this moment on (mirrors webapp-trigger.ps1). node answered the precheck above, so it
+# gives the millisecond form; date -u (whole seconds, never later than now) is the fallback.
+STARTED="$(node -e 'process.stdout.write(new Date().toISOString())' 2>/dev/null || true)"
+case "$STARTED" in
+  [0-9][0-9][0-9][0-9]-*Z) ;;
+  *) STARTED="$(date -u '+%Y-%m-%dT%H:%M:%SZ')" ;;
+esac
 cat >"$PROGRESS_FILE" <<JSON
 {
+  "run_started_at": "$STARTED",
   "current_step": 1,
   "completed_steps": [],
   "skipped_steps": [],

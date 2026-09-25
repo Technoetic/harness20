@@ -61,11 +61,17 @@ $pausedTemplate = '[HARNESS] PAUSED at step{STEP}/{TOTAL} (reason={REASON}{SINCE
 $hasPaused = @($progress.PSObject.Properties.Name) -ccontains 'paused'
 $isPaused = ($hasPaused -and -not ($progress.paused -is [bool] -and -not $progress.paused)) -or ($progress.status -is [string] -and $progress.status -ceq 'paused')
 if ($isPaused) {
+    # An explicit /webapp <topic> is answered by webapp-trigger, which runs for the same prompt (in
+    # parallel): it starts a new topic when no step is complete, else says why not. A PAUSED line
+    # here would contradict that answer.
+    if ([string]$harnessEvent.prompt -cmatch '^[ \t]*/(harness50:)?webapp[ \t]+\S') { exit 0 }
     $pauseTotal = $totalSteps
     $pauseFirst = $nextStep
     $pauseStep = $pauseFirst
     $pausedStepValue = $progress.paused_step
-    if (($pausedStepValue -is [int] -or $pausedStepValue -is [long]) -and $pausedStepValue -ge 1 -and $pausedStepValue -le $pauseTotal) { $pauseStep = [int]$pausedStepValue }
+    # max(paused_step, first unfinished): the Stop writer records the completions of the turn that
+    # paused after the pause itself (scripts/lib/pause-state.mjs pausedStep).
+    if (($pausedStepValue -is [int] -or $pausedStepValue -is [long]) -and $pausedStepValue -ge 1 -and $pausedStepValue -le $pauseTotal -and $pausedStepValue -gt $pauseFirst) { $pauseStep = [int]$pausedStepValue }
     $pauseCode = 'unknown'
     if ($progress.pause_reason -is [string] -and $pauseCodes -ccontains $progress.pause_reason) { $pauseCode = $progress.pause_reason }
     $pauseSince = ''

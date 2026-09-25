@@ -40,10 +40,13 @@ export function firstUnfinished(progress) {
 }
 
 export const reasonCode = value => (PAUSE_REASONS.includes(value) ? value : 'unknown');
-// paused_step when it is an integer inside 1..total_steps, else the first unfinished step.
+// Where the run stopped: max(paused_step, first unfinished step) when paused_step is an integer
+// inside 1..total_steps, else the first unfinished step. The pause is recorded mid-turn, before the
+// Stop writer records the completion lines of that turn, so a stored paused_step can lag behind.
 export function pausedStep(progress) {
   const step = progress.paused_step;
-  return Number.isInteger(step) && step >= 1 && step <= progress.total_steps ? step : firstUnfinished(progress);
+  const first = firstUnfinished(progress);
+  return Number.isInteger(step) && step >= 1 && step <= progress.total_steps ? Math.max(step, first) : first;
 }
 const pausedAt = progress => (typeof progress.paused_at === 'string' && PAUSED_AT.test(progress.paused_at) ? progress.paused_at : null);
 
@@ -90,6 +93,26 @@ export function applyResume(progress, { now = new Date() } = {}) {
   for (const key of PAUSE_KEYS) delete next[key];
   if (next.status === 'paused') next.status = 'running';
   return { changed: true, next, resumedFrom };
+}
+
+// What `reset` writes: the /webapp bootstrap template with no completed step, a new run boundary
+// (run_started_at, UTC) and a user-request pause, so the Stop hooks neither continue the old topic
+// nor count its completion lines again. '/webapp <topic>' then starts a new topic (no completed
+// step) and '/harness-resume' runs the kept topic from step 1.
+export const RESET_TOTAL = 50;
+export const RESET_NOTE = '리셋 후 대기 — /webapp <주제>로 새 실행, /harness-resume으로 현재 주제를 1단계부터';
+export function resetProgress({ now = new Date() } = {}) {
+  const fresh = {
+    current_step: 1,
+    completed_steps: [],
+    skipped_steps: [],
+    failed_steps: [],
+    total_steps: RESET_TOTAL,
+    metrics: { total_duration_minutes: 0, total_sessions: 0, steps_per_session_avg: 0 },
+    session_history: [],
+    run_started_at: now.toISOString()
+  };
+  return applyPause(fresh, { reason: 'user-request', note: RESET_NOTE, now }).next;
 }
 
 // Position and pause state of a validated progress.json.

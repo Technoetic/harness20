@@ -5,24 +5,28 @@
 //   node harness-pause.mjs pause  --workspace <root> --reason <code> --note <text> [--evidence step_archive/<file>]
 //   node harness-pause.mjs resume --workspace <root>
 //   node harness-pause.mjs status --workspace <root>
+//   node harness-pause.mjs reset  --workspace <root>
 //
 // Model codes (permission-denied, required-tool-failed, required-input-missing) need --evidence;
-// user-request (/harness-pause) does not. stdout is one JSON line; errors are one JSON line on
-// stderr. Exit codes: 0 done, 1 I/O failure, 2 refused by workspace state, 64 usage, 75 the file
-// kept changing. Nothing is created: no step_archive/, no progress.json. A Codex workspace is
-// refused (use Codex $webapp pause/resume there). Uses no codex/ module.
+// user-request (/harness-pause) does not. reset (/harness-reset) replaces progress.json with a new
+// run at step 1 (run_started_at now) that waits in a user-request pause; it accepts an unreadable
+// progress.json too, and leaves the step bodies, TOPIC.md, specs and outputs alone. stdout is one
+// JSON line; errors are one JSON line on stderr. Exit codes: 0 done, 1 I/O failure, 2 refused by
+// workspace state, 64 usage, 75 the file kept changing. Nothing is created: no step_archive/, no
+// progress.json. A Codex workspace is refused (use Codex $webapp pause/resume or
+// $harness50-reset there). Uses no codex/ module.
 import { lstat } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import {
   MODEL_PAUSE_REASONS, NOTE_MAX, PAUSE_REASONS,
-  applyPause, applyResume, firstUnfinished, pauseDetails, summary, validateProgress
+  applyPause, applyResume, firstUnfinished, pauseDetails, resetProgress, summary, validateProgress
 } from './lib/pause-state.mjs';
 import { physicalWorkspace, readSafe, sha256, writeSafe } from './lib/quality-files.mjs';
 
 const PROGRESS = 'step_archive/progress.json';
 const PROGRESS_LIMIT = 1024 * 1024;
-const FLAGS = { pause: ['workspace', 'reason', 'note', 'evidence'], resume: ['workspace'], status: ['workspace'] };
+const FLAGS = { pause: ['workspace', 'reason', 'note', 'evidence'], resume: ['workspace'], status: ['workspace'], reset: ['workspace'] };
 const CONTROL = /[\x00-\x1f\x7f\u2028\u2029]/;
 const ATTEMPTS = 3;
 
@@ -38,7 +42,7 @@ const usage = message => new PauseError(64, 'PAUSE_USAGE', message);
 // `--flag value` pairs only, as in scripts/qa-report.mjs.
 function parseArgs(argv) {
   const [command, ...args] = argv;
-  if (!Object.hasOwn(FLAGS, command ?? '')) throw usage('Expected pause, resume or status');
+  if (!Object.hasOwn(FLAGS, command ?? '')) throw usage('Expected pause, resume, status or reset');
   if (args.length % 2 !== 0) throw usage('Arguments must be --flag value pairs');
   const allowed = new Set(FLAGS[command]);
   const options = Object.create(null);
@@ -134,10 +138,14 @@ async function main() {
   // computed again from the new content.
   for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
     const bytes = await readProgress(root);
-    const progress = parseProgress(bytes);
+    // A reset starts over, so its only input is that the file exists as a small, unaliased
+    // regular file: unreadable JSON is replaced too (the /webapp skip line points here for it).
+    const progress = options.command === 'reset' ? null : parseProgress(bytes);
     if (options.command === 'status') return { action: 'status', changed: false, ...summary(progress), ...pauseDetails(progress) };
     let result;
-    if (options.command === 'pause') {
+    if (options.command === 'reset') {
+      result = { changed: true, next: resetProgress({ now: new Date() }) };
+    } else if (options.command === 'pause') {
       if (!firstUnfinished(progress)) throw new PauseError(2, 'PAUSE_COMPLETED', 'Every step is recorded as completed; there is nothing to pause');
       if (options.evidence) await checkEvidence(root, options.evidence);
       result = applyPause(progress, { reason: options.reason, note: options.note, evidence: options.evidence, now: new Date() });

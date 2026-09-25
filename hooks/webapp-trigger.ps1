@@ -142,7 +142,11 @@ if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $by
 Write-Log "TOPIC.md written"
 
 # 3) progress.json 초기화
+# run_started_at (UTC ISO 8601) is the run boundary: step-progress-writer counts only transcript
+# entries from this moment on, so completion lines of an earlier topic in the same session never
+# come back. scripts/harness-pause.mjs reset writes the same field.
 $progress = @{
+  run_started_at = [DateTime]::UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", [System.Globalization.CultureInfo]::InvariantCulture)
   current_step = 1
   completed_steps = @()
   skipped_steps = @()

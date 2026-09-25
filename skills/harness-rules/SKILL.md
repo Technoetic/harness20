@@ -65,13 +65,15 @@ Step NNN/50 완료
 멈춤 절차:
 
 1. 무엇을 시도했고 무엇이 막혔는지 현재 단계 결과 파일(`step_archive/` 아래)에 적는다.
-2. 다음 명령을 한 번 실행한다. progress.json을 직접 편집하지 않는다. note에는 명령어·비밀·로그 원문을 넣지 않는다.
-   `node "<plugin-root>/scripts/harness-pause.mjs" pause --workspace "<project-root>" --reason <코드> --evidence <step_archive/결과 파일> --note "<사용자가 할 일 1문장>"`
+2. 다음 명령을 한 번 실행한다. progress.json을 직접 편집하지 않는다. note에는 명령어·비밀·로그 원문을 넣지 않고, 작은따옴표와 줄바꿈을 뺀다. 작은따옴표로 감싸므로 `$`·백틱은 셸에서 전개되지 않는다.
+   `node "<plugin-root>/scripts/harness-pause.mjs" pause --workspace "<project-root>" --reason <코드> --evidence <step_archive/결과 파일> --note '<사용자가 할 일 1문장>'`
 3. 마지막 보고는 다음 한 줄만 쓰고 턴을 끝낸다. 완료 문구는 쓰지 않는다.
    `Step NNN/50 멈춤 | 사유: <코드> | 사용자가 할 일: <1문장> | 재개: /harness-resume`
 4. 기록 명령이 실패하거나 거부돼도 같은 보고로 끝낸다. 같은 막힘에 재시도를 소모하지 않는다.
 
-멈춘 동안에는 step을 실행하지 않고 사용자 메시지를 처리한다. 재개는 사용자가 명시 요청했을 때만 `/harness-resume`(같은 CLI의 `resume`)으로 한다. 새 `/webapp <주제>`는 완료 기록이 있는 진행을 건드리지 않는다. `/harness-reset`은 진행 기록을 새로 만들어 멈춤도 지우지만 재개가 아니라 새 실행이다.
+멈추기 전 같은 턴에서 보고한 `Step NNN/50 완료` 줄은 그 턴의 Stop에서 기록된다. 그래서 멈춤 위치와 재개 지점은 첫 미완료 step이다.
+
+멈춘 동안에는 step을 실행하지 않고 사용자 메시지를 처리한다. 재개는 사용자가 명시 요청했을 때만 `/harness-resume`(같은 CLI의 `resume`)으로 한다. 새 `/webapp <주제>`는 완료 기록이 있는 진행을 건드리지 않는다. `/harness-reset`(같은 CLI의 `reset`)은 완료 기록을 지우고 1단계의 새 실행을 `user-request` 멈춤으로 대기시킨다. 이전 멈춤과 `pause_history`도 지운다. 이어 `/webapp <주제>`는 새 주제를, `/harness-resume`은 현재 주제를 1단계부터 시작한다. 멈춘 작업을 이어가는 수단이 아니다.
 
 단계 본문 해석: "사용자 개입 요청"은 이 절차를 뜻한다. "현재 단계에서 멈춘다"는 완료를 보고하지 않고 다음 단계로 가지 않는다는 뜻이다. 원인이 위 사유면 이 절차로 멈추고, 아니면 허용된 라운드 안에서 현재 단계를 고친다. 필수 도구·필수 입력이 미달이면 "오류 기록 후 다음 Step 진행" 문구보다 이 절이 우선한다.
 
