@@ -10,7 +10,7 @@ param()
 
 $ErrorActionPreference = "Continue"
 function Write-HookLog($msg) {
-    if ($projectRoot -and (Test-Path (Join-Path $projectRoot "step_archive"))) {
+    if ($projectRoot -and (Test-Path -LiteralPath (Join-Path $projectRoot "step_archive"))) {
         try { Add-Content -LiteralPath (Join-Path $projectRoot "step_archive/step-auto-continue.log") -Value $msg -Encoding UTF8 -ErrorAction Stop } catch {}
     }
 }
@@ -33,20 +33,20 @@ try {
     Write-HookLog "stdin parse FAILED: $_"
 }
 
-$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($inputJson.cwd) { [string]$inputJson.cwd } else { (Get-Location).Path }
+$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($inputJson.cwd) { [string]$inputJson.cwd } else { [System.IO.Directory]::GetCurrentDirectory() }
 $progressFile = Join-Path $projectRoot "step_archive\progress.json"
 
 # Codex coexistence: when step_archive/.harness50-codex/state.json exists, the Codex state
 # manager owns continuation. Exit before any read or write: no block, no stall .state, no log.
 if (Test-Path -LiteralPath (Join-Path $projectRoot "step_archive\.harness50-codex\state.json")) { exit 0 }
 
-if (-not (Test-Path $progressFile)) {
+if (-not (Test-Path -LiteralPath $progressFile)) {
     Write-HookLog "progress.json missing -> exit 0"
     exit 0
 }
 
 try {
-    $progress = Get-Content $progressFile -Raw -Encoding UTF8 | ConvertFrom-Json
+    $progress = Get-Content -LiteralPath $progressFile -Raw -Encoding UTF8 | ConvertFrom-Json
 } catch {
     Write-HookLog "progress.json parse FAILED: $_ -> exit 0"
     exit 0
@@ -75,15 +75,15 @@ if ($inputJson -and $inputJson.session_id) { $sessionId = ([string]$inputJson.se
 $stateFile = if ($sessionId) { Join-Path (Join-Path $projectRoot "step_archive") "step-auto-continue.$sessionId.state" }
              else            { Join-Path (Join-Path $projectRoot "step_archive") "step-auto-continue.state" }
 try {
-    Get-ChildItem -Path (Join-Path $projectRoot "step_archive") -Filter "step-auto-continue.*.state" -ErrorAction SilentlyContinue |
+    Get-ChildItem -LiteralPath (Join-Path $projectRoot "step_archive") -Filter "step-auto-continue.*.state" -ErrorAction SilentlyContinue |
         Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-7) } |
         Remove-Item -ErrorAction SilentlyContinue
 } catch {}
 $prevState = ""
 $prevStall = 0
-if (Test-Path $stateFile) {
+if (Test-Path -LiteralPath $stateFile) {
     try {
-        $raw = (Get-Content $stateFile -Raw -Encoding UTF8).Trim()
+        $raw = (Get-Content -LiteralPath $stateFile -Raw -Encoding UTF8).Trim()
         # 형식: "completed=N;current=M|stall=K" (하위호환: |stall= 없으면 0)
         if ($raw -match '^(.*?)\|stall=(\d+)$') {
             $prevState = $Matches[1]
@@ -105,15 +105,15 @@ if ($inputJson -and $inputJson.stop_hook_active -eq $true -and $prevState -eq $c
     if ($newStall -ge $STALL_LIMIT) {
         # 연속 STALL_LIMIT회 진전 없음 -> 진짜 막힘, 포기 (무한 루프 방지)
         Write-HookLog "stop_hook_active=true AND no progress x$newStall (limit=$STALL_LIMIT) -> exit 0 (release)"
-        try { Set-Content -Path $stateFile -Value "$currState|stall=$STALL_LIMIT" -Encoding UTF8 -ErrorAction Stop } catch { exit 0 }
+        try { Set-Content -LiteralPath $stateFile -Value "$currState|stall=$STALL_LIMIT" -Encoding UTF8 -ErrorAction Stop } catch { exit 0 }
         exit 0
     }
     # 아직 한도 미만 -> stall 카운터만 올리고 계속 block (아래로 진행)
     Write-HookLog "stop_hook_active=true, no progress x$newStall (<$STALL_LIMIT) -> RETRY block"
-    try { Set-Content -Path $stateFile -Value "$currState|stall=$newStall" -Encoding UTF8 -ErrorAction Stop } catch { exit 0 }
+    try { Set-Content -LiteralPath $stateFile -Value "$currState|stall=$newStall" -Encoding UTF8 -ErrorAction Stop } catch { exit 0 }
 } else {
     # 진전이 있었거나 첫 stop -> stall 리셋
-    try { Set-Content -Path $stateFile -Value "$currState|stall=0" -Encoding UTF8 -ErrorAction Stop } catch { exit 0 }
+    try { Set-Content -LiteralPath $stateFile -Value "$currState|stall=0" -Encoding UTF8 -ErrorAction Stop } catch { exit 0 }
 }
 
 # 마지막 assistant 메시지에서 "질문/확인 대기 패턴" 감지
@@ -181,9 +181,9 @@ $nextStepStr = "{0:D3}" -f $nextStep
 $stepFile = "step_archive/step$nextStepStr.md"
 $archivedCandidate = Join-Path $projectRoot "step_archive\archived\step$nextStepStr.md"
 $flatCandidate = Join-Path $projectRoot "step_archive\step$nextStepStr.md"
-if (Test-Path $archivedCandidate) {
+if (Test-Path -LiteralPath $archivedCandidate) {
     $stepFile = "step_archive/archived/step$nextStepStr.md"
-} elseif (Test-Path $flatCandidate) {
+} elseif (Test-Path -LiteralPath $flatCandidate) {
     $stepFile = "step_archive/step$nextStepStr.md"
 }
 

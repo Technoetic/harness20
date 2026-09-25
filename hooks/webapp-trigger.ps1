@@ -19,7 +19,7 @@ try {
 $ErrorActionPreference = "Continue"
 
 $pluginRoot  = Split-Path $PSScriptRoot -Parent
-$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { (Get-Location).Path }
+$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { [System.IO.Directory]::GetCurrentDirectory() }
 $stepArchive = Join-Path $projectRoot "step_archive"
 $archivedDir = Join-Path $stepArchive "archived"
 $topicDir    = Join-Path $stepArchive "TOPIC"
@@ -30,7 +30,7 @@ $logFile     = Join-Path $PSScriptRoot "webapp-trigger.log"
 
 function Write-Log($msg) {
   $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-  try { Add-Content -Path $logFile -Value "[$ts] $msg" -Encoding UTF8 } catch {}
+  try { Add-Content -LiteralPath $logFile -Value "[$ts] $msg" -Encoding UTF8 } catch {}
 }
 
 # stdin JSON 수신
@@ -86,25 +86,25 @@ if (Test-Path -LiteralPath $codexState) {
 }
 
 # 1) step_archive 부트스트랩
-if (-not (Test-Path $stepArchive)) { New-Item -ItemType Directory -Path $stepArchive -Force | Out-Null }
-if (-not (Test-Path $archivedDir)) { New-Item -ItemType Directory -Path $archivedDir -Force | Out-Null }
-if (-not (Test-Path $topicDir))    { New-Item -ItemType Directory -Path $topicDir -Force | Out-Null }
+if (-not (Test-Path -LiteralPath $stepArchive)) { New-Item -ItemType Directory -Path $stepArchive -Force | Out-Null }
+if (-not (Test-Path -LiteralPath $archivedDir)) { New-Item -ItemType Directory -Path $archivedDir -Force | Out-Null }
+if (-not (Test-Path -LiteralPath $topicDir))    { New-Item -ItemType Directory -Path $topicDir -Force | Out-Null }
 
 # step001~050 복사 (없는 것만)
-if (Test-Path $assetSteps) {
-  Get-ChildItem $assetSteps -Filter "step*.md" | ForEach-Object {
+if (Test-Path -LiteralPath $assetSteps) {
+  Get-ChildItem -LiteralPath $assetSteps -Filter "step*.md" | ForEach-Object {
     $dst = Join-Path $archivedDir $_.Name
-    if (-not (Test-Path $dst)) { Copy-Item $_.FullName $dst -Force }
+    if (-not (Test-Path -LiteralPath $dst)) { Copy-Item -LiteralPath $_.FullName -Destination $dst -Force }
   }
 }
 
 # H4 수정: html-bundler를 프로젝트로 복사해 step038에서 실행 가능하게 한다.
 # (플러그인 hooks/는 ${CLAUDE_PLUGIN_ROOT} 밖이라 step 본문의 상대경로로 도달 불가)
 $toolsDir = Join-Path $stepArchive "tools"
-if (-not (Test-Path $toolsDir)) { New-Item -ItemType Directory -Path $toolsDir -Force | Out-Null }
+if (-not (Test-Path -LiteralPath $toolsDir)) { New-Item -ItemType Directory -Path $toolsDir -Force | Out-Null }
 foreach ($b in @("html-bundler.ps1", "html-bundler.sh")) {
   $bSrc = Join-Path $PSScriptRoot $b
-  if (Test-Path $bSrc) { Copy-Item $bSrc (Join-Path $toolsDir $b) -Force }
+  if (Test-Path -LiteralPath $bSrc) { Copy-Item -LiteralPath $bSrc -Destination (Join-Path $toolsDir $b) -Force }
 }
 
 # 2) TOPIC.md 작성 (덮어쓰기 — 신규 요청은 신규 주제)
@@ -127,7 +127,7 @@ step001이 진입 시 본 파일의 session_prompt를 읽어 topic/audience/inte
 
 - 자동 추출 항목이 모호하면 step001이 즉시 결정·기록 후 진행 (질문 금지)
 "@
-$topicBody | Out-File -FilePath $topicFile -Encoding UTF8 -Force
+$topicBody | Out-File -LiteralPath $topicFile -Encoding UTF8 -Force
 # BOM 제거
 $bytes = [System.IO.File]::ReadAllBytes($topicFile)
 if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
@@ -152,7 +152,7 @@ $progress = @{
   session_history = @()
   last_updated = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss")
 }
-$progress | ConvertTo-Json -Depth 6 | Out-File -FilePath $progressFile -Encoding UTF8 -Force
+$progress | ConvertTo-Json -Depth 6 | Out-File -LiteralPath $progressFile -Encoding UTF8 -Force
 $bytes = [System.IO.File]::ReadAllBytes($progressFile)
 if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
   [System.IO.File]::WriteAllBytes($progressFile, $bytes[3..($bytes.Length-1)])

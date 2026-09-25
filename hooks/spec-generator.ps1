@@ -26,20 +26,20 @@ $ErrorActionPreference = "Continue"
 $logFile = Join-Path $PSScriptRoot "spec-generator.log"
 function Write-SpecLog($msg) {
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    try { Add-Content -Path $logFile -Value "[$ts] $msg" -Encoding UTF8 } catch {}
+    try { Add-Content -LiteralPath $logFile -Value "[$ts] $msg" -Encoding UTF8 } catch {}
 }
 
-$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { (Get-Location).Path }
+$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { [System.IO.Directory]::GetCurrentDirectory() }
 $progressFile = Join-Path $projectRoot "step_archive\progress.json"
 $specDir = Join-Path $projectRoot "step_archive\specs"
 
 # Codex coexistence: no Claude SPEC files while the Codex state manager owns this workspace.
 if (Test-Path -LiteralPath (Join-Path $projectRoot "step_archive\.harness50-codex\state.json")) { exit 0 }
-if (-not (Test-Path $progressFile)) { exit 0 }
-if (-not (Test-Path $specDir)) { New-Item -ItemType Directory -Path $specDir -Force | Out-Null }
+if (-not (Test-Path -LiteralPath $progressFile)) { exit 0 }
+if (-not (Test-Path -LiteralPath $specDir)) { New-Item -ItemType Directory -Path $specDir -Force | Out-Null }
 
 try {
-    $progress = Get-Content $progressFile -Raw -Encoding UTF8 | ConvertFrom-Json
+    $progress = Get-Content -LiteralPath $progressFile -Raw -Encoding UTF8 | ConvertFrom-Json
 } catch {
     Write-SpecLog "progress.json read FAILED: $_"
     exit 0
@@ -67,19 +67,19 @@ foreach ($t in $targets) {
     }
     $stepNum = "{0:D3}" -f $t
     $specFile = Join-Path $specDir "SPEC-$stepNum.md"
-    if (Test-Path $specFile) { continue }  # 멱등: 기존 SPEC 보존
+    if (Test-Path -LiteralPath $specFile) { continue }  # 멱등: 기존 SPEC 보존
 
     $stepFile = Join-Path $projectRoot "step_archive\archived\step$stepNum.md"
-    if (-not (Test-Path $stepFile)) {
+    if (-not (Test-Path -LiteralPath $stepFile)) {
         $stepFile = Join-Path $projectRoot "step_archive\step$stepNum.md"
-        if (-not (Test-Path $stepFile)) {
+        if (-not (Test-Path -LiteralPath $stepFile)) {
             Write-SpecLog "step$stepNum.md not found"
             continue
         }
     }
 
     # Step 본문에서 핵심 추출
-    $stepBody = Get-Content $stepFile -Raw -Encoding UTF8
+    $stepBody = Get-Content -LiteralPath $stepFile -Raw -Encoding UTF8
     $titleMatch = [regex]::Match($stepBody, '(?m)^#\s+(.+)$')
     $title = if ($titleMatch.Success) { $titleMatch.Groups[1].Value.Trim() } else { "Step $t" }
 
@@ -132,7 +132,7 @@ $fence
 Read step_archive/archived/step$stepNum.md → 본문 실행
 "@
 
-    $spec | Out-File -FilePath $specFile -Encoding UTF8 -Force
+    $spec | Out-File -LiteralPath $specFile -Encoding UTF8 -Force
     # BOM 제거
     $bytes = [System.IO.File]::ReadAllBytes($specFile)
     if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {

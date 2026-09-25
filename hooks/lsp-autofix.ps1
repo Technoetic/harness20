@@ -29,7 +29,7 @@ $ErrorActionPreference = "Continue"
 $logFile = Join-Path $PSScriptRoot "lsp-autofix.log"
 function Write-LspLog($msg) {
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    try { Add-Content -Path $logFile -Value "[$ts] $msg" -Encoding UTF8 } catch {}
+    try { Add-Content -LiteralPath $logFile -Value "[$ts] $msg" -Encoding UTF8 } catch {}
 }
 
 # stdin
@@ -67,12 +67,12 @@ $filePath = $filePath -replace '/', '\'
 if ($filePath -notmatch '\\src\\') { exit 0 }
 if ($filePath -match '\\(node_modules|\.git|step_archive|\.claude)\\') { exit 0 }
 
-$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { (Get-Location).Path }
+$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { [System.IO.Directory]::GetCurrentDirectory() }
 
 # Biome 자동수정 (JS/TS)
 if ($jsExts -contains $ext) {
     try {
-        Push-Location $projectRoot
+        Push-Location -LiteralPath $projectRoot
         $biomeOut = (& cmd /c "npx biome check --write ""$filePath"" 2>&1") -join "`n"
         Pop-Location
         if ($LASTEXITCODE -eq 0) {
@@ -92,7 +92,7 @@ if ($jsExts -contains $ext) {
 # Stylelint 자동수정 (CSS)
 if ($cssExts -contains $ext) {
     try {
-        Push-Location $projectRoot
+        Push-Location -LiteralPath $projectRoot
         $slOut = (& cmd /c "npx stylelint --fix ""$filePath"" 2>&1") -join "`n"
         Pop-Location
         if ($LASTEXITCODE -eq 0) {

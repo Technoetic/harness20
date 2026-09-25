@@ -49,14 +49,7 @@ try { if ($j -and $j.tool_name) { $toolName = $j.tool_name } } catch {}
 $autoApproveTools = @("Bash", "Write", "Edit", "MultiEdit", "NotebookEdit", "WebFetch", "WebSearch")
 if ($autoApproveTools -notcontains $toolName) { exit 0 }
 
-# [보안 수정 — 하네스 활성 게이트] auto-approve는 오직 harness50 자율주행이
-# 실제 가동 중일 때만 발화한다. progress.json이 없으면(= /webapp 미트리거,
-# 무관한 일반 세션) 자동승인을 절대 발급하지 않고 정상 권한 흐름으로 떨어뜨린다.
-# Approval is limited to eligible project edits and WebSearch during an active workflow.
-# 상태가 되는 전역 자동승인 결함이 발생한다 (README:215 "그 외엔 silent skip" 계약 준수).
-$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($j.cwd) { $j.cwd } else { (Get-Location).Path }
-$progressFile = Join-Path $projectRoot "step_archive/progress.json"
-if (-not (Test-Path $progressFile)) { exit 0 }
+# Active workflow state is validated by approval-policy.mjs above.
 
 # 4회차 정규화 헬퍼 + 5회차 8.3 short name expand:
 #   URL-decode -> 8.3 expand (System.IO.Path.GetFullPath; well-known short names만 expand,

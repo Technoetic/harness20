@@ -441,10 +441,8 @@ const STALE_LOADER_PROGRESS = {
   skipped_steps: [], session_history: [], metrics: { total_sessions: 1, total_duration_minutes: 0, steps_per_session_avg: 0 }
 };
 
-test('Codex state turns Claude auto-approval off, even next to a stale progress.json', t => {
-  // No brackets here: auto-approve.ps1 checks progress.json with a wildcard Test-Path, so a
-  // bracketed project would never reach the approval baseline this test needs.
-  const f = fixture(t, { name: 'Codex 작업 approvals' });
+testEachName('Codex state turns Claude auto-approval off, even next to a stale progress.json', (t, name) => {
+  const f = fixture(t, { name });
   mkdirSync(f.archive, { recursive: true });
   writeFileSync(f.progressFile, JSON.stringify(STALE_LOADER_PROGRESS));
   // One variant per run, like the rest of this file: PowerShell on Windows, bash on POSIX, and the

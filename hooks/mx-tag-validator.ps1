@@ -30,7 +30,7 @@ $ErrorActionPreference = "Continue"
 $logFile = Join-Path $PSScriptRoot "mx-tag-validator.log"
 function Write-MxLog($msg) {
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    try { Add-Content -Path $logFile -Value "[$ts] $msg" -Encoding UTF8 } catch {}
+    try { Add-Content -LiteralPath $logFile -Value "[$ts] $msg" -Encoding UTF8 } catch {}
 }
 
 # stdin 이벤트 JSON
@@ -61,12 +61,12 @@ $ext = [System.IO.Path]::GetExtension($filePath).ToLower()
 if ($targetExts -notcontains $ext) { exit 0 }
 
 # Step 015 이후 구현 단계에서만 검증 (이전은 도구 설치/조사 Step)
-$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { (Get-Location).Path }
+$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { [System.IO.Directory]::GetCurrentDirectory() }
 $progressFile = Join-Path $projectRoot "step_archive\progress.json"
-if (-not (Test-Path $progressFile)) { exit 0 }
+if (-not (Test-Path -LiteralPath $progressFile)) { exit 0 }
 
 try {
-    $progress = Get-Content $progressFile -Raw -Encoding UTF8 | ConvertFrom-Json
+    $progress = Get-Content -LiteralPath $progressFile -Raw -Encoding UTF8 | ConvertFrom-Json
 } catch {
     Write-MxLog "progress.json read FAILED: $_"
     exit 0
@@ -87,9 +87,9 @@ if ($filePath -match '\\(step_archive|\.claude|node_modules|\.git)\\') {
 }
 
 # 파일 내용 점검
-if (-not (Test-Path $filePath)) { exit 0 }
+if (-not (Test-Path -LiteralPath $filePath)) { exit 0 }
 $content = ""
-try { $content = Get-Content $filePath -Raw -Encoding UTF8 } catch {
+try { $content = Get-Content -LiteralPath $filePath -Raw -Encoding UTF8 } catch {
     Write-MxLog "file read FAILED: $filePath"
     exit 0
 }

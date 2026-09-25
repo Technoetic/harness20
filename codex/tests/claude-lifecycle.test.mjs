@@ -11,13 +11,19 @@ const windows = process.platform === 'win32';
 const bashOnWindows = windows && process.env.H50_TEST_BASH === '1';
 const shell = bashOnWindows ? 'C:/Program Files/Git/bin/bash.exe' : windows ? 'powershell.exe' : 'bash';
 const ext = bashOnWindows || !windows ? 'sh' : 'ps1';
-function fixture(t) {
+// The bracketed name keeps the direct .ps1 hooks on -LiteralPath: a wildcard Test-Path,
+// Get-Content or Set-Content misses a project such as 'project [30]' and the hook goes quiet.
+const PROJECT_NAMES = ['project', 'project [30]'];
+function testEachProject(title, fn) {
+  for (const name of PROJECT_NAMES) test(`${title} (project "${name}")`, t => fn(t, name));
+}
+function fixture(t, projectName) {
   const root = mkdtempSync(join(tmpdir(), 'h50-lifecycle-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const plugin = join(root, 'cache', 'plugin', '2.2');
   cpSync(join(repo, 'hooks'), join(plugin, 'hooks'), { recursive: true });
   cpSync(join(repo, 'assets'), join(plugin, 'assets'), { recursive: true });
-  const project = join(root, 'project'); const other = join(root, 'other');
+  const project = join(root, projectName); const other = join(root, 'other');
   mkdirSync(project); mkdirSync(other);
   const run = (name, event = {}, envRoot = '', cwd = other) => {
     const path = join(plugin, 'hooks', `${name}.${ext}`);
@@ -35,16 +41,16 @@ function fixture(t) {
   };
   return { plugin, project, other, run, state };
 }
-test('exact installed startup bytes use event cwd and environment precedence', t => {
-  const f = fixture(t);
+testEachProject('exact installed startup bytes use event cwd and environment precedence', (t, name) => {
+  const f = fixture(t, name);
   f.run('webapp-trigger', { cwd: f.project, prompt: '/webapp fractions' });
   assert.ok(existsSync(join(f.project, 'step_archive', 'progress.json')));
   assert.ok(!existsSync(join(f.other, 'step_archive')));
   f.run('webapp-trigger', { cwd: f.project, prompt: '/webapp fractions' }, f.other);
   assert.ok(existsSync(join(f.other, 'step_archive', 'progress.json')));
 });
-test('writer preserves first unfinished step; loader and Stop agree', t => {
-  const f = fixture(t); f.state();
+testEachProject('writer preserves first unfinished step; loader and Stop agree', (t, name) => {
+  const f = fixture(t, name); f.state();
   f.run('step-progress-writer', { cwd: f.project, last_assistant_message: 'Step 003/3 완료' });
   const p = JSON.parse(readFileSync(join(f.project, 'step_archive', 'progress.json'), 'utf8'));
   assert.deepEqual(p.completed_steps, [3]); assert.equal(p.current_step, 1);
@@ -53,8 +59,8 @@ test('writer preserves first unfinished step; loader and Stop agree', t => {
   f.run('spec-generator', { cwd: f.project });
   assert.ok(existsSync(join(f.project, 'step_archive', 'specs', 'SPEC-001.md')));
 });
-test('Stop is project scoped, bounded, sticky on stall, and resets after progress', t => {
-  const f = fixture(t); f.state();
+testEachProject('Stop is project scoped, bounded, sticky on stall, and resets after progress', (t, name) => {
+  const f = fixture(t, name); f.state();
   const event = { cwd: f.project, session_id: 'same-session', stop_hook_active: true };
   for (let i = 0; i < 3; i++) assert.equal(JSON.parse(f.run('step-auto-continue', event)).decision, 'block');
   assert.equal(f.run('step-auto-continue', event), '');
@@ -67,8 +73,8 @@ test('Stop is project scoped, bounded, sticky on stall, and resets after progres
   assert.match(JSON.parse(f.run('step-auto-continue', event)).reason, /step002/);
   f.state([1, 2, 3], 3); assert.equal(f.run('step-auto-continue', event), '');
 });
-test('Stop uses process cwd fallback and releases missing, paused, malformed state', t => {
-  const f = fixture(t);
+testEachProject('Stop uses process cwd fallback and releases missing, paused, malformed state', (t, name) => {
+  const f = fixture(t, name);
   assert.equal(f.run('step-auto-continue', { cwd: f.project }), '');
   f.state([3], 3);
   assert.match(JSON.parse(f.run('step-auto-continue', {}, '', f.project)).reason, /step001/);

@@ -13,7 +13,7 @@ try {
 
 
 $ErrorActionPreference = "Continue"
-$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { (Get-Location).Path }
+$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { [System.IO.Directory]::GetCurrentDirectory() }
 $stepArchive = Join-Path $projectRoot "step_archive"
 $progressFile = Join-Path $stepArchive "progress.json"
 
@@ -30,12 +30,12 @@ function Write-ProgressAtomic($obj) {
         $json = $obj | ConvertTo-Json -Depth 32
         if ([string]::IsNullOrWhiteSpace($json) -or $json -eq 'null') { return }
         $tempFile = "$progressFile.tmp.$PID"
-        $json | Out-File -FilePath $tempFile -Encoding UTF8 -Force
+        $json | Out-File -LiteralPath $tempFile -Encoding UTF8 -Force
         $bytes = [System.IO.File]::ReadAllBytes($tempFile)
         if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
             [System.IO.File]::WriteAllBytes($tempFile, $bytes[3..($bytes.Length - 1)])
         }
-        Move-Item -Path $tempFile -Destination $progressFile -Force
+        Move-Item -LiteralPath $tempFile -Destination $progressFile -Force
     } catch {
         Write-Host "WARNING: progress.json write failed: $_"
     } finally {
@@ -124,13 +124,13 @@ if (-not (Test-Path $progressFile)) {
 }
 
 # 기존 progress.json이 있어도 total_steps가 실제 파일 수와 다르면 경고
-try { $existingProgress = Get-Content $progressFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop } catch { exit 0 }
+try { $existingProgress = Get-Content -LiteralPath $progressFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop } catch { exit 0 }
 if ($null -eq $existingProgress) { exit 0 }
 # stepNNN.md 개수: flat + archived/ 둘 다 스캔 후 파일명 기준 unique (재가동 시 archived/ 이동 대응)
-$stepFiles = @(Get-ChildItem -Path $stepArchive -Filter "step???.md" -ErrorAction SilentlyContinue)
+$stepFiles = @(Get-ChildItem -LiteralPath $stepArchive -Filter "step???.md" -ErrorAction SilentlyContinue)
 $archivedDir2 = Join-Path $stepArchive "archived"
-if (Test-Path $archivedDir2) {
-    $stepFiles += @(Get-ChildItem -Path $archivedDir2 -Filter "step???.md" -ErrorAction SilentlyContinue)
+if (Test-Path -LiteralPath $archivedDir2) {
+    $stepFiles += @(Get-ChildItem -LiteralPath $archivedDir2 -Filter "step???.md" -ErrorAction SilentlyContinue)
 }
 $actualTotal = @($stepFiles | ForEach-Object { $_.Name } | Sort-Object -Unique).Count
 $needsRewrite = $false
@@ -206,9 +206,9 @@ if ($null -ne $nextStep) {
     $nextStepFmt = "step$('{0:D3}' -f $nextStep)"
     # F9 fix (2026-06-10): archived/ 우선, flat 폴백 이중 해석 (auto-continue와 동일 규약)
     $nextStepRel = $null
-    if (Test-Path (Join-Path $archivedDir "$nextStepFmt.md")) {
+    if (Test-Path -LiteralPath (Join-Path $archivedDir "$nextStepFmt.md")) {
         $nextStepRel = "step_archive/archived/$nextStepFmt.md"
-    } elseif (Test-Path (Join-Path $stepArchive "$nextStepFmt.md")) {
+    } elseif (Test-Path -LiteralPath (Join-Path $stepArchive "$nextStepFmt.md")) {
         $nextStepRel = "step_archive/$nextStepFmt.md"
     }
     if ($nextStepRel) {

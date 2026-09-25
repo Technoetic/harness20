@@ -17,10 +17,10 @@ $ErrorActionPreference = "Continue"
 $logFile = Join-Path $PSScriptRoot "step-progress-writer.log"
 function Write-WriterLog($msg) {
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    try { Add-Content -Path $logFile -Value "[$ts] $msg" -Encoding UTF8 } catch {}
+    try { Add-Content -LiteralPath $logFile -Value "[$ts] $msg" -Encoding UTF8 } catch {}
 }
 Write-WriterLog "=== invoked ==="
-$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { (Get-Location).Path }
+$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { [System.IO.Directory]::GetCurrentDirectory() }
 $stepArchive = Join-Path $projectRoot "step_archive"
 $progressFile = Join-Path $stepArchive "progress.json"
 
@@ -42,7 +42,7 @@ if (Test-Path -LiteralPath (Join-Path (Join-Path $stepArchive ".harness50-codex"
     exit 0
 }
 
-if (-not (Test-Path $progressFile)) { exit 0 }
+if (-not (Test-Path -LiteralPath $progressFile)) { exit 0 }
 
 # B-P2-1/6/7 fix: Mutex 락으로 progress.json 동시 쓰기 방지
 $mutex = New-Object System.Threading.Mutex($false, "Global\step-progress-writer-mutex")
@@ -57,7 +57,7 @@ if (-not $mutexAcquired) {
 $progress = $null
 for ($i = 0; $i -lt 3; $i++) {
     try {
-        $rawProgress = Get-Content $progressFile -Raw -Encoding UTF8
+        $rawProgress = Get-Content -LiteralPath $progressFile -Raw -Encoding UTF8
         if ($rawProgress -and $rawProgress.Trim().Length -gt 0) {
             $progress = $rawProgress | ConvertFrom-Json
             if ($null -ne $progress) { break }
@@ -81,10 +81,10 @@ if ($inputJson -and $inputJson.last_assistant_message) {
     $response += "`n" + $inputJson.last_assistant_message
 }
 
-if ($inputJson -and $inputJson.transcript_path -and (Test-Path $inputJson.transcript_path)) {
+if ($inputJson -and $inputJson.transcript_path -and (Test-Path -LiteralPath $inputJson.transcript_path)) {
     try {
         # transcript 전체를 스캔 (JSONL). 파일이 클 수 있으나 Step당 KB 단위라 수용 가능
-        $allLines = Get-Content $inputJson.transcript_path -Encoding UTF8
+        $allLines = Get-Content -LiteralPath $inputJson.transcript_path -Encoding UTF8
         foreach ($line in $allLines) {
             if (-not $line) { continue }
             try {
@@ -151,7 +151,7 @@ $validSteps = New-Object System.Collections.Generic.HashSet[int]
 foreach ($s in $foundSteps) {
     $stepFileFlat = Join-Path $stepArchive ("step{0:D3}.md" -f $s)
     $stepFileArch = Join-Path $archivedDirW ("step{0:D3}.md" -f $s)
-    if ((Test-Path $stepFileFlat) -or (Test-Path $stepFileArch)) {
+    if ((Test-Path -LiteralPath $stepFileFlat) -or (Test-Path -LiteralPath $stepFileArch)) {
         [void]$validSteps.Add($s)
     }
 }
@@ -244,8 +244,8 @@ if ($sessions.Count -gt 0) {
 try {
     $specDir = Join-Path $stepArchive "specs"
     $outDir  = Join-Path $stepArchive "outputs"
-    if (Test-Path $specDir) {
-        $specCount = (Get-ChildItem -Path $specDir -Filter "SPEC-*.md" -ErrorAction SilentlyContinue).Count
+    if (Test-Path -LiteralPath $specDir) {
+        $specCount = (Get-ChildItem -LiteralPath $specDir -Filter "SPEC-*.md" -ErrorAction SilentlyContinue).Count
         if (-not $progress.PSObject.Properties.Name.Contains('moai_features')) {
             $progress | Add-Member -NotePropertyName 'moai_features' -NotePropertyValue ([PSCustomObject]@{ spec_generated_count=0; mx_tag_warnings=0; lsp_autofixes=0 }) -Force
         }
@@ -268,12 +268,12 @@ try {
     }
     # @MX 경고 / LSP 자동수정 카운트 (로그 행 수 기반 근사)
     $mxLog = Join-Path $PSScriptRoot "mx-tag-validator.log"
-    if (Test-Path $mxLog) {
-        $progress.moai_features.mx_tag_warnings = (Select-String -Path $mxLog -Pattern '@MX-WARN' -ErrorAction SilentlyContinue).Count
+    if (Test-Path -LiteralPath $mxLog) {
+        $progress.moai_features.mx_tag_warnings = (Select-String -LiteralPath $mxLog -Pattern '@MX-WARN' -ErrorAction SilentlyContinue).Count
     }
     $lspLog = Join-Path $PSScriptRoot "lsp-autofix.log"
-    if (Test-Path $lspLog) {
-        $progress.moai_features.lsp_autofixes = (Select-String -Path $lspLog -Pattern 'OK:' -ErrorAction SilentlyContinue).Count
+    if (Test-Path -LiteralPath $lspLog) {
+        $progress.moai_features.lsp_autofixes = (Select-String -LiteralPath $lspLog -Pattern 'OK:' -ErrorAction SilentlyContinue).Count
     }
 } catch {
     Write-WriterLog "moai_features update FAILED: $_"
@@ -288,7 +288,7 @@ try {
         Write-WriterLog "ERROR: ConvertTo-Json produced null/empty — refusing to write"
     } else {
         $tempFile = "$progressFile.tmp.$PID"
-        $jsonOutput | Out-File -FilePath $tempFile -Encoding UTF8 -Force
+        $jsonOutput | Out-File -LiteralPath $tempFile -Encoding UTF8 -Force
         # PS 5.1 Out-File은 BOM을 추가하므로 BOM 제거
         $bytes = [System.IO.File]::ReadAllBytes($tempFile)
         if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
@@ -296,10 +296,10 @@ try {
             [System.IO.File]::WriteAllBytes($tempFile, $bytes)
         }
         # 원자적 rename (Windows: Move-Item -Force는 같은 볼륨에서 원자적)
-        Move-Item -Path $tempFile -Destination $progressFile -Force
+        Move-Item -LiteralPath $tempFile -Destination $progressFile -Force
         Write-WriterLog "Progress saved atomically"
         # F1 fix (2026-06-10): 롤링 백업 — 완주 이력이 리셋/삭제로 소실되는 사고 대비
-        try { Copy-Item -Path $progressFile -Destination "$progressFile.bak" -Force } catch {}
+        try { Copy-Item -LiteralPath $progressFile -Destination "$progressFile.bak" -Force } catch {}
     }
 } catch {
     Write-WriterLog "atomic write FAILED: $_"
