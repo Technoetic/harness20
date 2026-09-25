@@ -64,7 +64,7 @@ Codex 단계부터 harness50 플러그인의 `codex/scripts/harness-state.mjs`(`
 
 3. **step001.md Read** — `step_archive/archived/step001.md` 1회 읽기.
 
-4. **연속 실행** — 본문 지시대로 실행 → "Step 001/50 완료" 보고 → 즉시 step002.md Read → … → step050.md까지 진행한다. 50단계 전 종료는 헌법 §2-1 명명된 멈춤뿐이다.
+4. **연속 실행** — 본문 지시대로 실행 → "Step 001/50 완료" 보고 → 즉시 step002.md Read → … → step050.md까지 진행한다. 50단계 전 종료는 헌법 §2-1 명명된 멈춤뿐이다. 50단계의 `quality-gate.mjs --inspect-final`이 종료 코드 0이면 헌법 §2 예외대로 `node "<plugin-root>/scripts/final-summary.mjs" --workspace "<project-root>"`를 1회 실행하고, `Step 050/50 완료` 줄 바로 다음에 그 출력의 세 제목만 그대로 붙인다.
 
 ## Jev-first 요청 라우팅
 
@@ -111,11 +111,11 @@ Jev 결과로 기존 필수 Acceptance·시각 검사·E2E·독립 검증·완�
 
 ## 절대 준수
 
-- 사용자에게 질문하지 마라. 예외는 헌법 §2-1 명명된 멈춤 보고 한 줄뿐이다
+- 사용자에게 질문하지 마라. 예외는 헌법 §2-1 명명된 멈춤 보고 한 줄과 §2 50단계 최종 요약의 `## 사용자 확인 필요` 절뿐이다
 - "진행할까요" / "어떻게 할까요" / "다음 턴에서 재개" 모두 금지
 - 토큰 한도 직전까지 한 턴 안에서 가능한 한 많은 step 실행
 - Stop hook이 자동 재개를 처리하므로 인위적으로 턴을 끊지 마라. 50단계 전에 끝낼 수 있는 길은 `permission-denied`·`required-tool-failed`·`required-input-missing` 멈춤을 `scripts/harness-pause.mjs pause`로 기록하는 것뿐이다
-- 각 step 완료는 1줄 보고 ("Step NNN/50 완료")만
+- 각 step 완료는 1줄 보고 ("Step NNN/50 완료")만. 단 50단계는 완료 줄 다음에 `final-summary.mjs` 출력의 세 제목(`## 사용자 확인 필요` / `## 변경` / `## 발견`)만 덧붙인다 (헌법 §2 예외)
 - 멈춘 작업은 이 명령으로 재개하지 않는다(재개는 `/harness-resume`). `/webapp <주제>`는 완료 기록이 있는 진행을 건드리지 않고 건너뛴다. 새 주제는 `/harness-reset` 후 `/webapp <주제>`
 
 ## 다음 행동

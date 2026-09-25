@@ -123,3 +123,25 @@ test('Claude final writer rejects old, incomplete and mismatched evidence, then 
   assert.equal(JSON.parse(readFileSync(f.progress, 'utf8')).completed_steps.length, 50);
   f.noCommands();
 });
+
+// harness-rules §2: the step 50 message is the completion line followed by the unchanged
+// scripts/final-summary.mjs output. The summary quotes a decision that mentions step 49, whose
+// body exists here, and must neither block Step 50 nor record step 49.
+test('final summary printed after the completion line keeps Step 50 recording exact', async () => {
+  const f = await fixture(48);
+  writeFileSync(join(f.project, 'step_archive', 'archived', 'step049.md'), '# Step 49\n');
+  await recordPassingFinalRegression(f.project);
+  const browser = passingBrowserReport(sha256(readFileSync(join(f.project, 'dist', 'index.html'))), f.manifest);
+  writeFileSync(join(f.project, 'step_archive', 'outputs', 'browser-output.json'), JSON.stringify(browser));
+  writeFileSync(join(f.project, 'step_archive', 'step025_plan.md'), '## 결정/사유\n\n- Step 49 완료 표기를 인용한 결정\n');
+  // The installed copy has only hooks/ and scripts/, so the CLI must not import codex/.
+  const summary = spawnSync(process.execPath, [join(f.plugin, 'scripts', 'final-summary.mjs'), '--workspace', f.project], { encoding: 'utf8', timeout: 60000 });
+  assert.equal(summary.status, 0, summary.stderr);
+  assert.match(summary.stdout, /^## 사용자 확인 필요\n/);
+  assert.match(summary.stdout, /Step 49 완료 표기/);
+  assert.equal(readFileSync(join(f.project, 'step_archive', 'outputs', 'final-summary.md'), 'utf8'), summary.stdout);
+  f.run('step-progress-writer', { last_assistant_message: `Step 050/50 완료\n${summary.stdout}` });
+  const progress = JSON.parse(readFileSync(f.progress, 'utf8'));
+  assert.deepEqual(progress.completed_steps, [...Array.from({ length: 48 }, (_, i) => i + 1), 50]);
+  f.noCommands();
+});

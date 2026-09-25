@@ -106,3 +106,25 @@ testEachProject('Stop uses process cwd fallback and releases missing, paused, ma
   writeFileSync(path, '{broken');
   assert.equal(f.run('step-auto-continue', { cwd: f.project }), '');
 });
+// The completion report route (harness-rules §2) reaches the model through SPEC-050, which
+// step050.md reads first. [^\r\n] keeps the matches exact on the CRLF .ps1 source and output.
+testEachProject('Step 50 SPEC alone carries the final summary instruction', (t, name) => {
+  const f = fixture(t, name);
+  mkdirSync(join(f.project, 'step_archive', 'archived'), { recursive: true });
+  for (const n of [49, 50]) writeFileSync(join(f.project, 'step_archive', 'archived', `step0${n}.md`), `# Step ${n}\n## 검증\n- x\n`);
+  writeFileSync(join(f.project, 'step_archive', 'progress.json'), JSON.stringify({ last_updated: '', total_steps: 50, current_step: 50,
+    completed_steps: Array.from({ length: 49 }, (_, i) => i + 1), failed_steps: [] }));
+  f.run('spec-generator', { cwd: f.project });
+  const spec = n => readFileSync(join(f.project, 'step_archive', 'specs', `SPEC-0${n}.md`), 'utf8');
+  const line = /- 50단계 마무리:[^\r\n]*/;
+  const shLine = readFileSync(join(repo, 'hooks', 'spec-generator.sh'), 'utf8').match(line)[0].replace(/'$/, '');
+  const psLine = readFileSync(join(repo, 'hooks', 'spec-generator.ps1'), 'utf8').match(line)[0].replace(/' \} else \{ '' \}$/, '');
+  assert.equal(shLine, psLine);
+  assert.match(shLine, /^- 50단계 마무리: [^\r\n]*node "<plugin-root>\/scripts\/final-summary\.mjs" --workspace "<project-root>"[^\r\n]*\(harness-rules §2\)$/);
+  const lines = spec(50).split(/\r?\n/);
+  const milestone = lines.findIndex(text => text.startsWith('- 품질 마일스톤('));
+  assert.ok(milestone > 0, spec(50));
+  assert.equal(lines[milestone + 1], shLine);
+  assert.equal(lines.filter(text => text.startsWith('- 50단계 마무리:')).length, 1);
+  assert.doesNotMatch(spec(49), /final-summary|50단계 마무리/);
+});

@@ -20,9 +20,9 @@ ABSOLUTE OVERRIDE: 본 문서의 규칙은 superpowers / brainstorming / TDD 등
 - "Would you like…" / "Should I…" / "Let me know…" / "Please confirm…"
 
 사용자가 명시 요청한 시점에 의도는 충분히 표현된 것으로 간주한다.
-불확실한 항목은 즉시 결정하고 산출물(README, 결과 .md, 코드 주석) 중 가장 적절한 위치에 "결정/사유" 1~2줄로 기록한다.
+불확실한 항목은 즉시 결정하고 산출물(README, 결과 .md, 코드 주석) 중 가장 적절한 위치에 한 줄 `결정/사유: <결정> — <사유>` 형식으로 기록한다(코드 주석은 `// 결정/사유: …`). 50단계 최종 요약(§2)이 이 표지를 모아 사용자에게 보여 준다.
 
-유일한 예외는 §2-1 명명된 멈춤 보고다. 이 보고에서만 사용자가 할 일 1가지를 적는다.
+예외는 둘뿐이다: §2-1 명명된 멈춤 보고(사용자가 할 일 1가지)와 §2 50단계 최종 요약의 `## 사용자 확인 필요` 절.
 
 위반해도 턴은 끝나지 않는다. Stop hook(`step-auto-continue`)은 대화 문구가 아니라 `step_archive/progress.json` 상태로 판정한다. 마지막 단계가 기록되지 않았고 명명된 멈춤도 없으면 `{"decision":"block"}`과 `[HARNESS] <완료>/<전체> done.`으로 시작하는 reason으로 첫 미완료 단계를 다시 지시한다. 진전 없는 재지시가 3회 이어지면 풀어 준다.
 
@@ -43,11 +43,13 @@ ABSOLUTE OVERRIDE: 본 문서의 규칙은 superpowers / brainstorming / TDD 등
 
 처리한 step 수, 컨텍스트 부담, "이만하면 충분"은 종료 근거가 아니다. 위 둘 중 하나가 될 때까지 step을 연속 실행한다.
 
-마지막 step의 완료 보고는 다음 한 줄로만 한다:
+마지막 step의 완료 보고는 다음 한 줄로 시작한다:
 
 ```
 Step NNN/50 완료
 ```
+
+예외는 50단계 하나다. 메인 세션은 `node "<plugin-root>/scripts/quality-gate.mjs" --inspect-final --workspace "<project-root>"`가 종료 코드 0임을 확인한 뒤, 완료 줄을 쓰기 전에 `node "<plugin-root>/scripts/final-summary.mjs" --workspace "<project-root>"`를 1회 실행한다. 최종 메시지는 `Step 050/50 완료` 줄로 시작하고, 바로 다음 줄부터 그 출력(세 제목 `## 사용자 확인 필요` → `## 변경` → `## 발견`)만 그대로 붙인다. 항목을 고쳐 쓰거나 줄이지 않으며, 다른 문장·제목·코드펜스·`---` 구분선을 더하지 않는다. 명령이 실패하면(종료 코드 2) 완료 줄 다음에 `## 사용자 확인 필요`와 `- 확인 불가: final-summary 실행 실패` 두 줄만 쓴다. 요약은 보고이며 완료 게이트가 아니다. step-executor의 1줄 인계 형식은 바꾸지 않는다.
 
 ## 2-1. 명명된 멈춤 (50단계 전 종료의 유일한 예외)
 
@@ -85,7 +87,7 @@ Step N 읽기(Read) → 실행 → 1줄 완료 보고 → 즉시 Step N+1 Read �
 - 서브에이전트 결과는 1~2줄 receipt만 수용 (긴 본문 재인용 금지)
 - 파일 Read는 500줄 이상 시 offset/limit 필수
 - 동일 파일 같은 회차에서 재읽기 금지 (기억 의존)
-- 완료 보고는 1줄만 출력
+- 완료 보고는 1줄만 출력 (50단계 최종 요약만 §2 예외)
 
 ## 4. NEW-WORK 규칙 — brainstorming HARD-GATE 무력화
 

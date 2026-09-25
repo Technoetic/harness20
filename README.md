@@ -15,7 +15,7 @@
 [![Hooks](https://img.shields.io/badge/Hooks-28_files-F59E0B?style=for-the-badge)](hooks/)
 [![Steps](https://img.shields.io/badge/Steps-50_files-10B981?style=for-the-badge)](assets/steps/)
 
-[![Security Tests](https://img.shields.io/badge/Security_Tests-45_cases_·_reproducible-22C55E?style=for-the-badge)](tests/security-regression.sh)
+[![Security Tests](https://img.shields.io/badge/Security_Tests-reproducible_·_FAIL%3D0-22C55E?style=for-the-badge)](tests/security-regression.sh)
 [![Patterns](https://img.shields.io/badge/Safety_Patterns-200+-EF4444?style=for-the-badge)](hooks/destructive-guard.ps1)
 [![Dual Shell](https://img.shields.io/badge/Dual_Shell-PS1_+_SH-7C3AED?style=for-the-badge&logo=powershell&logoColor=white)](hooks/)
 [![Style](https://img.shields.io/badge/style-no_questions-FF1493?style=for-the-badge)](skills/harness-rules/SKILL.md)
@@ -348,7 +348,7 @@ flowchart LR
 | 9 | 0 | **개발 감사 사이클 종료** |
 | 재현 | — | **커밋된 `tests/security-regression.sh` — 45 케이스 (차단 18 + 승인 8 + 게이트) 통과. 신규 커버: 변수 인다이렉션·인터프리터 삭제·git hooksPath·2단계 다운로드·자격증명 유출** |
 
-위 회차별 셀 수는 개발 과정의 감사 기록이며, 저장소에서 재현 가능한 검증은 `tests/security-regression.sh`(45 케이스)다. 감사 로그 원본은 커밋되어 있지 않다 — 재현 가능한 증거는 이 테스트 스위트로 대체한다.
+위 회차별 셀 수는 개발 과정의 감사 기록이며, 저장소에서 재현 가능한 검증은 `tests/security-regression.sh`(`PASS=N FAIL=0` 출력)다. 감사 로그 원본은 커밋되어 있지 않다 — 재현 가능한 증거는 이 테스트 스위트로 대체한다.
 
 </details>
 
@@ -421,7 +421,7 @@ harness50/
 │   ├── plugin.json                    ← v1.0.0 · MIT
 │   └── marketplace.json               ← /plugin marketplace add 진입점
 ├── tests/
-│   └── security-regression.sh         ← 45 케이스 안전 회귀 (재현 가능)
+│   └── security-regression.sh         ← 안전 회귀 (재현 가능, PASS=N FAIL=0 출력)
 ├── commands/                          ← 5개 슬래시 커맨드
 │   ├── webapp.md                      ← /webapp <주제>  자율주행 진입
 │   ├── harness-status.md              ← /harness-status 1줄 진행 보고
@@ -629,6 +629,25 @@ step045 E2E는 프로젝트의 `npm run e2e`를 실행한다 — 러너(Playwrig
 → harness50: 37/50 완료 | current=step038 | r1=- r2=- r3=-
 ```
 
+### 완료 보고
+
+50단계를 마치면 `Step 050/50 완료` 줄 바로 다음에 세 제목의 요약이 붙습니다. 저장된 증거(최종 HTML, 품질·브라우저·회귀 보고서, Jev, TOPIC, `결정/사유` 표지)만 읽는 보고이며 완료 게이트가 아닙니다. 같은 내용이 `step_archive/outputs/final-summary.md`에도 저장됩니다. 상세: [docs/FINAL-SUMMARY.md](docs/FINAL-SUMMARY.md)
+
+```text
+Step 050/50 완료
+## 사용자 확인 필요
+
+- 배포 검증 대기(pending) `step_archive/step045_e2e테스트결과.md:3`
+
+## 변경
+
+- 최종 HTML `dist/index.html` · … bytes · SHA-256 `…`
+
+## 발견
+
+- 최종 게이트 quality=PASS · browser=PASS · regression=PASS `quality-gate.mjs --inspect-final`
+```
+
 ### 처음부터 다시
 
 ```text
@@ -717,6 +736,9 @@ PASS/FAIL/INCOMPLETE 판정이며 점수는 없다. PASS가 아니면 한 번 �
 | 4 | **블랙리스트 방식의 본질적 불완전성** | 셸 동치표현은 무한(변수·인터프리터·인코딩·2단계) — 알려진 우회만 차단 | `tests/security-regression`으로 회귀 고정. 근본 대응은 화이트리스트 역전(로드맵) |
 | 5 | **진행 추적이 transcript 정규식 스캔 의존** (H8) | 완료 문구 변형 시 미기록→재개, 예시 인용 시 오집계 위험 | 코드펜스·인용 가드로 오탐 완화. 상태전이가 LLM 산문에 걸리는 구조적 약점은 잔존 |
 | 6 | **step 본문이 참조하는 검증기 다수 미번들** (H5) | tokei/c8/biome/semgrep 등 `*-validator.ps1` 24종 부재 | 부재 시 해당 단계 fail-open(건너뜀). 목록·정책은 [`docs/RETIRED-VALIDATORS.md`](docs/RETIRED-VALIDATORS.md) |
+| 7 | 가드 2종은 활성 여부와 무관하게 설치 범위 전체에서 동작하고, 명령 문자열 전체(따옴표 안 메시지·heredoc 본문 포함)를 정규식으로 검사 | 커밋 메시지나 PR 본문의 위험 문구도 승인할 수 없게 차단 | Write로 파일에 쓴 뒤 `git commit -F <파일>`·`gh pr create --body-file <파일>`. 문맥을 인식하는 검사는 후속 |
+| 8 | 훅은 hooks.json 제한 시간 전에 스스로 멈추고 결정을 내리지 않음(POSIX는 직계 자식만 종료) | 부하가 크면 자동 승인 대신 권한 창 | — |
+| 9 | 일부 가드 정규식이 병적으로 긴 편집 내용에서 느림 | 예산을 넘기면 결정 없이 종료 | 선형 패턴·시간 제한은 후속 |
 
 2.2부터 Bash와 WebFetch는 정상 권한 확인을 거칩니다. 위험 패턴 검사는 추가 방어이며,
 호스트 권한 정책이나 파일시스템 샌드박스를 대체하지 않습니다.
@@ -732,7 +754,7 @@ bash tests/security-regression.sh
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/security-regression.ps1
 ```
 
-두 스위트 모두 45 케이스(위험 18 차단 + 정상 8 승인 + 게이트)를 검사한다. Windows에서는 `.sh` 훅이 OS 가드로 no-op되므로 `.ps1` 스위트가 검증 SoT다.
+두 스위트 모두 위험 명령 차단·정상 명령 승인·게이트 사례를 검사하고 `결과: PASS=N FAIL=0`을 출력한다. Windows에서는 `.sh` 훅이 OS 가드로 no-op되므로 `.ps1` 스위트가 검증 SoT다.
 
 ---
 

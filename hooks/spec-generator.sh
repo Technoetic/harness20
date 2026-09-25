@@ -37,6 +37,8 @@ targets=sorted(set(int(x) for x in (p.get("completed_steps") or []) if 1<=int(x)
 if cur and 1<=cur<=total and cur not in targets:
     targets.append(cur)
 targets=sorted(set(targets))
+# Step 50 SPEC only (mirrors spec-generator.ps1 $finalLine): the completion report route.
+FINAL_SUMMARY_LINE='- 50단계 마무리: quality-gate.mjs --inspect-final 종료 코드 0 뒤 node "<plugin-root>/scripts/final-summary.mjs" --workspace "<project-root>"를 1회 실행하고, 완료 줄 바로 다음에 그 출력의 세 제목(사용자 확인 필요 / 변경 / 발견)만 그대로 붙인다 (harness-rules §2)'
 
 def gen(n):
     num=f"{n:03d}"
@@ -50,6 +52,7 @@ def gen(n):
     sm=re.search(r'(?ms)^##\s+(실행 내용|개요|목적|Step-Back|검증).+?(?=^##\s+|^---|\Z)', body)
     ref="\n".join((sm.group(0).split("\n")[:30]) if sm else [f"본문 추출 실패. step{num}.md 직접 참조."])
     prev=f"{n-1:03d}"
+    final_line=("\n"+FINAL_SUMMARY_LINE) if n==50 and total==50 else ""
     now=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     content=f"""# SPEC-{num} — {title}
 
@@ -71,7 +74,7 @@ def gen(n):
 ## ACCEPTANCE
 - 해당 Step의 자체 Self-Calibration 통과
 - 결과 파일: step_archive/archived/step{num}.md 본문 절차가 지정한 경로 (머리말 Sync 줄과 다르면 본문 절차를 따른다)
-- 품질 마일스톤(scripts/quality-gate.mjs): 완료 38단계 → trust5_r1, 완료 44단계 → trust5_r2, 완료 49단계 이후(최종 Step 050) → trust5_r3. Stop 훅(trust5-validator)이 step_archive/outputs/trust5_rN.md에 Verdict(PASS/FAIL/INCOMPLETE)를 기록하고, PASS가 아니면 복구를 요구한다.
+- 품질 마일스톤(scripts/quality-gate.mjs): 완료 38단계 → trust5_r1, 완료 44단계 → trust5_r2, 완료 49단계 이후(최종 Step 050) → trust5_r3. Stop 훅(trust5-validator)이 step_archive/outputs/trust5_rN.md에 Verdict(PASS/FAIL/INCOMPLETE)를 기록하고, PASS가 아니면 복구를 요구한다.{final_line}
 
 ## REFERENCE
 ```
