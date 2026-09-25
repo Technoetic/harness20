@@ -47,10 +47,12 @@ function spelled(candidate) {
   }
 }
 // Claude progress.json and everything under step_archive/.harness50-codex/ steer the Stop gates.
-// A Codex state.json there silences them, so edits to either never receive hook approval.
+// A Codex state.json there silences them, so edits to either never receive hook approval. The
+// same names in a subfolder are excluded too: a progress.json written there without a prompt would
+// start a run (loader instructions, approval, Stop continuation) once that folder is opened.
 function workflowState(candidate, root) {
   const relative = path.relative(spelled(root), spelled(candidate)).replaceAll('\\', '/').toLowerCase();
-  return /^step_archive(?::[^/]*)?\/(?:progress\.json(?::[^/]*)?$|\.harness50-codex(?::[^/]*)?(?:\/|$))/.test(relative);
+  return /(^|\/)step_archive(?::[^/]*)?\/(?:progress\.json(?::[^/]*)?$|\.harness50-codex(?::[^/]*)?(?:\/|$))/.test(relative);
 }
 // Execution-linked files: a later git operation, install, editor, CI run, agent session or
 // user-approved command runs or follows them without anyone reading the edit. They keep the
@@ -67,7 +69,10 @@ const EXECUTION_LINKED = [
   /(^|\/)(\.gitlab-ci\.ya?ml|azure-pipelines\.ya?ml|jenkinsfile|\.travis\.ya?ml|bitbucket-pipelines\.ya?ml)$/,
   /(^|\/)(package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|\.yarnrc(\.ya?ml)?|\.?pnpmfile\.c?js|bunfig\.toml|\.envrc|harness50\.quality\.json)$/,
   /(^|\/)node_modules(\/|$)/,
-  /^step_archive\/tools(\/|$)/
+  /^step_archive\/tools(\/|$)/,
+  // Step bodies: the loader and the Stop hook tell the next session to read and run them, and only
+  // webapp-trigger copies them in, so the model never needs to write there.
+  /^step_archive\/archived(\/|$)/
 ];
 // Project-relative, lower case, '/' separated, with any ':stream' suffix (NTFS alternate data
 // stream) dropped from each component before matching.

@@ -192,6 +192,19 @@ test('execution-linked files never receive hook approval in an active workflow',
     assert.match(run(root, 'auto-approve', write(target)).output, /"allow"/, target);
   }
 });
+test('step bodies and a subfolder run state never receive hook approval; step results still do', t => {
+  // The loader and the Stop hook tell the next session to read and run archived step bodies, and a
+  // progress.json in a subfolder would start a run there once that folder is opened.
+  const root = fixture(t);
+  for (const target of ['step_archive/archived/step002.md', 'step_archive/archived/step001.md', 'step_archive/archived', 'STEP_ARCHIVE/Archived/step003.md',
+    'sub/step_archive/progress.json', 'a/b/STEP_ARCHIVE/PROGRESS.JSON', 'sub/step_archive/.harness50-codex/state.json', 'sub/step_archive/.harness50-codex',
+    ...(windows ? ['step_archive/archived/step001.md::$DATA', 'sub/step_archive/progress.json::$DATA'] : [])]) {
+    assert.equal(run(root, 'auto-approve', write(target)).output, '', target);
+  }
+  for (const target of ['step_archive/step001_preflight.md', 'step_archive/outputs/notes.md', 'sub/step_archive_notes/progress.json', 'src/step_archive.js', 'docs/archived/x.md']) {
+    assert.match(run(root, 'auto-approve', write(target)).output, /"allow"/, target);
+  }
+});
 test('the guard mode leaves execution-linked edits to the normal prompt instead of denying them', t => {
   const root = fixture(t);
   const guard = run(root, 'permission-request-guard', { hook_event_name: 'PermissionRequest', ...write('package.json') });

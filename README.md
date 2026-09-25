@@ -4,7 +4,7 @@
 
 ### 한 줄 요청 → 50 step 자율주행 → 인터랙티브 웹 튜토리얼 1편
 
-**"논문 트렌드 분석 대시보드 만들어"** 한 줄을 던지면 컨텍스트 한계 직전까지 멈추지 않는 결정론적 절차가 가동된다.<br/>
+**`/webapp 논문 트렌드 분석 대시보드`** 한 줄을 던지면 50단계 완료나 명명된 멈춤 전까지 멈추지 않는 결정론적 절차가 가동된다.<br/>
 모델을 똑똑하게 만드는 대신 **모델이 놓을 트랙을 좁힌다**.
 
 <br/>
@@ -400,7 +400,7 @@ graph TB
 |:---:|:---|:---|
 | 1 | **하네스 엔지니어링** | 모델을 똑똑하게 만들기 전에 트랙·가드·게이트·기록을 깔아라 |
 | 2 | **절차의 원자화** | 한 step은 한 책임. 끝나면 다음 step 즉시 호출 |
-| 3 | **질문 금지** | "진행할까요?"는 위반. 모호하면 결정 + 산출물에 1줄 사유 기록. 예외는 명명된 멈춤 보고뿐 |
+| 3 | **질문 금지** | "진행할까요?"는 위반. 모호하면 결정 + 산출물에 1줄 사유 기록. 예외는 명명된 멈춤 보고와 50단계 요약의 사용자 확인 필요 절뿐 |
 | 4 | **자연 종료 금지** | "이만하면 충분"은 위반. 50단계 완료나 명명된 멈춤 전에는 계속 |
 | 5 | **AI Slop 방지** | 8 배수 grid · 폰트 4 · accent 1 · radius 5 · 44 pt 터치 |
 | 6 | **MoAI-ADK 정직성** | @MX 4종 태그 · EARS-라이트 SPEC · TRUST 5 게이트 |
@@ -473,7 +473,7 @@ harness50/
 
 </div>
 
-이 한 줄이 **컨텍스트 한계 직전까지 멈추지 않는 자율 실행**의 핵심이다.
+이 한 줄이 **50단계 완료나 명명된 멈춤 전까지 멈추지 않는 자율 실행**의 핵심이다.
 
 <div align="center">
 <img src="docs/screenshots/stop-hook-magic.svg" width="90%" alt="Stop hook이 progress.json을 읽고 block JSON을 반환해 다음 step을 자동 재개하는 메커니즘 시각화"/>
@@ -652,10 +652,13 @@ Step 050/50 완료
 
 ```text
 /harness-reset
-→ harness50 리셋 완료 — step001부터 재시작 가능 (새 주제는 리셋 후 /webapp <주제>)
+→ harness50 리셋 완료 — 새 주제는 /webapp <주제>, 현재 주제를 1단계부터 다시 하려면 /harness-resume
+
+/webapp 새 주제
+→ step001부터 새 주제로 실행
 ```
 
-`/harness-reset`은 `step_archive/archived/`, `specs/`, `outputs/`는 보존. progress.json만 초기화.
+`/harness-reset`은 `scripts/harness-pause.mjs reset`으로 progress.json만 1단계의 새 실행으로 바꾸고 `step_archive/archived/`, `specs/`, `outputs/`, `TOPIC/TOPIC.md`는 보존합니다. 새 실행은 `user-request` 멈춤으로 대기하므로 리셋한 턴의 Stop이 옛 주제로 1단계를 시작하지 않습니다. 이어서 `/webapp <주제>`는 새 주제로 시작하고, `/harness-resume`은 현재 주제를 1단계부터 진행합니다. 리셋과 `/webapp` 부트스트랩은 `run_started_at`(UTC)을 새 실행 경계로 적고, 진행 기록 훅은 그 이전 대화의 `Step NNN/50 완료` 줄을 세지 않습니다(`run_started_at`이 없는 2.9.0 이하의 실행은 전체를 셉니다).
 
 ### 멈춤과 재개
 
@@ -670,7 +673,7 @@ Step 050/50 완료
 → step038부터 이어서 실행
 ```
 
-멈춤은 `step_archive/progress.json`의 `paused`·`pause_*` 필드로 기록되고 진행 기록은 그대로 남습니다. 모델은 권한 거부·필수 도구 3회 실패·필수 외부 입력 부재일 때만 같은 CLI(`scripts/harness-pause.mjs`, 헌법 §2-1)로 멈춥니다. 멈춘 동안 Stop 훅은 실행을 다시 지시하지 않고 자동 승인과 품질 게이트도 쉬며, 세션 시작과 프롬프트마다 `[HARNESS] PAUSED at stepNNN/50` 한 줄로 멈춘 위치만 알립니다. `/harness-reset`과 `/webapp <topic>`은 재개 수단이 아닙니다.
+멈춤은 `step_archive/progress.json`의 `paused`·`pause_*` 필드로 기록되고 진행 기록은 그대로 남습니다. 모델은 권한 거부·필수 도구 3회 실패·필수 외부 입력 부재일 때만 같은 CLI(`scripts/harness-pause.mjs`, 헌법 §2-1)로 멈춥니다. 멈추기 전 같은 턴에 보고한 `Step NNN/50 완료` 줄은 그 턴의 Stop에서 기록되므로, 멈춘 위치와 재개 지점은 첫 미완료 step입니다. 멈춘 동안 Stop 훅은 실행을 다시 지시하지 않고 자동 승인과 품질 게이트도 쉬며, 세션 시작과 프롬프트마다 `[HARNESS] PAUSED at stepNNN/50` 한 줄로 멈춘 위치만 알립니다. `/harness-reset`과 `/webapp <topic>`은 재개 수단이 아닙니다.
 
 ---
 
@@ -698,7 +701,7 @@ PASS/FAIL/INCOMPLETE 판정이며 점수는 없다. PASS가 아니면 한 번 �
 
 | 이벤트 | 실행 hook | 역할 |
 |:---|:---|:---|
-| **UserPromptSubmit** | webapp-trigger → step-obedience-guard | `/webapp <주제>`일 때만 부트스트랩(완료 기록이 있는 progress는 건너뜀). 활성 실행에서는 다음 step 알림, 멈춘 실행에서는 멈춘 위치 1줄 |
+| **UserPromptSubmit** | webapp-trigger → step-obedience-guard | `/webapp <주제>`일 때만 부트스트랩(완료 기록이 있는 progress는 건너뜀). 활성 실행에서는 다음 step 알림, 멈춘 실행에서는 멈춘 위치 1줄(`/webapp <주제>`에는 webapp-trigger만 답함) |
 | **SessionStart** | step-progress-loader | 진행 중인 실행에서만 progress.json 로드 + 다음 step 지시 주입(새로 만들지 않음). 멈춘 실행에서는 멈춘 위치만 알림 |
 | **PreToolUse** | destructive-guard + auto-approve | 위험 차단(Bash) + 편집·WebSearch 자동 승인 (병렬, exit 2 우선) |
 | **PermissionRequest** | permission-request-guard | `updatedInput` 변조 방어용 최후 검증 (deny+exit 2) |
@@ -711,10 +714,12 @@ PASS/FAIL/INCOMPLETE 판정이며 점수는 없다. PASS가 아니면 한 번 �
 
 - destructive-guard와 permission-request-guard는 설치 범위 전체(모든 폴더)에서 실행됩니다.
 - webapp-trigger는 첫 줄이 `/webapp <주제>`(또는 `/harness50:webapp <주제>`)일 때만 실행됩니다.
-- step-progress-loader는 진행 중인 실행과 Codex 작업 공간(한 줄 안내)에서 실행됩니다.
+- step-progress-loader는 진행 중인 실행, 멈춘 실행(멈춘 위치 한 줄), Codex 작업 공간(한 줄 안내)에서 실행됩니다.
+- step-obedience-guard는 진행 중인 실행과 멈춘 실행(멈춘 위치 한 줄)에서 실행됩니다.
+- step-progress-writer는 진행 중인 실행과 멈춘 실행에서 실행됩니다. 멈춘 실행에서는 멈춘 턴에 보고된 완료 줄만 기록하고, 기록할 줄이 없으면 아무것도 쓰지 않습니다.
 - trust5-validator는 진행 중일 때와 50단계를 모두 마친 뒤에 실행됩니다.
-- 나머지 훅(step-obedience-guard·auto-approve·mx-tag-validator·lsp-autofix·step-progress-writer·spec-generator·step-auto-continue)은 진행 중인 실행에서만 실행됩니다.
-- 진행 중에도 실행과 연결되는 파일은 자동 승인에서 빠집니다. 예: `.mcp.json`, `CLAUDE.md`, `AGENTS.md`, `.husky/`, `.github/workflows/`, `package.json`, lockfile, `harness50.quality.json`, `node_modules/`, `step_archive/tools/`.
+- 나머지 훅(auto-approve·mx-tag-validator·lsp-autofix·spec-generator·step-auto-continue)은 진행 중인 실행에서만 실행됩니다.
+- 진행 중에도 실행과 연결되는 파일은 자동 승인에서 빠집니다. 예: `.mcp.json`, `CLAUDE.md`, `AGENTS.md`, `.husky/`, `.github/workflows/`, `package.json`, lockfile, `harness50.quality.json`, `node_modules/`, `step_archive/tools/`, `step_archive/archived/`(단계 본문). 하위 폴더의 `step_archive/progress.json`과 `step_archive/.harness50-codex/`도 자동 승인되지 않습니다.
 - lsp-autofix는 프로젝트 `node_modules`에 biome·stylelint가 있을 때만 `npx --no-install`로 실행합니다.
 
 ---
