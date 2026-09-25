@@ -85,10 +85,6 @@ if ($actualTotal -gt 0 -and $actualTotal -ne [int]$existingProgress.total_steps)
 }
 
 # MoAI-ADK 벤치마킹: 누락 필드 자동 추가 (마이그레이션)
-if (-not $existingProgress.PSObject.Properties.Name.Contains('trust5_results')) {
-    $existingProgress | Add-Member -NotePropertyName 'trust5_results' -NotePropertyValue ([PSCustomObject]@{ r1=$null; r2=$null; r3=$null }) -Force
-    $needsRewrite = $true
-}
 if (-not $existingProgress.PSObject.Properties.Name.Contains('moai_features')) {
     $existingProgress | Add-Member -NotePropertyName 'moai_features' -NotePropertyValue ([PSCustomObject]@{ spec_generated_count=0; mx_tag_warnings=0; lsp_autofixes=0 }) -Force
     $needsRewrite = $true

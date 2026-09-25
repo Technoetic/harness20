@@ -415,9 +415,9 @@ test('without state.json (fresh or after a Codex reset) the Claude step hooks be
     stop: f.run('step-auto-continue', { session_id: 'legacy' }),
     writer: completeStepOne(f),
     stopAfter: f.run('step-auto-continue', { session_id: 'legacy' }),
-    // Git Bash emulation only: Windows python ends lines with CRLF, which the untouched legacy
-    // printf in step-obedience-guard.sh rejects. Real POSIX hosts and PowerShell run it.
-    guard: bashOnWindows ? null : f.run('step-obedience-guard', { prompt: 'continue' }),
+    // step-obedience-guard.sh drops the CR a Windows python prints, so the Git Bash emulation
+    // checks it too.
+    guard: f.run('step-obedience-guard', { prompt: 'continue' }),
     progress: position(readProgress(f))
   });
   const [legacy, afterReset] = [observe(plain), observe(reset)];
@@ -428,7 +428,7 @@ test('without state.json (fresh or after a Codex reset) the Claude step hooks be
     assert.match(JSON.parse(observed.stop).reason, /step001/, name);
     assert.equal(JSON.parse(observed.stopAfter).decision, 'block', name);
     assert.match(JSON.parse(observed.stopAfter).reason, /step002/, name);
-    if (!bashOnWindows) assert.match(observed.guard, /step002/, name);
+    assert.match(observed.guard, /step002/, name);
     assert.deepEqual(observed.progress, { total_steps: 3, current_step: 2, completed_steps: [1], failed_steps: [] }, name);
   }
   // Hook output does not depend on whether a contended write landed, so both fixtures match exactly.

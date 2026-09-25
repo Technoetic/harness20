@@ -168,7 +168,7 @@ v2.4.0은 Claude·Codex의 제품 QA에 [실패·검증 인계 보고서](docs/Q
    step025.md  ───────►  4단계 카드 스토리보드 기획
    step030.md  ───────►  통합 설계 (디자인 토큰·SVG·ARIA)
    step037.md  ───────►  단일 HTML 인터랙티브 튜토리얼 구현
-   step038.md  ───────►  빌드 스모크 게이트 + TRUST 5 r1 (50점 만점)
+   step038.md  ───────►  빌드 스모크 게이트 + TRUST 5 r1
    step044.md  ───────►  클라이언트 사이드 라우팅 + TRUST 5 r2
    step045.md  ───────►  E2E 테스트 (프로젝트의 npm run e2e, 프리플라이트 흡수)
    step050.md  ───────►  콘솔 에러 0 + 최종 build 게이트 + TRUST 5 r3
@@ -448,7 +448,7 @@ harness50/
 │   ├── mx-tag-validator.{ps1,sh}      ← @MX 4종 태그 검증
 │   ├── lsp-autofix.{ps1,sh}           ← Biome / Stylelint 자동수정
 │   ├── spec-generator.{ps1,sh}        ← SPEC-NNN.md 자동 생성
-│   ├── trust5-validator.{ps1,sh}      ← r1·r2·r3 50점 만점 평가
+│   ├── trust5-validator.{ps1,sh}      ← r1·r2·r3 측정 증거 검사(Verdict)
 │   └── validate-tools.{ps1,sh}        ← 도구 검증 wrapper
 │
 └── assets/steps/                      ← 50개 결정론적 절차
@@ -507,7 +507,7 @@ sequenceDiagram
     end
 ```
 
-질문 패턴(`"진행할까요?"`, `"다음 턴에서 재개"` 등 50+개) 감지 시 `[VIOLATION DETECTED]` reason과 함께 강제 재실행. 모델이 빠져나갈 길은 progress.json이 50이 되는 그 시점뿐이다.
+질문 패턴 감지와 무관하게 Stop 훅은 progress.json에 미완료 Step이 남아 있으면 `[HARNESS] N/50 done.`으로 시작하는 reason으로 첫 미완료 Step을 다시 지시한다(Windows .ps1은 질문 패턴 39개를 감지하면 재지시 문구에 No user-facing questions를 덧붙인다). 진전 없는 재지시가 3회 이어지면 풀어 준다.
 
 ---
 
@@ -638,21 +638,17 @@ step045 E2E는 프로젝트의 `npm run e2e`를 실행한다 — 러너(Playwrig
 
 <div align="center">
 
-## 🧪 평가 게이트 — TRUST 5 (50점 만점)
+## 🧪 품질 마일스톤 — 측정 증거 (r1·r2·r3)
 
 </div>
 
-| 축 | 측정 | 만점 | 임계 |
-|:---|:---|:---:|:---:|
-| **Tested** 테스트성 | `coverage/` 디렉토리 + vitest 결과 | 10 | 7 |
-| **Readable** 가독성 | Biome check 0 errors | 10 | 7 |
-| **Unified** 일관성 | `src/` 구조 + 디자인 토큰 단일화 | 10 | 7 |
-| **Secured** 보안성 | semgrep `--config=auto` findings 0 | 10 | 7 |
-| **Trackable** 추적성 | `@MX` 4종 태그 커버리지 | 10 | 7 |
-| **총점** | | **50** | **40** PASS |
+| 마일스톤 | 발화(연속 완료 수) | 검사 | 결과 파일 |
+|:---|:---:|:---|:---|
+| **r1** | 38 | test·lint·typecheck·security 네 명령 exit 0 + 측정 커버리지 ≥ 85% | `step_archive/outputs/trust5_r1.md` |
+| **r2** | 44 | test·lint·typecheck·security 네 명령 exit 0 + 측정 커버리지 ≥ 85% | `step_archive/outputs/trust5_r2.md` |
+| **r3** | 49 이후(최종 Step 050) | r1·r2와 같은 검사 + 현재 HTML의 schema-v3 브라우저 라우팅 증거 + Step 50 회귀 행렬 6종 | `step_archive/outputs/trust5_r3.md` |
 
-평가 라운드: r1 = step038 / r2 = step044 / r3 = step050 도달 시 자동 발화.<br/>
-40점 이상 PASS · 40점 미만 WARN (fail-open, 자율주행은 계속).
+PASS/FAIL/INCOMPLETE 판정이며 점수는 없다. PASS가 아니면 한 번 복구를 요구하고, Step 050 완료는 최종 PASS 전까지 기록되지 않는다. 상세: [docs/QUALITY.md](docs/QUALITY.md)
 
 ---
 

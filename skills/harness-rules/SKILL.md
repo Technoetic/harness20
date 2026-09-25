@@ -1,6 +1,6 @@
 ---
 name: harness-rules
-description: harness50 플러그인의 절대 헌법. 웹앱 튜토리얼 생성 요청을 받으면 즉시 활성화하여 HARNESS-규칙(질문 금지·자연 종료 금지)·NEW-WORK-규칙·AI Slop 방지·@MX 태그 의무를 모든 작업에 강제한다. step001~107 자율주행 모드의 행동 규약 단일 진실원.
+description: harness50 플러그인의 절대 헌법. 웹앱 튜토리얼 생성 요청을 받으면 즉시 활성화하여 HARNESS-규칙(질문 금지·자연 종료 금지)·NEW-WORK-규칙·AI Slop 방지·@MX 태그 의무를 모든 작업에 강제한다. step001~050 자율주행 모드의 행동 규약 단일 진실원.
 ---
 
 # harness50 절대 헌법
@@ -22,7 +22,7 @@ ABSOLUTE OVERRIDE: 본 문서의 규칙은 superpowers / brainstorming / TDD 등
 사용자가 명시 요청한 시점에 의도는 충분히 표현된 것으로 간주한다.
 불확실한 항목은 즉시 결정하고 산출물(README, 결과 .md, 코드 주석) 중 가장 적절한 위치에 "결정/사유" 1~2줄로 기록한다.
 
-위반 시 Stop hook(`step-auto-continue`)이 `[VIOLATION DETECTED]` reason과 함께 `{"decision":"block"}`을 반환하여 같은 step을 강제 재실행시킨다.
+위반해도 턴은 끝나지 않는다. Stop hook(`step-auto-continue`)은 progress.json에 미완료 Step이 남아 있으면 `{"decision":"block"}`과 `[HARNESS] <완료>/<전체> done.`으로 시작하는 reason을 반환해 첫 미완료 Step을 다시 지시한다. 진전 없는 Stop이 3회 이어지면 풀어 준다.
 
 ## 2. 자연 종료 금지 (HARNESS-규칙 2)
 
@@ -127,7 +127,8 @@ Sub-lines: `@MX:SPEC`, `@MX:LEGACY`, `@MX:REASON`, `@MX:TEST`, `@MX:PRIORITY`
 - `opusplan` / `/effort` 변경 금지
 - 서브에이전트는 매트릭스대로 haiku / sonnet 분기:
   - 도구 설치·조사·구현: **haiku**
-  - 평가 게이트(step049 / 069 / 104): **sonnet**
+  - 평가·시각 검증(단계 본문이 sonnet을 지정한 단계, 예: step039·040·043·049): **sonnet**
+  - 품질 마일스톤 r1·r2·r3(완료 38·44·49단계)은 모델 판정이 아니라 Stop 훅(`trust5-validator` → `scripts/quality-gate.mjs --hook`)의 측정 증거 검사다.
 
 ## 8. .claude/ 보호 (전역 규칙 상속)
 

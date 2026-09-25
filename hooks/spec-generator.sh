@@ -69,9 +69,9 @@ def gen(n):
 - progress.json.current_step == {n}
 
 ## ACCEPTANCE
-- Self-Calibration 통과
-- 결과 파일 step_archive/step{num}_*.md 생성
-- 평가 라운드(49/69/104) 도달 시 TRUST 5 게이트 통과
+- 해당 Step의 자체 Self-Calibration 통과
+- 결과 파일: step_archive/archived/step{num}.md 본문 절차가 지정한 경로 (머리말 Sync 줄과 다르면 본문 절차를 따른다)
+- 품질 마일스톤(scripts/quality-gate.mjs): 완료 38단계 → trust5_r1, 완료 44단계 → trust5_r2, 완료 49단계 이후(최종 Step 050) → trust5_r3. Stop 훅(trust5-validator)이 step_archive/outputs/trust5_rN.md에 Verdict(PASS/FAIL/INCOMPLETE)를 기록하고, PASS가 아니면 복구를 요구한다.
 
 ## REFERENCE
 ```

@@ -243,28 +243,12 @@ if ($sessions.Count -gt 0) {
 # MoAI-ADK 벤치마킹: 보조 산출물 카운트 반영
 try {
     $specDir = Join-Path $stepArchive "specs"
-    $outDir  = Join-Path $stepArchive "outputs"
     if (Test-Path -LiteralPath $specDir) {
         $specCount = (Get-ChildItem -LiteralPath $specDir -Filter "SPEC-*.md" -ErrorAction SilentlyContinue).Count
         if (-not $progress.PSObject.Properties.Name.Contains('moai_features')) {
             $progress | Add-Member -NotePropertyName 'moai_features' -NotePropertyValue ([PSCustomObject]@{ spec_generated_count=0; mx_tag_warnings=0; lsp_autofixes=0 }) -Force
         }
         $progress.moai_features.spec_generated_count = $specCount
-    }
-    # trust5_results 필드는 outputs/ 유무와 무관하게 보장
-    if (-not $progress.PSObject.Properties.Name.Contains('trust5_results')) {
-        $progress | Add-Member -NotePropertyName 'trust5_results' -NotePropertyValue ([PSCustomObject]@{ r1=$null; r2=$null; r3=$null }) -Force
-    }
-    if (Test-Path $outDir) {
-        foreach ($r in @('r1','r2','r3')) {
-            $rf = Join-Path $outDir "trust5_$r.md"
-            if (Test-Path $rf) {
-                $rc = Get-Content $rf -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
-                if ($rc -match '\*\*총점\*\*\s*\|\s*\*\*(\d+)/50\*\*') {
-                    $progress.trust5_results.$r = [int]$Matches[1]
-                }
-            }
-        }
     }
     # @MX 경고 / LSP 자동수정 카운트 (로그 행 수 기반 근사)
     $mxLog = Join-Path $PSScriptRoot "mx-tag-validator.log"

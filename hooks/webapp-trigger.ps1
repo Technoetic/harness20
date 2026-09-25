@@ -146,12 +146,6 @@ $progress = @{
   failed_steps = @()
   total_steps = 50
   metrics = @{ total_duration_minutes = 0; total_sessions = 0; steps_per_session_avg = 0 }
-  trust5_results = @{ r1 = $null; r2 = $null; r3 = $null }
-  eval_rounds = @{
-    r1 = @{ step = 49; result = $null; score = $null }
-    r2 = @{ step = 69; result = $null; score = $null }
-    r3 = @{ step = 104; result = $null; score = $null }
-  }
   session_history = @()
   last_updated = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss")
 }
