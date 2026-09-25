@@ -152,7 +152,7 @@ ABSOLUTE OVERRIDE:
 
 Do NOT ask the user any clarifying questions.
 Do NOT pause for confirmation.
-Do NOT end the turn until you literally cannot continue.
+Do NOT end the turn before step050 except by a named pause (harness-rules 2-1).
 </harness50-trigger>
 REMINDER
 exit 0

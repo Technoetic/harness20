@@ -13,6 +13,9 @@
 //   - that step's body exists (step_archive/archived/stepNNN.md, else step_archive/stepNNN.md).
 // A progress.json created by an older SessionStart loader has no step bodies next to it, so it
 // reads as stale and never turns hooks on.
+// A named pause (scripts/harness-pause.mjs, harness-rules 2-1) is judged on the same rules with
+// the pause flag removed: 'paused' only when that run would be active, else finished, stale,
+// stopped or invalid. Only the loader and the prompt guard start for a paused run.
 //
 // It never writes and never imports codex/: installed copies and hook fixtures may ship hooks/
 // without it. The CLI prints one ASCII line and always exits 0.
@@ -26,14 +29,16 @@ export const MAX_PROGRESS_BYTES = 1024 * 1024;
 // First line only: '^' without the m flag anchors at the start of the prompt. Case-sensitive.
 export const EXPLICIT_WEBAPP = /^[ \t]*\/(?:harness50:)?webapp[ \t]+\S/;
 // Which run phases start each registered hook. 'always' runs everywhere the plugin is installed;
-// 'explicit-webapp' runs only for a '/webapp <topic>' prompt. Phase lists can grow (paused).
+// 'explicit-webapp' runs only for a '/webapp <topic>' prompt. In a paused run only the loader and
+// the prompt guard start, to say where the run stopped; Stop, approval, quality, SPEC, MX, LSP and
+// the writer stay off until /harness-resume.
 export const HOOK_GATES = Object.freeze({
   'destructive-guard': 'always',
   'permission-request-guard': 'always',
   'webapp-trigger': 'explicit-webapp',
-  'step-progress-loader': Object.freeze(['active', 'codex']),
+  'step-progress-loader': Object.freeze(['active', 'codex', 'paused']),
   'trust5-validator': Object.freeze(['active', 'finished']),
-  'step-obedience-guard': Object.freeze(['active']),
+  'step-obedience-guard': Object.freeze(['active', 'paused']),
   'auto-approve': Object.freeze(['active']),
   'mx-tag-validator': Object.freeze(['active']),
   'lsp-autofix': Object.freeze(['active']),
@@ -124,11 +129,26 @@ export function readRun(root) {
   let state;
   try { state = readProgress(physical(root), entry.file); } catch { return { phase: 'invalid' }; }
   const run = classifyProgress(state);
+  if (run.phase === 'paused') return pausedRun(root, state);
   if (run.phase !== 'running') return run;
-  const name = stepName(run.next);
-  if (regularFile(path.join(root, 'step_archive', 'archived', name))) return { ...run, phase: 'active', stepBody: 'archived' };
-  if (regularFile(path.join(root, 'step_archive', name))) return { ...run, phase: 'active', stepBody: 'flat' };
-  return { ...run, phase: 'stale' };
+  const body = stepBody(root, run.next);
+  return body ? { ...run, phase: 'active', stepBody: body } : { ...run, phase: 'stale' };
+}
+function stepBody(root, step) {
+  const name = stepName(step);
+  if (regularFile(path.join(root, 'step_archive', 'archived', name))) return 'archived';
+  if (regularFile(path.join(root, 'step_archive', name))) return 'flat';
+  return null;
+}
+// classifyProgress reports 'paused' before any structural check, so judge the same state without
+// the pause: a run that would be active stays 'paused'; anything else keeps that other phase.
+function pausedRun(root, state) {
+  const unpaused = { ...state };
+  delete unpaused.paused;
+  if (unpaused.status === 'paused') delete unpaused.status;
+  const run = classifyProgress(unpaused);
+  if (run.phase !== 'running') return run;
+  return stepBody(root, run.next) ? { phase: 'paused', next: run.next, completed: run.completed } : { ...run, phase: 'stale' };
 }
 export const isActive = root => readRun(root).phase === 'active';
 
@@ -164,7 +184,7 @@ export function webappPrecheck(root) {
   const done = state.completed_steps;
   if (!Array.isArray(done)) return PRECHECK_INVALID_LINE;
   if (done.length === 0) return 'issue';
-  return `[HARNESS] webapp trigger skipped: step_archive/progress.json already records ${done.length}/${STEP_COUNT} completed steps, so step_archive/TOPIC/TOPIC.md and progress.json were left unchanged. Continue that run, or run /harness-reset first and then /webapp <topic> for a new topic.`;
+  return `[HARNESS] webapp trigger skipped: step_archive/progress.json already records ${done.length}/${STEP_COUNT} completed steps, so step_archive/TOPIC/TOPIC.md and progress.json were left unchanged. Continue that run (use /harness-resume if it is paused), or run /harness-reset first and then /webapp <topic> for a new topic.`;
 }
 
 function invokedDirectly() {

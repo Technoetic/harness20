@@ -1,6 +1,8 @@
 // Claude hooks through the installed dispatcher (node hooks/run-hook.mjs <name>, as hooks.json
 // runs them) in folders that have no active Harness50 run: nothing may be created, approved,
-// blocked or injected there. Only an explicit /webapp <topic> starts a run.
+// blocked or injected there. Only an explicit /webapp <topic> starts a run. A paused run (named
+// pause, harness-rules 2-1) is the one exception that speaks: the loader and the prompt guard
+// print where it stopped, and still nothing is written.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -8,6 +10,7 @@ import { delimiter, join } from 'node:path';
 import { spawn } from 'node:child_process';
 
 import { HOOK_GATES } from '../../hooks/lib/harness-activity.mjs';
+import { pausedLine } from '../../scripts/lib/pause-state.mjs';
 import { PROJECT_NAMES, installPlugin, repo, runDispatcher, tempRoot, testEachName, tree, windows } from './helpers/claude-hooks.mjs';
 
 // Loader-created progress.json from the incident workspace: step 1 of 50 and no step bodies.
@@ -117,11 +120,18 @@ const writeBodies = (project, steps) => {
   for (const step of steps) writeFileSync(join(project, 'step_archive', 'archived', `step${String(step).padStart(3, '0')}.md`), `# Step ${step}\n`);
 };
 const valid = { current_step: 1, total_steps: 50, completed_steps: [], failed_steps: [], skipped_steps: [], session_history: [], metrics: { total_sessions: 0 } };
+const PAUSED_RUN = { ...valid, paused: true };
+// What a paused run gets: the loader's two lines and the guard's one line for every prompt that is
+// not a run control command (none of PROMPTS is). Every other hook stays silent.
+const PAUSED_OUTPUT = {
+  'step-progress-loader': `=== Paused at step001 ===\n${pausedLine(PAUSED_RUN)}\n`,
+  'step-obedience-guard': `${pausedLine(PAUSED_RUN)}\n`
+};
 
 const WORKSPACES = {
   empty: () => {},
   'stale-loader': project => writeProgress(project, STALE_LOADER_PROGRESS),
-  paused: project => { writeProgress(project, { ...valid, paused: true }); writeBodies(project, [1]); },
+  paused: project => { writeProgress(project, PAUSED_RUN); writeBodies(project, [1]); },
   'total 107': project => { writeProgress(project, { ...valid, total_steps: 107 }); writeBodies(project, [1]); },
   'gap-inconsistent': project => { writeProgress(project, { ...valid, completed_steps: [2], current_step: 3 }); writeBodies(project, [1, 2, 3]); },
   corrupt: project => writeProgress(project, '{broken'),
@@ -140,7 +150,7 @@ const WORKSPACES = {
 };
 
 for (const [kind, prepare] of Object.entries(WORKSPACES)) {
-  testEachName(`inactive workspace (${kind}): no registered hook writes, approves, blocks or injects`, async (t, name) => {
+  testEachName(`inactive workspace (${kind}): no registered hook writes, approves, blocks or injects step instructions`, async (t, name) => {
     const f = setup(t, name);
     writeFileSync(join(f.project, 'src', '[id].js'), 'export const id = 1;\n');
     if (prepare(f.project, f.base, t) === 'skip') return;
@@ -154,7 +164,8 @@ for (const [kind, prepare] of Object.entries(WORKSPACES)) {
     }
     assert.ok(tasks.length >= 30, `only ${tasks.length} hook calls`);
     for (const [label, result] of await inPool(tasks)) {
-      assert.deepEqual(result, { status: 0, stdout: '', stderr: '' }, label);
+      const expected = kind === 'paused' ? PAUSED_OUTPUT[label.split(' ')[0]] ?? '' : '';
+      assert.deepEqual({ ...result, stdout: result.stdout.replace(/\r\n/g, '\n') }, { status: 0, stdout: expected, stderr: '' }, label);
     }
     assert.deepEqual(tree(f.project), before.project);
     if (before.outside) assert.deepEqual(tree(join(f.base, 'outside')), before.outside);

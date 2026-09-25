@@ -41,6 +41,8 @@
 
 Codex does not provide a `/webapp` slash command. Codex에서 기존 작업을 이어가려면 `$webapp resume`, 자동 이어가기를 멈추려면 `$webapp pause`를 사용합니다.
 
+Claude Code에서 자동 이어가기를 멈추려면 `/harness-pause`, 멈춘 작업을 이어가려면 `/harness-resume`을 사용합니다. `/harness-reset`은 진행 기록을 새로 만들고 `/webapp <topic>`은 완료 기록이 있는 진행을 건드리지 않으므로 둘 다 재개 수단이 아닙니다.
+
 플러그인 이름이 표시되는 Codex에서는 `$harness50:webapp`, `$harness50:harness50-status`, `$harness50:harness50-reset`을 선택합니다. 짧은 이름과 같은 제어 요청으로 처리됩니다.
 
 Codex의 새 작업은 한 줄 주제로 시작할 수 있습니다. 초기화 관리자가 원문과 명시 조건을 보존하면서 여섯 필수 주제 항목을 준비하고, 미지정 항목만 기본값으로 표시한 뒤 해시를 고정합니다. 완성된 Markdown/YAML 주제는 바이트 그대로 보존하며, 기존 workflow의 주제는 변경하지 않습니다.
@@ -175,12 +177,12 @@ v2.4.0은 Claude·Codex의 제품 QA에 [실패·검증 인계 보고서](docs/Q
                         ↓
    Stop hook  ────►  진행 미완료면  {"decision":"block"}  →  자동 재개
                         ↓
-            50 step 완주 후에야 사용자에게 컨트롤 반환
+            50 step 완주 또는 명명된 멈춤 전까지 컨트롤을 돌려주지 않음
 ```
 
 > [!IMPORTANT]
-> 진짜 종료 조건은 단 하나: **컨텍스트 한계 도달**. <br/>
-> "이만하면 충분"이라는 모델의 자기판단을 위반으로 정의한다.
+> 종료 조건은 둘뿐이다: **50단계 완료 기록** 또는 **명명된 멈춤**(권한 거부·필수 도구 3회 실패·필수 외부 입력 부재·사용자 요청). <br/>
+> "이만하면 충분"이라는 모델의 자기판단은 위반이다. 멈춤은 사유와 함께 progress.json에 기록되고 `/harness-resume`으로 풀린다.
 
 ---
 
@@ -398,8 +400,8 @@ graph TB
 |:---:|:---|:---|
 | 1 | **하네스 엔지니어링** | 모델을 똑똑하게 만들기 전에 트랙·가드·게이트·기록을 깔아라 |
 | 2 | **절차의 원자화** | 한 step은 한 책임. 끝나면 다음 step 즉시 호출 |
-| 3 | **질문 금지** | "진행할까요?"는 위반. 모호하면 결정 + 산출물에 1줄 사유 기록 |
-| 4 | **자연 종료 금지** | "이만하면 충분"은 위반. 컨텍스트 한계 직전까지 계속 |
+| 3 | **질문 금지** | "진행할까요?"는 위반. 모호하면 결정 + 산출물에 1줄 사유 기록. 예외는 명명된 멈춤 보고뿐 |
+| 4 | **자연 종료 금지** | "이만하면 충분"은 위반. 50단계 완료나 명명된 멈춤 전에는 계속 |
 | 5 | **AI Slop 방지** | 8 배수 grid · 폰트 4 · accent 1 · radius 5 · 44 pt 터치 |
 | 6 | **MoAI-ADK 정직성** | @MX 4종 태그 · EARS-라이트 SPEC · TRUST 5 게이트 |
 
@@ -420,9 +422,11 @@ harness50/
 │   └── marketplace.json               ← /plugin marketplace add 진입점
 ├── tests/
 │   └── security-regression.sh         ← 45 케이스 안전 회귀 (재현 가능)
-├── commands/                          ← 3개 슬래시 커맨드
+├── commands/                          ← 5개 슬래시 커맨드
 │   ├── webapp.md                      ← /webapp <주제>  자율주행 진입
 │   ├── harness-status.md              ← /harness-status 1줄 진행 보고
+│   ├── harness-pause.md               ← /harness-pause  명명된 멈춤 기록 (진행 보존)
+│   ├── harness-resume.md              ← /harness-resume 멈춤 해제 후 이어서 실행
 │   └── harness-reset.md               ← /harness-reset  progress.json 리셋
 │
 ├── skills/                            ← 4개 스킬
@@ -507,7 +511,7 @@ sequenceDiagram
     end
 ```
 
-질문 패턴 감지와 무관하게 Stop 훅은 progress.json에 미완료 Step이 남아 있으면 `[HARNESS] N/50 done.`으로 시작하는 reason으로 첫 미완료 Step을 다시 지시한다(Windows .ps1은 질문 패턴 39개를 감지하면 재지시 문구에 No user-facing questions를 덧붙인다). 진전 없는 재지시가 3회 이어지면 풀어 준다.
+Stop 훅은 문구가 아니라 progress.json 상태로 판정한다. 50단계가 기록되지 않았고 명명된 멈춤도 없으면 `[HARNESS] N/50 done.`으로 시작하는 reason으로 첫 미완료 단계를 다시 지시하고, 진전 없는 재지시는 3회에서 멈춘다. Windows 훅은 질문 문구(39개 패턴)를 감지하면 재지시 문구만 바꾼다. 모델이 빠져나갈 길은 50단계 완료와 명명된 멈춤(`scripts/harness-pause.mjs`) 둘뿐이다.
 
 ---
 
@@ -634,6 +638,21 @@ step045 E2E는 프로젝트의 `npm run e2e`를 실행한다 — 러너(Playwrig
 
 `/harness-reset`은 `step_archive/archived/`, `specs/`, `outputs/`는 보존. progress.json만 초기화.
 
+### 멈춤과 재개
+
+```text
+/harness-pause 회의로 잠시 중단
+→ harness50 멈춤 — step038에서 자동 진행 중지. 재개: /harness-resume
+
+/harness-status
+→ harness50: 37/50 완료 | current=step038 | r1=- r2=- r3=- | 멈춤: user-request @step038 — 회의로 잠시 중단
+
+/harness-resume
+→ step038부터 이어서 실행
+```
+
+멈춤은 `step_archive/progress.json`의 `paused`·`pause_*` 필드로 기록되고 진행 기록은 그대로 남습니다. 모델은 권한 거부·필수 도구 3회 실패·필수 외부 입력 부재일 때만 같은 CLI(`scripts/harness-pause.mjs`, 헌법 §2-1)로 멈춥니다. 멈춘 동안 Stop 훅은 실행을 다시 지시하지 않고 자동 승인과 품질 게이트도 쉬며, 세션 시작과 프롬프트마다 `[HARNESS] PAUSED at stepNNN/50` 한 줄로 멈춘 위치만 알립니다. `/harness-reset`과 `/webapp <topic>`은 재개 수단이 아닙니다.
+
 ---
 
 <div align="center">
@@ -660,8 +679,8 @@ PASS/FAIL/INCOMPLETE 판정이며 점수는 없다. PASS가 아니면 한 번 �
 
 | 이벤트 | 실행 hook | 역할 |
 |:---|:---|:---|
-| **UserPromptSubmit** | webapp-trigger → step-obedience-guard | `/webapp <주제>`일 때만 부트스트랩(완료 기록이 있는 progress는 건너뜀). 활성 실행에서는 다음 step 알림 |
-| **SessionStart** | step-progress-loader | 진행 중인 실행에서만 progress.json 로드 + 다음 step 지시 주입(새로 만들지 않음) |
+| **UserPromptSubmit** | webapp-trigger → step-obedience-guard | `/webapp <주제>`일 때만 부트스트랩(완료 기록이 있는 progress는 건너뜀). 활성 실행에서는 다음 step 알림, 멈춘 실행에서는 멈춘 위치 1줄 |
+| **SessionStart** | step-progress-loader | 진행 중인 실행에서만 progress.json 로드 + 다음 step 지시 주입(새로 만들지 않음). 멈춘 실행에서는 멈춘 위치만 알림 |
 | **PreToolUse** | destructive-guard + auto-approve | 위험 차단(Bash) + 편집·WebSearch 자동 승인 (병렬, exit 2 우선) |
 | **PermissionRequest** | permission-request-guard | `updatedInput` 변조 방어용 최후 검증 (deny+exit 2) |
 | **PostToolUse** | mx-tag-validator + lsp-autofix | @MX 태그 검증 + Biome/Stylelint 자동수정 |

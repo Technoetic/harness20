@@ -20,9 +20,32 @@ if [ -e "$PROJECT_ROOT/step_archive/.harness50-codex/state.json" ]; then exit 0;
 # Parse progress without jq. Without python3 the state is unknown, so say nothing rather than
 # invent one. tr drops the CR that a Windows python prints, which would break the numbers below.
 command -v python3 >/dev/null 2>&1 || exit 0
-TOTAL=""; DONE=""; NEXT=""
-read -r TOTAL DONE NEXT < <(python3 - "$PROGRESS_FILE" <<'PY' | tr -d '\r'
-import json,sys
+
+# The commands that control the run itself (/harness-pause, /harness-resume, /harness-status,
+# /harness-reset) get no reminder, paused or not (mirrors step-obedience-guard.ps1).
+CONTROL="$(printf '%s' "$RAW" | python3 -c 'import json,re,sys
+d=json.load(sys.stdin)
+p=d.get("prompt") if isinstance(d,dict) else None
+print("control" if isinstance(p,str) and re.match(r"\s*/(harness50:)?harness-(pause|resume|status|reset)(\s|$)",p) else "")' 2>/dev/null || true)"
+case "$CONTROL" in control*) exit 0 ;; esac
+
+# The fourth field is '-' or the validated PAUSED line of a named pause (harness-rules 2-1); read
+# gives the last variable the rest of the line.
+TOTAL=""; DONE=""; NEXT=""; PAUSED_LINE=""
+read -r TOTAL DONE NEXT PAUSED_LINE < <(python3 - "$PROGRESS_FILE" <<'PY' | tr -d '\r'
+import json,re,sys
+# Same bytes as step-obedience-guard.ps1 and step-progress-loader (scripts/lib/pause-state.mjs).
+CODES=('permission-denied','required-tool-failed','required-input-missing','user-request')
+PAUSED='[HARNESS] PAUSED at step{STEP}/{TOTAL} (reason={REASON}{SINCE}). Automatic continuation is off: do not run steps. Tell the user why (pause_note in step_archive/progress.json) and handle their message. Resume only when the user explicitly asks: /harness-resume.'
+def paused_line(p,total,first):
+    # Validated values only: a known code, a step inside 1..total, an ISO paused_at. pause_note and
+    # pause_evidence are never printed.
+    step=p.get('paused_step')
+    if not (isinstance(step,int) and not isinstance(step,bool) and 1<=step<=total): step=first
+    code=p.get('pause_reason') if p.get('pause_reason') in CODES else 'unknown'
+    at=p.get('paused_at')
+    since=', since '+at if isinstance(at,str) and re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,3})?Z',at) else ''
+    return step, PAUSED.replace('{STEP}',f'{step:03d}').replace('{TOTAL}',str(total)).replace('{REASON}',code).replace('{SINCE}',since)
 try:
     p=json.load(open(sys.argv[1],encoding="utf-8"))
     total=int(p.get("total_steps",50))
@@ -33,7 +56,10 @@ except Exception:
 nxt=None
 for i in range(1,total+1):
     if i not in done_set: nxt=i; break
-print(total, len(done), nxt if nxt is not None else 0)
+line='-'
+if nxt is not None and (('paused' in p and p['paused'] is not False) or p.get('status')=='paused'):
+    line=paused_line(p,total,nxt)[1]
+print(total, len(done), nxt if nxt is not None else 0, line)
 PY
 )
 case "$TOTAL:$DONE:$NEXT" in
@@ -42,6 +68,12 @@ esac
 
 [ "$DONE" -ge "$TOTAL" ] && exit 0
 [ "$NEXT" = "0" ] && exit 0
+
+# Named pause: that one line only, no step reminder (mirrors step-obedience-guard.ps1).
+if [ -n "$PAUSED_LINE" ] && [ "$PAUSED_LINE" != "-" ]; then
+  printf '%s\n' "$PAUSED_LINE"
+  exit 0
+fi
 
 # archived/ first, then the flat step_archive/ copy (mirrors step-obedience-guard.ps1).
 NEXT_FMT="$(printf 'step%03d' "$NEXT")"

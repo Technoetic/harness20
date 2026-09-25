@@ -115,6 +115,24 @@ for (const name of ['x', 'x [30]']) {
   });
 }
 
+// A named pause (scripts/harness-pause.mjs) is judged with the pause flag removed: only a run that
+// would otherwise be active reads as paused.
+test('readRun narrows paused to runs that would otherwise be active', t => {
+  const paused = { paused: true };
+  assert.deepEqual(readRun(project(t, 'p body', { progress: run([], 1, paused), body: 'archived' })), { phase: 'paused', next: 1, completed: 0 });
+  assert.deepEqual(readRun(project(t, 'p flat [30]', { progress: run([], 1, paused), body: 'flat' })), { phase: 'paused', next: 1, completed: 0 });
+  assert.deepEqual(readRun(project(t, 'p status', { progress: run([], 1, { status: 'paused' }), body: 'archived' })), { phase: 'paused', next: 1, completed: 0 });
+  assert.deepEqual(readRun(project(t, 'p no body', { progress: run([], 1, paused) })), { phase: 'stale', next: 1, completed: 0 });
+  assert.equal(readRun(project(t, 'p finished', { progress: run(range(1, 50), 50, paused), body: 'archived' })).phase, 'finished');
+  assert.deepEqual(readRun(project(t, 'p total 107', { progress: run([], 1, { ...paused, total_steps: 107 }), body: 'archived' })), { phase: 'invalid' });
+  assert.deepEqual(readRun(project(t, 'p gap', { progress: run([2], 3, paused), body: 'archived' })), { phase: 'invalid' });
+  assert.deepEqual(readRun(project(t, 'p cancelled', { progress: run([], 1, { ...paused, status: 'cancelled' }), body: 'archived' })), { phase: 'stopped' });
+  for (const value of ['true', 1, null, 'yes']) {
+    assert.equal(readRun(project(t, `p ${String(value)}`, { progress: run([], 1, { paused: value }), body: 'archived' })).phase, 'paused', String(value));
+  }
+  assert.equal(readRun(project(t, 'p false', { progress: run([], 1, { paused: false }), body: 'archived' })).phase, 'active');
+});
+
 test('readRun rejects a progress.json reached through a link that leaves the project', t => {
   const outside = project(t, 'outside', { progress: run(), body: 'archived' });
   const root = project(t, 'inside');
@@ -149,9 +167,9 @@ const EXPECTED = {
   'destructive-guard': PHASES,
   'permission-request-guard': PHASES,
   'webapp-trigger': [],
-  'step-progress-loader': ['codex', 'active'],
+  'step-progress-loader': ['paused', 'codex', 'active'],
   'trust5-validator': ['finished', 'active'],
-  'step-obedience-guard': ['active'],
+  'step-obedience-guard': ['paused', 'active'],
   'auto-approve': ['active'],
   'mx-tag-validator': ['active'],
   'lsp-autofix': ['active'],
@@ -242,6 +260,7 @@ test('webappPrecheck issues only where no completed step would be lost', t => {
   };
   assert.match(lines.recorded, /^\[HARNESS\] webapp trigger skipped: step_archive\/progress\.json already records 1\/50 completed steps/);
   assert.match(lines.recorded, /run \/harness-reset first and then \/webapp <topic> for a new topic\.$/);
+  assert.ok(lines.recorded.includes('Continue that run (use /harness-resume if it is paused), or run /harness-reset first'), lines.recorded);
   assert.match(lines.finished, /already records 50\/50 completed steps/);
   for (const key of ['broken', 'array', 'notArray']) assert.match(lines[key], /^\[HARNESS\] webapp trigger skipped: step_archive\/progress\.json is unreadable or invalid/, key);
   assert.match(lines.codex, /^\[HARNESS\] webapp trigger skipped: a Codex workflow owns this workspace/);

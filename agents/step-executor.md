@@ -96,4 +96,10 @@ Step NNN/50 완료
 Step NNN/50 미완료 | QA: <report_sha256 또는 unavailable> | 다음 검사: <정제된 다음 검사 1개>
 ```
 
-추가 설명·이모지·산출물 본문 인용 금지. 호출자는 미완료 step을 완료 처리하거나 다음 step으로 넘기지 않는다.
+헌법 §2-1 멈춤 사유(권한 거부·필수 도구 3회 실패·필수 외부 입력 부재)에 해당하면 아래 한 줄로 인계한다. 워커는 `harness-pause.mjs`를 실행하거나 progress.json을 고치지 않는다. 멈춤 기록은 호출자가 한다.
+
+```
+Step NNN/50 멈춤 필요 | 사유: <permission-denied|required-tool-failed|required-input-missing> | 증거: <step_archive/ 경로> | 사용자가 할 일: <1문장>
+```
+
+추가 설명·이모지·산출물 본문 인용 금지. 호출자는 미완료·멈춤 필요 step을 완료 처리하거나 다음 step으로 넘기지 않는다. 멈춤 필요 인계를 받으면 헌법 §2-1 절차로 기록하고 턴을 끝낸다.

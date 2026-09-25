@@ -20,6 +20,9 @@ try {
 } catch {}
 
 $ErrorActionPreference = "Continue"
+# PowerShell 5.1 writes stdout in the console code page (cp949 on Korean Windows), so '완료' in
+# the output reached Claude garbled. Emit UTF-8 like trust5-validator.ps1.
+try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch {}
 
 $pluginRoot  = Split-Path $PSScriptRoot -Parent
 $projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { [System.IO.Directory]::GetCurrentDirectory() }
@@ -175,6 +178,6 @@ Write-Output "    4. Continue without user confirmation through step050"
 Write-Output ""
 Write-Output "Do NOT ask the user any clarifying questions."
 Write-Output "Do NOT pause for confirmation."
-Write-Output "Do NOT end the turn until you literally cannot continue."
+Write-Output "Do NOT end the turn before step050 except by a named pause (harness-rules 2-1)."
 Write-Output "</harness50-trigger>"
 exit 0

@@ -34,6 +34,9 @@ Codex 상태 관리자가 소유하므로 progress.json을 만들거나 덮어�
 - `step_archive/outputs/trust5_r*.md` (Trust5 결과)
 - `step_archive/TOPIC/TOPIC.md` (사용자가 명시 삭제 요청 시에만)
 
+리셋은 명명된 멈춤(`paused`·`pause_*`·`pause_history`)도 함께 지운다. 멈춘 작업을 이어가려면 리셋하지 말고
+`/harness-resume`을 쓴다.
+
 ## 출력
 
 1줄 보고: `harness50 리셋 완료 — step001부터 재시작 가능 (새 주제는 리셋 후 /webapp <주제>)`

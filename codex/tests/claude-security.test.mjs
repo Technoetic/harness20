@@ -47,7 +47,7 @@ test('shipping hook allows an ordinary project write in bootstrap state', t => {
   const root = fixture(t);
   assert.match(run(root, 'auto-approve', write('src/app.js')).output, /"allow"/);
 });
-for (const [name, state] of Object.entries({ missing: null, malformed: '{', empty: {}, completed: { ...active, current_step: 50, completed_steps: Array.from({ length: 50 }, (_, i) => i + 1) }, paused: { ...active, paused: true }, statusPaused: { ...active, status: 'paused' }, gap: { ...active, current_step: 3, completed_steps: [2] }, inconsistent: { ...active, current_step: 2 }, strings: { ...active, current_step: '1' } })) {
+for (const [name, state] of Object.entries({ missing: null, malformed: '{', empty: {}, completed: { ...active, current_step: 50, completed_steps: Array.from({ length: 50 }, (_, i) => i + 1) }, paused: { ...active, paused: true }, pausedNull: { ...active, paused: null }, pausedString: { ...active, paused: 'true' }, pausedOne: { ...active, paused: 1 }, statusPaused: { ...active, status: 'paused' }, gap: { ...active, current_step: 3, completed_steps: [2] }, inconsistent: { ...active, current_step: 2 }, strings: { ...active, current_step: '1' } })) {
   test(`autoapproval defers for ${name} state`, t => {
     assert.equal(run(fixture(t, state), 'auto-approve', write('src/app.js')).output, '');
   });
@@ -64,6 +64,8 @@ for (const target of ['.claude/subdir/../settings.json', '/cache/harness50/2.1.0
 test('arbitrary shell and out-of-project writes require normal permission', t => {
   const root = fixture(t);
   assert.equal(run(root, 'auto-approve', { tool_name: 'Bash', tool_input: { command: 'echo hello' } }).output, '');
+  // The named pause CLI changes progress.json, so it keeps the host permission prompt too.
+  assert.equal(run(root, 'auto-approve', { tool_name: 'Bash', tool_input: { command: 'node x/scripts/harness-pause.mjs resume --workspace .' } }).output, '');
   assert.equal(run(root, 'auto-approve', write('../outside.txt')).output, '');
 });
 test('existing destructive command denial remains (payload never executed)', t => {

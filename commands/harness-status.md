@@ -11,6 +11,10 @@ harness50: <completed>/50 완료 | current=<stepNNN 또는 -> | r1=<판정> r2=<
 ```
 
 - current는 첫 미완료 Step이다. 50/50이면 `-`로 쓴다.
+- `paused`가 있고 `false`가 아니거나 `status`가 `paused`이면(명명된 멈춤, 헌법 §2-1) 줄 끝에
+  ` | 멈춤: <pause_reason> @step<paused_step> — <pause_note>`를 붙인다. pause_reason이
+  `permission-denied`·`required-tool-failed`·`required-input-missing`·`user-request`가 아니면 `unknown`,
+  paused_step이 없거나 범위 밖이면 첫 미완료 Step을 쓴다.
 - progress.json 없으면: "harness50 비활성 — /webapp <주제> 로 시작"
 - 단, `step_archive/.harness50-codex/state.json`이 있으면 progress.json 대신 harness50 플러그인의
   `node codex/scripts/harness-state.mjs show --workspace "<project-root>"` 결과(`status`, `current_step`,

@@ -9,6 +9,9 @@
 param()
 
 $ErrorActionPreference = "Continue"
+# PowerShell 5.1 writes stdout in the console code page (cp949 on Korean Windows), so '완료' in
+# the output reached Claude garbled. Emit UTF-8 like trust5-validator.ps1.
+try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch {}
 function Write-HookLog($msg) {
     if ($projectRoot -and (Test-Path -LiteralPath (Join-Path $projectRoot "step_archive"))) {
         try { Add-Content -LiteralPath (Join-Path $projectRoot "step_archive/step-auto-continue.log") -Value $msg -Encoding UTF8 -ErrorAction Stop } catch {}
@@ -60,7 +63,11 @@ $total = [int]$progress.total_steps
 $current = [int]$progress.current_step
 $completedCount = @($progress.completed_steps).Count
 
-if ($progress.paused -eq $true -or $progress.status -eq 'paused' -or $total -lt 1 -or $total -gt 999) { exit 0 }
+# Named pause (harness-rules 2-1), same judgement as scripts/lib/pause-state.mjs isPaused: a paused
+# key whose value is not boolean false, or status "paused". A paused run prints nothing here.
+$hasPaused = @($progress.PSObject.Properties.Name) -ccontains 'paused'
+$isPaused = ($hasPaused -and -not ($progress.paused -is [bool] -and -not $progress.paused)) -or ($progress.status -is [string] -and $progress.status -ceq 'paused')
+if ($isPaused -or $total -lt 1 -or $total -gt 999) { exit 0 }
 $current = 0
 for ($n = 1; $n -le $total; $n++) { if (@($progress.completed_steps) -notcontains $n) { $current = $n; break } }
 if ($current -eq 0) { exit 0 }
@@ -190,11 +197,14 @@ if (Test-Path -LiteralPath $archivedCandidate) {
 # 출력은 1~2줄로 최소화한다 (긴 reason 주입이 컨텍스트를 키워 tool-call 직렬화 오류를 유발).
 # B-FIX(2026-06-05): 멈춤의 근본 원인은 검증 스킬(evaluator/verify/check)의 긴 본문을
 # 도구 호출 파라미터 안에 직렬화하다 XML이 깨지는 것. reason에 회피 지침 1줄 추가.
-$guard = "DO NOT paste verification/CoVE text into tool-call parameters — write findings to a .md file, keep tool args minimal."
+$guard = "DO NOT paste verification/CoVE text into tool-call parameters - write findings to a .md file, keep tool args minimal."
+# The only early stop (harness-rules 2-1). Same bytes as NAMED in step-auto-continue.sh and
+# step-progress-loader (scripts/lib/pause-state.mjs NAMED_PAUSE).
+$namedPause = 'Early stop only as a named pause (permission-denied | required-tool-failed | required-input-missing; harness-rules 2-1): save evidence under step_archive/, run node "<plugin-root>/scripts/harness-pause.mjs" pause --workspace "<project-root>" --reason <code> --evidence <step_archive/file> --note "<user action>", then end the turn with the pause report.'
 if ($hasQuestion) {
-    $reason = "[HARNESS] $completedCount/$total done. No user-facing questions. Resume now: read+execute $stepFile, report 'Step $nextStepStr/$total 완료', continue. $guard (User direct requests still take priority.)"
+    $reason = "[HARNESS] $completedCount/$total done. No user-facing questions. Resume now: read+execute $stepFile, report 'Step $nextStepStr/$total 완료', continue. $namedPause $guard (User direct requests still take priority.)"
 } else {
-    $reason = "[HARNESS] $completedCount/$total done. Next: read+execute $stepFile, report 'Step $nextStepStr/$total 완료', then auto-advance. Only stop after step $total. $guard (User direct requests still take priority.)"
+    $reason = "[HARNESS] $completedCount/$total done. Next: read+execute $stepFile, report 'Step $nextStepStr/$total 완료', then auto-advance. $namedPause $guard (User direct requests still take priority.)"
 }
 
 # B-P2-2 fix: 공식 스펙은 단일 채널만 허용.

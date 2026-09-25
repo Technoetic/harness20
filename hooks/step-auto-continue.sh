@@ -4,6 +4,8 @@ command -v python3 >/dev/null 2>&1 || exit 0
 export RAW_STDIN="$(cat || true)"
 python3 - <<'PY_STOP'
 import json, os, re
+# The only early stop (harness-rules 2-1). Same bytes as $namedPause in step-auto-continue.ps1.
+NAMED='Early stop only as a named pause (permission-denied | required-tool-failed | required-input-missing; harness-rules 2-1): save evidence under step_archive/, run node "<plugin-root>/scripts/harness-pause.mjs" pause --workspace "<project-root>" --reason <code> --evidence <step_archive/file> --note "<user action>", then end the turn with the pause report.'
 try:
     event=json.loads(os.environ.get('RAW_STDIN') or '{}')
     root=os.environ.get('CLAUDE_PROJECT_DIR') or event.get('cwd') or os.getcwd()
@@ -12,7 +14,8 @@ try:
     # continuation when its state exists. Exit before any read or write.
     if os.path.exists(os.path.join(archive,'.harness50-codex','state.json')): raise SystemExit(0)
     with open(os.path.join(archive,'progress.json'),encoding='utf-8-sig') as f: p=json.load(f)
-    if p.get('paused') is True or p.get('status')=='paused': raise SystemExit(0)
+    # Named pause, same judgement as scripts/lib/pause-state.mjs isPaused: nothing is printed.
+    if ('paused' in p and p['paused'] is not False) or p.get('status')=='paused': raise SystemExit(0)
     total=int(p['total_steps'])
     if not 1<=total<=999: raise SystemExit(0)
     done=sorted(set(p.get('completed_steps') or []))
@@ -33,7 +36,7 @@ try:
     if stall>=3: raise SystemExit(0)
     step=f'step{current:03d}.md'
     relative='step_archive/archived/'+step if os.path.isfile(os.path.join(archive,'archived',step)) else 'step_archive/'+step
-    print(json.dumps({'decision':'block','reason':f'[HARNESS] {len(done)}/{total} done. Read and execute {relative}, report completion, then continue. User direct requests take priority.'}))
+    print(json.dumps({'decision':'block','reason':f'[HARNESS] {len(done)}/{total} done. Read and execute {relative}, report completion, then continue. {NAMED} User direct requests take priority.'}))
 except (OSError,ValueError,KeyError,TypeError): pass
 PY_STOP
 exit 0
