@@ -11,8 +11,10 @@ export const PAUSE_KEYS = Object.freeze(['pause_reason', 'paused_step', 'paused_
 // paused_at as written by applyPause (Date#toISOString). Hooks print it only when it matches.
 export const PAUSED_AT = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,3})?Z$/;
 
-// The sentence the Stop hook and the SessionStart loader add to every continue instruction.
-export const NAMED_PAUSE = 'Early stop only as a named pause (permission-denied | required-tool-failed | required-input-missing; harness-rules 2-1): save evidence under step_archive/, run node "<plugin-root>/scripts/harness-pause.mjs" pause --workspace "<project-root>" --reason <code> --evidence <step_archive/file> --note "<user action>", then end the turn with the pause report.';
+// The sentence the Stop hook and the SessionStart loader add to every continue instruction. Same
+// string (not the same source bytes) as $namedPause in the .ps1 hooks and NAMED in the .sh hooks.
+// The note is single-quoted, so $(...), backticks and $VAR in it stay text in bash and PowerShell.
+export const NAMED_PAUSE = 'Early stop only as a named pause (permission-denied | required-tool-failed | required-input-missing; harness-rules 2-1): save evidence under step_archive/, run node "<plugin-root>/scripts/harness-pause.mjs" pause --workspace "<project-root>" --reason <code> --evidence <step_archive/file> --note \'<user action, no quotes>\', then end the turn with the pause report.';
 // The one line the loader and the prompt guard print for a paused run. Free text (pause_note,
 // pause_evidence) is never printed; the placeholders take validated values only.
 export const PAUSED_TEMPLATE = '[HARNESS] PAUSED at step{STEP}/{TOTAL} (reason={REASON}{SINCE}). Automatic continuation is off: do not run steps. Tell the user why (pause_note in step_archive/progress.json) and handle their message. Resume only when the user explicitly asks: /harness-resume.';

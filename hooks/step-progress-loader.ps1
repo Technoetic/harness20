@@ -75,10 +75,11 @@ if ($null -eq $existingProgress) { exit 0 }
 # Named pause (harness-rules 2-1). Only scripts/harness-pause.mjs sets or clears it. While it is set
 # this hook writes nothing (no session count, no migration) and prints where the run stopped
 # instead of the resume instructions. Same judgement as scripts/lib/pause-state.mjs isPaused; the
-# code list, template and NAMED sentence match step-progress-loader.sh and step-obedience-guard.
+# code list, template and NAMED sentence match step-progress-loader.sh and step-obedience-guard
+# (in $namedPause the single quote is doubled here).
 $pauseCodes = @('permission-denied', 'required-tool-failed', 'required-input-missing', 'user-request')
 $pausedTemplate = '[HARNESS] PAUSED at step{STEP}/{TOTAL} (reason={REASON}{SINCE}). Automatic continuation is off: do not run steps. Tell the user why (pause_note in step_archive/progress.json) and handle their message. Resume only when the user explicitly asks: /harness-resume.'
-$namedPause = 'Early stop only as a named pause (permission-denied | required-tool-failed | required-input-missing; harness-rules 2-1): save evidence under step_archive/, run node "<plugin-root>/scripts/harness-pause.mjs" pause --workspace "<project-root>" --reason <code> --evidence <step_archive/file> --note "<user action>", then end the turn with the pause report.'
+$namedPause = 'Early stop only as a named pause (permission-denied | required-tool-failed | required-input-missing; harness-rules 2-1): save evidence under step_archive/, run node "<plugin-root>/scripts/harness-pause.mjs" pause --workspace "<project-root>" --reason <code> --evidence <step_archive/file> --note ''<user action, no quotes>'', then end the turn with the pause report.'
 $hasPaused = @($existingProgress.PSObject.Properties.Name) -ccontains 'paused'
 $isPaused = ($hasPaused -and -not ($existingProgress.paused -is [bool] -and -not $existingProgress.paused)) -or ($existingProgress.status -is [string] -and $existingProgress.status -ceq 'paused')
 if ($isPaused) {

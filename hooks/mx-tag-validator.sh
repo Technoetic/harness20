@@ -39,15 +39,20 @@ case "$FP" in
 esac
 [ -f "$FP" ] || exit 0
 
+# An exit-0 PostToolUse hook reaches Claude only through stdout additionalContext (its stderr is
+# dropped), so the warning goes out as the same JSON with the same words as mx-tag-validator.ps1.
+# json.dumps escapes every non-ASCII character, so the output does not depend on the locale. The two
+# warnings exclude each other (tags present or not), so at most one is printed.
+emit_warning() { python3 -c 'import json,sys;print(json.dumps({"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":sys.argv[1]}}))' "$1"; }
+
 if grep -qE '@MX:(NOTE|WARN|ANCHOR|TODO)' "$FP" 2>/dev/null; then
   if grep -qE '@MX:(WARN|ANCHOR)' "$FP" && ! grep -q '@MX:REASON' "$FP"; then
-    echo "[@MX-WARN] $FP has WARN/ANCHOR but missing @MX:REASON sub-line" 1>&2
+    emit_warning "[@MX-WARN] $FP has WARN/ANCHOR but missing @MX:REASON sub-line — add // @MX:REASON: <근거>"
   fi
   log "OK [step=$CUR] $FP"
   exit 0
 fi
 
 log "[@MX-WARN] $FP has no @MX tags"
-echo "[@MX-WARN] $FP has no @MX tags (NOTE/WARN/ANCHOR/TODO)" 1>&2
-echo "Add: // @MX:NOTE: <intent>  // @MX:WARN: <risk> (+ @MX:REASON)  // @MX:ANCHOR: <invariant>  // @MX:TODO: <pending>" 1>&2
+emit_warning "[@MX-WARN] $FP has no @MX tags (NOTE/WARN/ANCHOR/TODO) — add at top: // @MX:NOTE: <컨텍스트·의도>, 조건부로 @MX:WARN/@MX:ANCHOR(+@MX:REASON)/@MX:TODO (MoAI mx-tag-protocol SoT)"
 exit 0

@@ -198,9 +198,9 @@ if (Test-Path -LiteralPath $archivedCandidate) {
 # B-FIX(2026-06-05): 멈춤의 근본 원인은 검증 스킬(evaluator/verify/check)의 긴 본문을
 # 도구 호출 파라미터 안에 직렬화하다 XML이 깨지는 것. reason에 회피 지침 1줄 추가.
 $guard = "DO NOT paste verification/CoVE text into tool-call parameters - write findings to a .md file, keep tool args minimal."
-# The only early stop (harness-rules 2-1). Same bytes as NAMED in step-auto-continue.sh and
-# step-progress-loader (scripts/lib/pause-state.mjs NAMED_PAUSE).
-$namedPause = 'Early stop only as a named pause (permission-denied | required-tool-failed | required-input-missing; harness-rules 2-1): save evidence under step_archive/, run node "<plugin-root>/scripts/harness-pause.mjs" pause --workspace "<project-root>" --reason <code> --evidence <step_archive/file> --note "<user action>", then end the turn with the pause report.'
+# The only early stop (harness-rules 2-1). Same string as NAMED in step-auto-continue.sh and
+# step-progress-loader (scripts/lib/pause-state.mjs NAMED_PAUSE); the single quote is doubled here.
+$namedPause = 'Early stop only as a named pause (permission-denied | required-tool-failed | required-input-missing; harness-rules 2-1): save evidence under step_archive/, run node "<plugin-root>/scripts/harness-pause.mjs" pause --workspace "<project-root>" --reason <code> --evidence <step_archive/file> --note ''<user action, no quotes>'', then end the turn with the pause report.'
 if ($hasQuestion) {
     $reason = "[HARNESS] $completedCount/$total done. No user-facing questions. Resume now: read+execute $stepFile, report 'Step $nextStepStr/$total 완료', continue. $namedPause $guard (User direct requests still take priority.)"
 } else {

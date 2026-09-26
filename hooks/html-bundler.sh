@@ -4,7 +4,8 @@ case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) exit 0 ;; esac
 # html-bundler.sh — src/ 구조를 단일 dist/index.html로 번들링 (file:// 호환)
 #
 # 역할 (step037/038 계약):
-#   src/index.html 베이스 + src/**/*.css → <style> 인라인 + src/**/*.js → <script> 인라인(import/export 제거)
+#   src/index.html 베이스 + src/**/*.css → <style> 인라인(첫 </head> 앞, 원격 @import는 맨 앞으로, 로컬 @import는 제거)
+#   + src/**/*.js → <script> 인라인(마지막 </body> 앞, import/export 문 제거)
 #   로컬 <link href>, <script src> 참조 제거. 결과: dist/index.html 단일 파일.
 #
 # 사용: bash <경로>/html-bundler.sh [PROJECT_ROOT]
@@ -35,7 +36,7 @@ with open(index_src, encoding="utf-8") as f:
 
 # 1) 로컬 참조 태그 제거 (외부 http(s)는 보존)
 html = re.sub(r'(?i)<link\b[^>]*\bhref\s*=\s*["\'](?!https?:|//)[^"\']*\.css[^>]*>', '', html)
-html = re.sub(r'(?i)<script\b[^>]*\bsrc\s*=\s*["\'](?!https?:|//)[^"\']*\.js[^>]*>\s*</script>', '', html)
+html = re.sub(r'(?i)<script\b[^>]*\bsrc\s*=\s*["\'](?!https?:|//)[^"\']*\.js[^>]*>\s*</script\s*>', '', html)
 
 # src/ 아래 일반 파일만 모은다. 프로젝트 경로의 [ ]가 glob 문자 클래스로 읽히지 않게
 # escape하고, 이름만 .js/.css인 디렉터리(예: vendor.js/)는 건너뛴다 (ps1의 -LiteralPath -File과 동일).
@@ -43,28 +44,41 @@ def src_files(pattern):
     return [p for p in glob.glob(os.path.join(glob.escape(src), "**", pattern), recursive=True) if os.path.isfile(p)]
 
 # 2) CSS 수집 → <style>
+#    @import 줄은 본문에서 지운다. 로컬 파일은 어차피 모두 인라인되고, 원격(http(s):, //) @import는
+#    처음 나온 순서로 한 번씩 <style> 맨 앞에 둔다(@import는 다른 규칙보다 앞에 있어야 읽힌다).
+#    html-bundler.ps1과 같은 정규식이다.
+IMPORT_LINE = re.compile(r'^[ \t]*@import\s+[^;\r\n]+;[ \t]*\r?\n?', re.I | re.M)
+REMOTE = re.compile(r'https?:|//', re.I)
 css_files = sorted(src_files("*.css"))
 css_parts = []
+remote_imports = []
 for p in css_files:
     rel = os.path.relpath(p, src)
     with open(p, encoding="utf-8") as f:
-        css_parts.append("/* %s */\n%s" % (rel, f.read()))
-style_block = ("<style>\n" + "\n\n".join(css_parts) + "\n</style>\n") if css_parts else ""
+        css = f.read()
+    for m in IMPORT_LINE.finditer(css):
+        line = m.group(0).strip()
+        if REMOTE.search(line) and line not in remote_imports:
+            remote_imports.append(line)
+    css_parts.append("/* %s */\n%s" % (rel, IMPORT_LINE.sub('', css)))
+import_head = ("\n".join(remote_imports) + "\n") if remote_imports else ""
+style_block = ("<style>\n" + import_head + "\n\n".join(css_parts) + "\n</style>\n") if css_parts else ""
 
-# 3) JS 수집 → import/export 제거 → <script>
+# 3) JS 수집 → import/export 문 제거 → <script>
+#    줄이 아니라 문 단위로 지운다: 여러 줄 import { … } from, 세미콜론 없는 문, 따로 선 export default
+#    줄도 깨진 코드를 남기지 않는다. import()와 import.meta는 문이 아니라서 그대로 둔다.
+#    html-bundler.ps1과 같은 정규식 네 개다.
+IMPORT_STMT = re.compile(r'''^[ \t]*import[ \t]*(?:[\w$*{}\s,]+?[ \t]*from[ \t]*)?(["'])[^"'\r\n]*\1[ \t]*;?[ \t]*\r?\n?''', re.M)
+EXPORT_LIST = re.compile(r'''^[ \t]*export[ \t]*(?:\{[^}]*\}|\*(?:[ \t]+as[ \t]+[\w$]+)?)[ \t]*(?:from[ \t]*(["'])[^"'\r\n]*\1)?[ \t]*;?[ \t]*\r?\n?''', re.M)
+EXPORT_DEFAULT = re.compile(r'^([ \t]*)export[ \t]+default[ \t\r\n]+', re.M)
+EXPORT_DECLARATION = re.compile(r'^([ \t]*)export[ \t]+(?=(?:async[ \t]+)?function|class|const|let|var)', re.M)
+
 def strip_module(js):
-    out = []
-    for ln in js.splitlines():
-        if re.match(r'^\s*import\s', ln):
-            continue
-        if re.match(r'^\s*export\s+default\s', ln):
-            ln = re.sub(r'^\s*export\s+default\s', '', ln)
-        elif re.match(r'^\s*export\s+\{', ln):
-            continue
-        elif re.match(r'^\s*export\s', ln):
-            ln = re.sub(r'^(\s*)export\s+', r'\1', ln)
-        out.append(ln)
-    return "\n".join(out)
+    js = IMPORT_STMT.sub('', js)                 # ① import … from '…' 와 import '…'
+    js = EXPORT_LIST.sub('', js)                 # ② export { … } [from '…'] 와 export * [as ns] from '…'
+    js = EXPORT_DEFAULT.sub(r'\1', js)           # ③ export default → 뒤의 식이나 선언만 (다음 줄에 있어도)
+    js = EXPORT_DECLARATION.sub(r'\1', js)       # ④ export function/class/const/let/var → 선언만
+    return js
 
 js_files = sorted(src_files("*.js") + src_files("*.mjs"))
 js_parts = []
@@ -74,18 +88,16 @@ for p in js_files:
         js_parts.append("// %s\n%s" % (rel, strip_module(f.read())))
 script_block = ("<script>\n" + "\n\n".join(js_parts) + "\n</script>\n") if js_parts else ""
 
-# 4) 주입 (치환 문자열은 함수로 넘겨 그대로 넣는다: 코드 안의 \d·\n이나 Windows 상대 경로의 \가
-#    re 이스케이프로 해석되지 않게)
+# 4) 주입: 첫 </head> 앞에 style, 마지막 </body> 앞에 script (html-bundler.ps1과 같은 규칙).
+#    찾은 위치에 문자열로 끼워 넣으므로 코드 안의 \d·\1이나 Windows 상대 경로의 \가 re 이스케이프로
+#    읽히지 않는다. 앞쪽 </body>는 <template>이나 스크립트 문자열 안의 글자일 수 있어 문서를 닫는
+#    마지막 것을 쓴다. 태그가 없으면 style은 맨 앞에, script는 맨 뒤에 붙인다.
 if style_block:
-    if re.search(r'(?i)</head>', html):
-        html = re.sub(r'(?i)</head>', lambda m: style_block + '</head>', html, count=1)
-    else:
-        html = style_block + html
+    head = re.search(r'(?i)</head\s*>', html)
+    html = html[:head.start()] + style_block + html[head.start():] if head else style_block + html
 if script_block:
-    if re.search(r'(?i)</body>', html):
-        html = re.sub(r'(?i)</body>', lambda m: script_block + '</body>', html, count=1)
-    else:
-        html = html + script_block
+    bodies = list(re.finditer(r'(?i)</body\s*>', html))
+    html = html[:bodies[-1].start()] + script_block + html[bodies[-1].start():] if bodies else html + script_block
 
 # 5) 저장 (UTF-8, LF)
 html = html.replace("\r\n", "\n")

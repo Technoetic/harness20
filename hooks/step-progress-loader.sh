@@ -41,10 +41,11 @@ python3 - <<'PY'
 import json, os, datetime, re
 p_path=os.environ.get("PROGRESS_FILE")
 a_dir=os.environ.get("ARCHIVED_DIR")
-# Same bytes as step-progress-loader.ps1 and step-obedience-guard (scripts/lib/pause-state.mjs).
+# Same string as step-progress-loader.ps1 and step-obedience-guard (scripts/lib/pause-state.mjs).
+# Python triple quotes keep the inner single quotes of NAMED.
 CODES=('permission-denied','required-tool-failed','required-input-missing','user-request')
 PAUSED='[HARNESS] PAUSED at step{STEP}/{TOTAL} (reason={REASON}{SINCE}). Automatic continuation is off: do not run steps. Tell the user why (pause_note in step_archive/progress.json) and handle their message. Resume only when the user explicitly asks: /harness-resume.'
-NAMED='Early stop only as a named pause (permission-denied | required-tool-failed | required-input-missing; harness-rules 2-1): save evidence under step_archive/, run node "<plugin-root>/scripts/harness-pause.mjs" pause --workspace "<project-root>" --reason <code> --evidence <step_archive/file> --note "<user action>", then end the turn with the pause report.'
+NAMED='''Early stop only as a named pause (permission-denied | required-tool-failed | required-input-missing; harness-rules 2-1): save evidence under step_archive/, run node "<plugin-root>/scripts/harness-pause.mjs" pause --workspace "<project-root>" --reason <code> --evidence <step_archive/file> --note '<user action, no quotes>', then end the turn with the pause report.'''
 def paused_line(p,total,first):
     # Validated values only: a known code, a step inside 1..total, an ISO paused_at. pause_note and
     # pause_evidence are never printed. The step is max(paused_step, first unfinished): the Stop
