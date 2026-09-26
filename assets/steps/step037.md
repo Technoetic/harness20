@@ -37,6 +37,7 @@ CSS를 작성하는 서브에이전트에게는 반드시 아래 지시를 포�
 1. `step_archive/screenshots/research/awwwards-*.png` 패턴으로 Glob 검색하여 **모두** Read할 것
 2. `step_archive/awwwards-*.txt` 패턴으로 Glob 검색하여 **모두** Read할 것
 3. 스크린샷에서 직접 디자인 패턴을 추출하여 CSS에 반영할 것
+4. `step_archive/step030_레이아웃설계_chunk1.md`의 `harness50-design-contract` 블록을 Read하고 CSS 값은 `tokens`로만 정할 것. `exclude`에서 `adopted: false`인 항목은 스크린샷에 있어도 CSS에 옮기지 말 것 (목록 우선)
 
 CSS 담당 서브에이전트는 스크린샷을 읽어야 하므로 **haiku를 사용하지 않는다** (sonnet 이상 사용).
 

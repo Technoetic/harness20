@@ -69,6 +69,15 @@ semantic HTML은 CSS와 필요한 JavaScript만으로 의미·구조·접근성 
 조사 축·대안이 보완되었다면 24단계 최종 분석을 따른다. 최신 기획·설계의 해당 provenance와 비교하고 기존 원본만으로 보완 결론을 대체하지 않는다.
 보완이 없으면 명시된 빈 manifest를 확인한다. 이 단계에서 새 사이트 방문이나 자료 수집을 하지 않는다.
 
+## 설계 제외 계약 우선
+
+30단계 `step_archive/step030_레이아웃설계_chunk1.md`의 `harness50-design-contract` 블록을 persisted
+research와 함께 읽는다. 형식과 항목 뜻은 플러그인 `docs/DESIGN-CONTRACT.md`를 따른다. `exclude`에서
+`adopted`가 false인 항목에 해당하는 capture 요소는 구현에 없어도 누락 finding으로 판정하지 않는다
+(목록 우선). 독립 검증자는 그 차이를 보고서에 `excluded-by-contract`와 항목 id로 기록하고, 보정
+구현자는 그 스타일을 들여오지 않는다. 계약 블록이 없으면 같은 문서의 계약 없는 작업 공간 절차로
+기준을 보고서에 복원하며 30단계 산출물은 고치지 않는다.
+
 ## 완료 조건
 
 - `awwwards-applied-screenshot`: 마지막 보강 뒤 구현 capture가 저장됐다.

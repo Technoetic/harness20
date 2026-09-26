@@ -119,9 +119,25 @@ Step N 읽기(Read) → 실행 → 1줄 완료 보고 → 즉시 Step N+1 Read �
 
 ### 폰트·시각
 
-- 금지: Inter / Roboto / Arial / 보라 그라데이션 남발 / 무한 중앙정렬 / 과도한 border-radius
+- 금지: Inter / Roboto / Arial / 보라 그라데이션 남발 / 무한 중앙정렬 / 과도한 border-radius / 획일적 단색 배경
 - 허용: UI는 `Helvetica Neue` 또는 `Georgia`, 코드는 `JetBrains Mono` 또는 `Courier New`
 - 11가지 미학(Brutalism / Glassmorphism / Swiss / Dark OLED / Neumorphism / Cyberpunk 등) 중 명시 선택만
+
+### 기본 제외 목록 (역할·CSS 시그니처)
+
+"AI 느낌을 피하라" 같은 일반 지시는 한 기본값을 다른 기본값으로 바꿀 뿐이다. 아래 이름으로 전달한다. 30단계가 이 목록, 위 '금지' 줄의 구세대 항목(`generic-sans`·`purple-gradient`·`centered-cards`·`excess-radius`·`flat-background`), TOPIC의 `디자인 제외(사용자)` 항목을 설계 계약(`step_archive/step030_레이아웃설계_chunk1.md`의 `harness50-design-contract`, 형식: `docs/DESIGN-CONTRACT.md`)의 `exclude`로 고정한다. 37·43·49단계와 평가자는 이 계약만 판정 근거로 쓴다.
+
+| id | 제외하는 것 | 해당하지 않는 것 |
+|---|---|---|
+| `cream-background` | 페이지 바탕(body·main·화면 루트)의 크림·아이보리·베이지·색조 있는 오프화이트 | 순백 `#ffffff`, 무채색 연회색 표면, 어두운 바탕 |
+| `italic-heading-accent` | h1~h3 안 일부 단어만 `em`·`i`·`font-style: italic`으로 기울인 강조 | 인용·학명·작품명 같은 표기 관례 |
+| `numbered-section-labels` | 섹션 머리 장식으로 쓴 0 채움 번호 라벨(01, 02 / …, CSS counter 포함) | 실제 순서를 나타내는 `ol` 목록과 "N단계" 제목 |
+| `monospace-labels` | eyebrow·badge·태그·nav·버튼·섹션 라벨의 monospace | `code`·`pre`·`kbd`·`samp`와 코드 값·명령어 표시 |
+| `pill-buttons` | 버튼·링크 버튼의 알약형 모서리(radius ≥ 높이/2, 9999px·50%·rounded-full) | 정사각 원형 아이콘 버튼, 토글 스위치 트랙, 아바타 |
+
+- 예외: TOPIC이 그 스타일을 직접 요구했거나 명시 선택한 미학이 그것 없이는 성립하지 않으면 30단계가 `adopted: true`와 `exception_reason`을 적고 같은 사유를 `결정/사유:` 한 줄로 남긴다. 사용자 제외 항목(`topic-N`)은 채택하지 않는다.
+- 우선순위: 계약의 제외 목록 > Awwwards 참조 충실도. 참조 사례가 제외 항목을 써도 구현하거나 누락으로 요구하지 않는다.
+- 채택되지 않은 제외 항목 위반은 49단계에서 `Important` finding이다. 계약에 없는 미관 선호는 `advisory`다.
 
 ### 공간·터치·접근성
 
@@ -184,6 +200,7 @@ Phase 3: 구현 에이전트 병렬 실행 (프롬프트에 Phase 1 산출물 �
 1. 참조할 조사 결과 파일 경로
 2. 디자인 요구사항 (조사에서 추출한 패턴)
 3. 출력 파일 경로 + UTF-8 / LF 줄바꿈
+4. 설계 계약 경로(`step_archive/step030_레이아웃설계_chunk1.md`의 `harness50-design-contract`) — `tokens` 값만 쓰고, 채택되지 않은 `exclude` 항목은 조사 패턴과 충돌해도 쓰지 않는다
 
 ## 10. 브라우저 검증 백엔드 고정
 

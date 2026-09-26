@@ -132,6 +132,7 @@ Navigation API를 우선 선택한다. API 이름의 존재만으로 사용 가�
 - 유지보수성 (Class 구조 명확성)
 - 반응형 구현 난이도
 - Awwwards 조사 반영도 (step023/step024 결과 참조)
+- 디자인 제외 목록 준수 (TOPIC `constraints`의 `디자인 제외` 줄. 제외 항목에 기대는 안은 감점)
 
 결과: `step_archive/outputs/step030_설계선택.md` — 선택된 안과 이유 명시
 
@@ -159,12 +160,39 @@ step030_전체설계_chunk2.md (500줄 이하)
 서브에이전트는 항상 haiku를 사용한다. (2026-06-10 정정: 헤더·CLAUDE.md 모델 매트릭스와 통일 — sonnet은 EVAL 게이트 평가자 전용)
 
 
+## 시각 토큰·제외 계약 (필수)
+
+최종 설계를 쓸 때 `step_archive/step030_레이아웃설계_chunk1.md`에 아래 형식의 계약 블록을 **정확히 하나** 둔다. 형식·항목 뜻·예외 규칙의 단일 원천은 플러그인 `docs/DESIGN-CONTRACT.md`다. 37·43·49단계와 평가자가 말하는 "선택된 디자인 토큰"과 "제외 목록"은 이 블록뿐이다.
+
+```json harness50-design-contract
+{
+  "schema_version": 1,
+  "tokens": {
+    "colors": { "background": "#ffffff", "surface": "#f2f2f2", "text": "#1a1a1a", "accent": "#0b57d0" },
+    "fonts": { "ui": "Helvetica Neue", "code": "JetBrains Mono" },
+    "type": { "sizes": [14, 16, 20, 32], "weights": [400, 700] },
+    "spacing": [4, 8, 16, 24, 32],
+    "radius": [0, 4, 8],
+    "shadow": []
+  },
+  "exclude": [
+    { "id": "cream-background", "source": "host", "signature": "페이지 바탕(body·main·화면 루트)의 크림·아이보리·베이지·색조 있는 오프화이트", "adopted": false, "exception_reason": null }
+  ]
+}
+```
+
+- 위 값은 예시다. `tokens`는 선택된 안의 바탕·표면·본문·강조 1색, UI·코드 서체, 글자 크기(최대 4)·굵기(최대 2), 간격, radius, shadow를 헌법 §5 범위 안에서 고정한다. 구현 값은 모두 이 토큰에 매핑된다.
+- `exclude`는 세 출처를 모두 담는다. `legacy` 5종(`generic-sans`, `purple-gradient`, `centered-cards`, `excess-radius`, `flat-background`), `host` 5종(`cream-background`, `italic-heading-accent`, `numbered-section-labels`, `monospace-labels`, `pill-buttons`), TOPIC `디자인 제외(사용자)` 줄의 각 항목(`topic-1`부터, `source: "topic"`, 원문을 `signature`에 보존). `signature`는 헌법 §5 표의 역할·CSS 문구를 쓴다.
+- `legacy`·`host` 항목은 TOPIC이 그 스타일을 직접 요구했거나 선택된 미학(헌법 §5)이 그것 없이는 성립하지 않을 때만 `adopted: true`로 채택하고 `exception_reason`에 근거를 적는다. 같은 근거를 레이아웃 설계 본문에 `결정/사유: <id> 채택 — <사유>` 한 줄로도 남긴다. `topic` 항목은 채택하지 않는다.
+- Awwwards 사례가 제외 항목을 쓰면 계약이 우선한다. 그 요소는 설계에 넣지 않고 대체 방식을 적는다.
+
 ## CoVe (Chain-of-Verification)
 
 설계 완료 후:
 - [ ] 조사/기획의 모든 요구사항이 설계에 반영되었는가?
 - [ ] 구현 가능한 설계인가?
 - [ ] 이전 실패 패턴을 반복하지 않는가?
+- [ ] 레이아웃 설계 chunk1에 `harness50-design-contract` 블록이 정확히 하나 있고, TOPIC 제외 줄의 항목이 모두 `exclude`에 있으며, 채택한 예외마다 `결정/사유` 줄이 있는가?
 
 ## Jev 의미 체크포인트
 

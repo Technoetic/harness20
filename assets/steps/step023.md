@@ -73,6 +73,14 @@ Step 22에서 수집된 스크린샷과 텍스트를 분석하여 디자인 패�
    - 무조건 중앙정렬 카드
    - 과도한 border-radius
    - 획일적 단색 배경
+   - 크림·오프화이트 페이지 바탕 (순백도 무채색 연회색도 아닌, 따뜻하거나 색조가 있는 거의 흰 바탕)
+   - 제목 속 이탤릭 강조어 (h1~h3 안 일부 단어만 `em`·`i`·`font-style: italic`)
+   - 01·02·03 장식 번호 섹션 라벨 (0으로 채운 두 자리 번호를 섹션 머리 장식으로 사용)
+   - 코드 밖 모노스페이스 라벨 (eyebrow·badge·nav·버튼·섹션 라벨의 monospace)
+   - 알약형 버튼 (radius가 높이의 절반 이상인 버튼·링크 버튼)
+   - `step_archive/TOPIC/TOPIC.md` `constraints`의 `디자인 제외(사용자)` 항목
+
+   반면교사 표시는 비교 자료다. 제외 여부는 30단계 설계 계약(`harness50-design-contract`)이 확정한다.
 2. **11가지 미학 축 매핑** — 수집 사례를 Brutalism / Glassmorphism / Minimalism(Swiss) / Dark OLED Luxury / Neumorphism / Cyberpunk 중 해당 축으로 분류. 각 축마다 물리적 CSS 제약(border 두께, shadow blur, grid 형태 등)을 구체 수치로 기록.
 3. **토큰 추출** — 사례에서 관찰된 간격·타이포·색상 값을 4pt/8pt 그리드와 60-30-10 규칙에 맞게 정규화하여 기록.
 4. **조립 가능성 평가** — 각 대안이 기존 디자인 시스템·Shadcn/ui 같은 컴포넌트 라이브러리로 조립 가능한지 여부.

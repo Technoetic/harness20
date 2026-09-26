@@ -150,6 +150,7 @@ function assertStep30SectionContract(content) {
     "Class 설계 계약",
     "비동기와 성능 계약",
     "레이아웃·상호작용·접근성 계약",
+    "시각 토큰·제외 계약",
     "최종 독립 검증",
     "완료 조건"
   ];
@@ -161,6 +162,7 @@ function assertStep30SectionContract(content) {
   const classDesign = sections["Class 설계 계약"].replace(/\s+/g, " ");
   const asyncDesign = sections["비동기와 성능 계약"].replace(/\s+/g, " ");
   const accessibility = sections["레이아웃·상호작용·접근성 계약"].replace(/\s+/g, " ");
+  const contract = sections["시각 토큰·제외 계약"].replace(/\s+/g, " ");
   const verification = sections["최종 독립 검증"].replace(/\s+/g, " ");
   const completion = sections["완료 조건"].replace(/\s+/g, " ");
 
@@ -198,6 +200,18 @@ function assertStep30SectionContract(content) {
   assert.match(accessibility, /반응형 breakpoint[^]*화면 상태/);
   assert.match(accessibility, /loading[^]*empty[^]*error[^]*disabled/);
 
+  assert.match(contract, /`step_archive\/step030_레이아웃설계_chunk1\.md`[^]*`json harness50-design-contract`[^]*정확히 하나/);
+  assert.match(contract, /`docs\/DESIGN-CONTRACT\.md`/);
+  assert.match(contract, /`tokens`[^]*`colors`[^]*`fonts`[^]*`type`[^]*`spacing`[^]*`radius`[^]*`shadow`[^]*`exclude`/);
+  assert.match(contract, /`id`[^]*`source`[^]*`signature`[^]*`adopted`[^]*`exception_reason`/);
+  assert.match(contract, /`host` 출처의 기본 항목을 두지 않는다/);
+  assert.match(contract, /`generic-sans`[^]*`purple-gradient`[^]*`centered-cards`[^]*`excess-radius`[^]*`flat-background`/);
+  assert.match(contract, /TOPIC `constraints`와 요청 전문[^]*`topic-1`/);
+  assert.match(contract, /`adopted: true`[^]*`exception_reason`[^]*결정\/사유/);
+  assert.match(contract, /`topic` 항목은 채택하지 않/);
+  assert.match(contract, /계약이 우선/);
+  assert.doesNotMatch(contract, /cream-background|italic-heading-accent|numbered-section-labels|monospace-labels|pill-buttons/);
+  assert.match(verification, /시각 토큰·제외 계약/);
   const reportReferences = [...new Set(
     [...verification.matchAll(/`(step_archive\/outputs\/step030_최종검증(?:_r\d+)?\.md)`/g)]
       .map((match) => match[1])
@@ -218,6 +232,7 @@ function assertStep30SectionContract(content) {
     "class-architecture-contract",
     "async-lifecycle-contract",
     "responsive-accessibility-contract",
+    "design-exclusion-contract",
     "pass-verdict"
   ]) {
     assert.match(completion, new RegExp("`" + acceptanceId + "`"));
@@ -285,6 +300,7 @@ const EXPECTED_PLANNING_ACCEPTANCE_DESCRIPTIONS = {
     "class-architecture-contract": "Confirms SRP classes, composition, constructor injection, state ownership, and public/private APIs.",
     "async-lifecycle-contract": "Confirms asynchronous initialization, start, I/O, cancellation, errors, parallelism, and performance contracts.",
     "responsive-accessibility-contract": "Confirms responsive breakpoints, states, keyboard, focus, reduced motion, touch, and contrast contracts.",
+    "design-exclusion-contract": "Confirms the layout design holds exactly one visual token and exclusion contract that merges the host default and TOPIC exclusions and records a reason for every adopted exception.",
     "design-chunks-bounded": "Confirms design manifests match declared chunks of at most 500 lines.",
     "pass-verdict": "Requires the final independent verifier to record an evidenced PASS."
   }
@@ -317,7 +333,7 @@ test("index records SHA-256 digests of the unmodified Claude source bytes", asyn
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(0, 5));
 
   assert.deepEqual(hashes, {
-    step001: "2aee375edd23d80a0e1f87d5276d4be59435abfb2f02d16598e47ebb2b93eec5",
+    step001: "0653c4110f62fc0451c0ebcf40964fd78a6c4029f15ebf23b6f4ab995fe22a20",
     step002: "3138e7a161fe488b3c1777da7e72820d1c5d3faa992380f1cbd73a74103b3e89",
     step003: "971e337ad3eba825d3260949ae19b8d9ddfcae37e9ebc7ea7dd8ea377e03a500",
     step004: "5d40b076c3d1cae5e13a64ad16488f73d46c7beae6e2756b9a091544bbd4db1e",
@@ -336,7 +352,7 @@ test("preflight batch declares the exact Codex-native step contracts", async () 
       phase: "preflight",
       source: "assets/steps/step001.md",
       target: "codex/assets/steps/step001.md",
-      source_sha256: "2aee375edd23d80a0e1f87d5276d4be59435abfb2f02d16598e47ebb2b93eec5",
+      source_sha256: "0653c4110f62fc0451c0ebcf40964fd78a6c4029f15ebf23b6f4ab995fe22a20",
       inputs: ["step_archive/TOPIC/TOPIC.md"],
       outputs: ["step_archive/step001_preflight.md"],
       requires: [],
@@ -1338,7 +1354,7 @@ test("research batch declares the exact Codex-native evidence contracts", async 
       phase: "research",
       source: "assets/steps/step023.md",
       target: "codex/assets/steps/step023.md",
-      source_sha256: "6efdd52549990ea26e16968a6da65c576edcf46e5e914f8a6708292c81b8c461",
+      source_sha256: "9ebd0a2e029e47d88e58a005e9de54ff8b16529bf275b4adc85c99d4ce0dc4be",
       inputs: [
         "step_archive/step016_조사결과_chunk1.md",
         "step_archive/step022_수집결과_chunk1.md",
@@ -1409,7 +1425,7 @@ test("research source hashes bind the untouched Claude steps 016 through 024", a
     step020: "eb729885309aaa07e489bc2a1a2987606161fba43e3b6a996a552e15298d425b",
     step021: "c36004a40bd93ed6bc79043cd7120629f2f71e6582feb89ca3e3a6d20cc7da54",
     step022: "2d16baba92f09b0ab7811731517979c048434a3ab2f9a570c5e0ce7a690dd93c",
-    step023: "6efdd52549990ea26e16968a6da65c576edcf46e5e914f8a6708292c81b8c461",
+    step023: "9ebd0a2e029e47d88e58a005e9de54ff8b16529bf275b4adc85c99d4ce0dc4be",
     step024: "a57a38272cde57d70d86503a58b175b69434238a28c80b3210392ca1a5ab85f5"
   });
 });
@@ -1912,7 +1928,7 @@ test("planning batch declares the exact Codex-native artifact contracts", async 
       phase: "planning",
       source: "assets/steps/step030.md",
       target: "codex/assets/steps/step030.md",
-      source_sha256: "5f8643da4e1deb4c3451f3ce39cc443c8fd654aa39ef015243121defe092b9fc",
+      source_sha256: "8581ac1abd5b8d68dd9127cbecd001f5038f168414aa4dad102bc5c2276d3dca",
       inputs: [
         "step_archive/TOPIC/TOPIC.md",
         "step_archive/step029_planning_chunk1.md",
@@ -1940,6 +1956,7 @@ test("planning batch declares the exact Codex-native artifact contracts", async 
         { id: "class-architecture-contract", kind: "check", required: true },
         { id: "async-lifecycle-contract", kind: "check", required: true },
         { id: "responsive-accessibility-contract", kind: "check", required: true },
+        { id: "design-exclusion-contract", kind: "check", required: true },
         { id: "design-chunks-bounded", kind: "check", required: true },
         { id: "pass-verdict", kind: "check", required: true }
       ],
@@ -1959,7 +1976,7 @@ test("planning source hashes bind the reviewed source steps 025 through 030", as
     step027: "92e6538f33b3beb7a4be49460de06dcc45817296c5ca43f1f96af47be5ee9fe4",
     step028: "681e4901e23093f5caff6420431835fdacd37d6f3ac3e7f628c7c3566d7f93af",
     step029: "01ea1d8a424937393aa0827ab9f41c952200f04a771e90b121c9a5569e364d40",
-    step030: "5f8643da4e1deb4c3451f3ce39cc443c8fd654aa39ef015243121defe092b9fc"
+    step030: "8581ac1abd5b8d68dd9127cbecd001f5038f168414aa4dad102bc5c2276d3dca"
   });
 });
 
@@ -2609,7 +2626,7 @@ const EXPECTED_IMPLEMENTATION_TARGET_SHA256 = Object.freeze({
   step034: "28ccaea5e66abc407ed9ad0f1543c2c989b9bcdd4648580e5e252131605d7892",
   step035: "9db05334af746fe8e0f02bac6ba1f9c4fce56855adbad3667ff30a8d1b65e249",
   step036: "309f1fc4c9ab8f7d23eb31b8d37d5648ce35e274154f4e70ffd7213cb4f05c7e",
-  step037: "149083bcba53e7df3f783e4885e3f3eb438f5637298318d042d8944360474d67",
+  step037: "241f4e199ffa3567fa1b84c5e973223ea6789e854af2714688fc0221d373fffd",
   step038: "dae26106a224c11fdf7becbd6941659569bcd182e1c2b9909962bacd156e5198"
 });
 
@@ -2821,7 +2838,7 @@ test("implementation batch declares the exact Codex-native evidence contracts", 
       phase: "implementation",
       source: "assets/steps/step037.md",
       target: "codex/assets/steps/step037.md",
-      source_sha256: "4fde6cd81a22e429563170db70497a765508eaece81bf8dadc4297dbd3bf5e10",
+      source_sha256: "ddac5165b3aa9dbb8dd029e3da89cfb6de0d876698ddaba7aa6ad7a6519f5a3c",
       inputs: [
         "step_archive/outputs/step024_검증_r1.md",
         "step_archive/TOPIC/TOPIC.md",
@@ -2902,7 +2919,7 @@ test("implementation source hashes bind the reviewed source steps 031 through 03
     step034: "f82ed6a8cd582b740d39d53e75b8b31b75b4b9b759b48d8d63add97cd24f4671",
     step035: "664d663cc7ed8cbb8605e3c5c5d2653fb139421eb469e81d1f08201fbf284acd",
     step036: "27787a5adeff811a6ce6b1f8c58fe9afc0703139f049e88a705b6e911b2fcec0",
-    step037: "4fde6cd81a22e429563170db70497a765508eaece81bf8dadc4297dbd3bf5e10",
+    step037: "ddac5165b3aa9dbb8dd029e3da89cfb6de0d876698ddaba7aa6ad7a6519f5a3c",
     step038: "f250caba0c63b654ecbe011b7591e6dff23cdeb8c83e4e6347dde937a94be8f0"
   });
 });
@@ -3184,6 +3201,7 @@ function assertStep37ImplementationContract(content) {
   assert.match(section, /step022-primary-desktop\.png[^]*실제로 열어[^]*CSS[^]*화면 영역/);
   assert.match(section, /시각 검사 기능[^]*사용할 수 없으면[^]*차단/);
   assert.match(section, /구현manifest\.md[^]*파일[^]*digest[^]*요구 추적/);
+  assert.match(section, /`harness50-design-contract` `tokens`로만[^]*`adopted`가 false[^]*구현하지 않는다\(목록 우선\)/);
   assert.doesNotMatch(section, /(?:브레인스토밍|brainstorm)|대안을 새로|선택을 변경/i);
 }
 
@@ -3377,7 +3395,7 @@ const EXPECTED_REVIEW_TARGET_SHA256 = Object.freeze({
   step040: "54ac1baac5086ce382de0147f66f568deebc30a997aa26471cf42a659b8669e0",
   step041: "c7062942a31f2ce520dfdcad0634082be2a21500ead63cc402fda1be6240e19d",
   step042: "a94fcec2f5371b57985e37587356aa00a866af34adaaf0c7cd9832812ad74ca0",
-  step043: "6d070a4fca012d4e3bfddbcd7d59cc3fdcd651dc9031bb9a64b10fb315960e4b",
+  step043: "96d6c4085abc4fba0ad0a8a9914cd320731ab503c91890b9630acea41a922a1f",
   step044: "3c16321a6741e5efa04d10aa9173ba50a19eb625f13c5abd47a12491bc2f8023"
 });
 
@@ -3580,7 +3598,7 @@ const EXPECTED_REVIEW_ROWS = [
     phase: "review",
     source: "assets/steps/step043.md",
     target: "codex/assets/steps/step043.md",
-    source_sha256: "6b4db388b8176cdbef2bddc462e3a6547c7f69aec6597a1eb8286d8427748173",
+    source_sha256: "63b75eccf23a872712756d954e93549c255343ea067b2fcab5f886aebffaf544",
     inputs: [
       "step_archive/step022_수집결과_chunk1.md",
       "step_archive/awwwards-step022-primary.txt",
@@ -3682,7 +3700,7 @@ test("review source hashes bind reviewed source steps 039 through 044", async ()
     step040: "b95e68b9b3d412184127288c10af0cb82d74ca66c745152498cf3d0a3ae0e0a3",
     step041: "d3bd6bc9850aa09868a3925349fd826a898230a5200e1a384f14d058921b883c",
     step042: "de60366a82b20ca40f7d8fa0fb43df0194d723039155f0ee6714df1fdff83e16",
-    step043: "6b4db388b8176cdbef2bddc462e3a6547c7f69aec6597a1eb8286d8427748173",
+    step043: "63b75eccf23a872712756d954e93549c255343ea067b2fcab5f886aebffaf544",
     step044: "bad68534ce5d04e52a1b4ff933f15fcb5dcaa6a03958f695810b044682489f35"
   });
 });
@@ -3990,6 +4008,11 @@ function assertStep43Contract(content) {
   assert.match(loop, /연구 screenshot[^]*구현 screenshot[^]*실제로 열어/i);
   assertBoundedVisualLoop(sections["증거 제한 보강 루프"]);
   assertStep43RemediationOrder(content);
+  const exclusion = extractMarkdownSection(content, "설계 제외 계약 우선").replace(/\s+/g, " ");
+  assert.match(exclusion, /`step_archive\/step030_레이아웃설계_chunk1\.md`[^]*`harness50-design-contract`/);
+  assert.match(exclusion, /`adopted`가 false[^]*누락 finding으로 판정하지 않는다[^]*목록 우선/);
+  assert.match(exclusion, /`excluded-by-contract`[^]*보정 구현자는 그 스타일을 들여오지 않는다/);
+  assert.match(exclusion, /계약 블록이 없으면[^]*30단계 산출물은 고치지 않는다/);
 }
 
 function assertStep43RemediationOrder(content) {
@@ -4095,6 +4118,8 @@ test("review semantic checks reject missing evidence, unavailable-visual bypasse
     ["step042-contrast", assertStep42Contract, step42.replace("contrast", "색감")],
     ["step043-unbounded", assertStep43Contract, step43.replace("최대 5라운드", "제한 없이 반복")],
     ["step043-visual-bypass", assertStep43Contract, step43.replace("시각 검사 기능을 사용할 수 없으면", "시각 검사 기능을 사용할 수 없어도")],
+    ["step043-reference-over-contract", assertStep43Contract, step43.replace("누락 finding으로 판정하지 않는다", "누락 finding으로 판정한다")],
+    ["step043-rewrites-step30", assertStep43Contract, step43.replace("30단계 산출물은 고치지 않는다", "30단계 산출물에 계약을 추가한다")],
     ["step044-premature-milestone", assertStep44Contract, step44.replace("모두 `PASS`인 뒤에만", "검사 전에")],
     ["step044-reordered", assertStep44Contract, step44
       .replace("## 현재 build 검증", "## __TEMP_BUILD__")
@@ -4408,7 +4433,7 @@ const EXPECTED_E2E_ROWS = [
     phase: "e2e",
     source: "assets/steps/step049.md",
     target: "codex/assets/steps/step049.md",
-    source_sha256: "3cebc468c5ed9c815e616d0070111a61adc55aa2015880728c242918d6c77c30",
+    source_sha256: "db375fd7117e6ce4086a80562a3d2f8215c8f98f7e3111b9532b07ac37fae3b8",
     inputs: [
       "step_archive/step030_레이아웃설계_chunk1.md",
       "step_archive/step030_전체설계_chunk1.md",
@@ -4524,7 +4549,7 @@ test("e2e source hashes bind reviewed source steps 045 through 050", async () =>
     step046: "c290f0b81e68da011996abaa3a6fb2dd753d5c7199b8f6acaab2b8b3f606d1d9",
     step047: "e35c1b210e06b1cb4742573941a789e166aa4a131a2cc012481b3747ffdc04be",
     step048: "b171cb98e9ca33de2e7ff5f58f721dd1590c5df213b8598268726125176982d0",
-    step049: "3cebc468c5ed9c815e616d0070111a61adc55aa2015880728c242918d6c77c30",
+    step049: "db375fd7117e6ce4086a80562a3d2f8215c8f98f7e3111b9532b07ac37fae3b8",
     step050: "fe19984ab5614cc4c10db56a79a75ac3d5cd8af7a787849250e48767f794cd3d"
   });
 });
@@ -4543,7 +4568,7 @@ const EXPECTED_E2E_TARGET_SHA256 = Object.freeze({
   step046: "187a619f02da34101426d23f466182758b7d0b6bc0977ab3518c8c6bb2bfd93d",
   step047: "d2ed158f4fb15f52e21d76438776bbe0b1e5a0124a46eb4e7bd511c31398dfde",
   step048: "d858de0ea976dbce2a85c62ec71722964d2615528c2235fdf8e877b1d2a1558b",
-  step049: "b151cd00e427077405015452618825bd5b7443c26b2dbe3c8eb08d3ec34e5518",
+  step049: "764cf2132e9197a95a84c9e65d549956e7dc6ef37ee1ea513e48d649987ece1b",
   step050: "d267d4f2f588f42f04eebc51641319cebe52b7f090af0b629de0e85026d107bd"
 });
 
@@ -4689,6 +4714,9 @@ function assertStep49Contract(content) {
   ]) assert.match(sample, new RegExp(axis.replace("/", "\\/"), "i"));
   assert.match(sample, /selected design token[^]*persisted research evidence/i);
   assert.match(sample, /font family[^]*이름만으로 금지하지 않는다/i);
+  assert.match(sample, /`step_archive\/step030_레이아웃설계_chunk1\.md`[^]*`harness50-design-contract`/);
+  assert.match(sample, /`adopted`가 false[^]*최소 `Important` finding/);
+  assert.match(sample, /계약에 없는 스타일 선호는 finding으로 만들지 않는다/);
   assert.match(loop, /step_archive\/screenshots\/design\/step049-primary-r1\.png/);
   assert.match(loop, /독립 검증자[^]*판정[^]*보정자[^]*수정/i);
   assert.match(loop, /persisted evidence[^]*최종 screenshot[^]*실제로 열어/i);
@@ -4874,6 +4902,7 @@ test("e2e semantic checks reject bypasses, missing interactions, weak sampling, 
     ["step048-false-na", assertStep48Contract, step48.replace("실제로 존재하지 않음을", "검사가 어려움을")],
     ["step049-small-sample", assertStep49Contract, step49.replace("min(10, component count)", "min(3, component count)")],
     ["step049-font-ban", assertStep49Contract, step49.replace(/이름만으로 금지하지\s*않는다/, "이름만으로 금지한다")],
+    ["step049-advisory-exclusion", assertStep49Contract, step49.replace("최소 `Important` finding", "advisory 의견")],
     ["step050-fixed-sleep", assertStep50Contract, step50.replace(/fixed sleep은\s*사용하지 않는다/, "fixed sleep을 사용한다")],
     ["step050-premature-milestone", assertStep50Contract, step50.replace(/모든\s*필수 gate가 `PASS`인 뒤에만/, "console 검사 전에도")],
     ["step050-receipt-after-complete", assertStep50Contract, step50.replace("내구성 있게 먼저 기록한다", "completed 뒤에 기록한다")],

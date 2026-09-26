@@ -24,6 +24,10 @@ Step 37에서 구현된 CSS가 Awwwards 조사 결과를 충실히 반영했는�
 검증자는 보충 원문·스크린샷도 직접 열어 확인한다. 기존 glob에 없는 보충 이미지를 누락하거나
 보충 전에 부족하다고 판정된 Step 23 결론만으로 비교 기준을 되돌리지 않는다.
 
+## 설계 제외 계약 우선
+
+비교 기준에는 `step_archive/step030_레이아웃설계_chunk1.md`의 `harness50-design-contract` 블록(플러그인 `docs/DESIGN-CONTRACT.md`)도 들어간다. `exclude`에서 `adopted: false`인 항목에 해당하는 Awwwards 요소는 구현에 없어도 부족한 부분이 아니다 (목록 우선). 검증자는 그 차이를 FAIL 항목에 넣지 않고 `제외 계약: <id>`로 따로 적는다. 수정자는 피드백에 있더라도 그 스타일을 들여오지 않는다.
+
 ## QA 완료 증거 (필수)
 
 신뢰한 설치 플러그인의 `docs/QA-REPORTS.md`와 `scripts/qa-report.mjs`를 사용한다.
@@ -58,6 +62,7 @@ Step 37에서 구현된 CSS가 Awwwards 조사 결과를 충실히 반영했는�
    - 채택한 모든 기존·보충 원문과 이미지의 정확한 경로를 해석하고 SHA-256을 대조한다.
    - 원문을 읽고 이미지는 직접 열어 확인한다. 기존 glob만으로 입력을 제한하지 않는다.
    - 최종 PASS 누락, 입력 누락·hash 불일치 또는 필수 이미지 미검사는 INCOMPLETE다.
+   - `step_archive/step030_레이아웃설계_chunk1.md`의 `harness50-design-contract` 블록도 Read한다. `exclude`에서 `adopted: false`인 항목에 해당하는 원본 요소는 부족한 부분으로 적지 않고 `제외 계약: <id>`로 따로 적는다 (목록 우선).
 
 2. 구현 스크린샷을 Read한다:
    - `step_archive/screenshots/compare-awwwards-applied-rN.png`
@@ -105,6 +110,7 @@ Step 37에서 구현된 CSS가 Awwwards 조사 결과를 충실히 반영했는�
    - 채택한 모든 기존·보충 원문과 이미지의 정확한 경로를 해석하고 SHA-256을 대조한다.
    - 원문을 읽고 이미지는 직접 열어 확인한다. 기존 glob만으로 입력을 제한하지 않는다.
    - 최종 PASS 누락, 입력 누락·hash 불일치 또는 필수 이미지 미검사는 INCOMPLETE다.
+   - 같은 계약 블록을 Read한다. `exclude`에서 `adopted: false`인 항목의 스타일은 피드백에 있어도 들여오지 않는다.
 
 4. 피드백에 나열된 부족한 부분을 `src/css/*.css`, `src/js/Visualizer.js`에 반영한다.
 

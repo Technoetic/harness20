@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Claude `/webapp` and the step 1 TOPIC template replace the generic anti-slop line with one named default exclusion line. The line adds cream/off-white page backgrounds, italic accent words in headings, zero-padded 01/02/03 section labels, monospace labels outside code and pill buttons to the legacy five.
+- Both hosts' step 30 write exactly one `json harness50-design-contract` block (tokens + exclude, format in docs/DESIGN-CONTRACT.md) into the layout chunk. Steps 37, 43 and 49 and the evaluator judge only against this block: step 49 treats an unadopted exclusion as at least `Important`, and step 43 no longer asks for an excluded reference element.
+- Codex keeps the legacy list plus TOPIC exclusions. Its step 30 gains the required check `design-exclusion-contract`, and an older Step 30 receipt still replays.
+- Codex workspaces past step 30 reconstruct the contract in the current step report and never edit step 30 outputs.
+- Porting: Codex step 1 and step 23 were reviewed without change.
+
 ## 2.10.0 — 2026-09-26
 
 - Behaviour changes on upgrade (details in the bullets below): a run starts only from `/webapp <topic>`, because the natural-language triggers are gone; opening Claude Code no longer creates `step_archive/progress.json`; the step hooks act only for an active run, which needs `total_steps` 50, `current_step` equal to the first unfinished step and that step's body file, so an in-progress run of the older 107-step layout, one whose `total_steps` an older loader rewrote, or one without its step bodies stays inactive until `/harness-reset` and `/webapp <topic>` start it again; edits to execution-linked files always keep the normal permission prompt; and `lsp-autofix` fixes nothing without a project-local biome or stylelint.

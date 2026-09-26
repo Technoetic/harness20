@@ -61,6 +61,12 @@ rendered semantic component를 stable sort하고 `min(10, component count)`만�
 연결한다. 특정 font family를 프로젝트 맥락이나 token 근거 없이 이름만으로 금지하지
 않는다. 임의 preference나 새 외부 조사는 판정 근거가 아니다.
 
+selected design token과 제외 목록은 30단계 `step_archive/step030_레이아웃설계_chunk1.md`의
+`harness50-design-contract` 블록이다. 형식은 플러그인 `docs/DESIGN-CONTRACT.md`를 따른다. `exclude`에서
+`adopted`가 false인 항목에 해당하는 화면 요소는 출처와 상관없이 최소 `Important` finding이다. 계약에
+없는 스타일 선호는 finding으로 만들지 않는다. 계약 블록이 없으면 같은 문서의 계약 없는 작업 공간
+절차를 따른다.
+
 ## 독립 디자인 검증 루프
 
 현재 application을 설계된 viewport와 상태에서 촬영하고 primary 결과를

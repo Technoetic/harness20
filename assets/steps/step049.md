@@ -30,10 +30,10 @@ persistence: session
 
 ## 판정 기준
 
-검증 전에 Step/SPEC의 필수 acceptance, 선택된 디자인 토큰, 저장된 조사 근거를 확인한다.
+검증 전에 Step/SPEC의 필수 acceptance, 선택된 디자인 토큰과 제외 목록(`step_archive/step030_레이아웃설계_chunk1.md`의 `harness50-design-contract`, 플러그인 `docs/DESIGN-CONTRACT.md`), 저장된 조사 근거를 확인한다.
 각 finding은 해당 기준과 관찰한 스크린샷 영역 또는 실제 검사 결과에 연결한다.
 
-- **필수 finding (`Critical` / `Important`)**: 기능·접근성·보안 결함 또는 필수 acceptance/디자인 토큰 위반. 필수 검사 실패는 중요도와 관계없이 완료를 차단한다.
+- **필수 finding (`Critical` / `Important`)**: 기능·접근성·보안 결함, 필수 acceptance/디자인 토큰 위반, 또는 설계 계약 `exclude`에서 `adopted: false`인 항목에 해당하는 스타일(최소 `Important`). 필수 검사 실패는 중요도와 관계없이 완료를 차단한다.
 - **참고 의견 (`advisory`)**: 필수 기준 위반의 근거가 없는 미관·선호 제안. 필수 항목을 통과했다면 이 의견만으로 `FAIL`을 만들거나 수정을 반복하지 않는다.
 - 참고 점수나 선호 의견으로 필수 finding을 강등하거나 실패·누락·스킵을 `PASS`로 바꾸지 않는다.
 - 필수 선행 입력이 없거나 필요한 증거를 확보할 실행·시각 검사 기능이 없으면 `INCOMPLETE`로 기록하고 차단한다. 이 단계에서 만들 스크린샷은 아래 촬영 절차에서 확보하며 최종 판정 시 필수 증거의 누락을 확인한다. 코드 분석은 실제 이미지를 여는 시각 검사를 대체하지 못한다.
@@ -85,21 +85,28 @@ persistence: session
 - **여백**: 가장자리 여유, 섹션 간 간격, 내부 패딩 균일성
 - **겹침/잘림**: 위치 지정 요소 간섭, overflow 잘림, z-index 충돌
 - **시각적 완성도**: 전체적인 균형감, 시각적 노이즈, 미완성 느낌
-- **AI Slop 징후 (필수 점검)**: 아래 징후를 확인하고 선택된 토큰·필수 acceptance와 대조한다. 필수 기준 위반은 `FAIL`, 근거 없는 선호는 `advisory`로 기록한다. 폰트 이름만으로 금지하지 않는다.
-  - Inter/Roboto/Arial 폰트 노출 여부
-  - 보라 계열 그라데이션 배경의 맥락 없는 사용
-  - 모든 카드가 중앙정렬만 되어 있는 획일적 구조
-  - 과도한 border-radius (프로젝트 토큰 범위 밖)
+- **AI Slop 징후 (필수 점검)**: 아래 징후를 설계 계약·필수 acceptance와 대조한다. 계약 `exclude`에 있고 `adopted: false`인 항목의 위반은 `Important` 필수 finding(`FAIL`)이고, 계약에 없는 징후는 `advisory`로 기록한다. 폰트 이름만으로 금지하지 않는다 — 계약 항목이 근거다.
+  - Inter/Roboto/Arial 폰트 노출 여부 (`generic-sans`)
+  - 보라 계열 그라데이션 배경의 맥락 없는 사용 (`purple-gradient`)
+  - 모든 카드가 중앙정렬만 되어 있는 획일적 구조 (`centered-cards`)
+  - 과도한 border-radius — 계약 `tokens.radius` 밖 값, 헌법 §5 허용값 [0, 4, 8, 12, 16] 밖 값 (`excess-radius`)
+  - 획일적 단색 배경 (`flat-background`)
+  - 크림·오프화이트 페이지 바탕 (`cream-background`)
+  - 제목 속 이탤릭 강조어 (`italic-heading-accent`)
+  - 01·02·03 장식 번호 섹션 라벨 (`numbered-section-labels`)
+  - 코드 밖 모노스페이스 라벨 (`monospace-labels`)
+  - 알약형 버튼 (`pill-buttons`)
+  - 계약의 `topic-N` 항목 (사용자 제외)
   - 임의 헥스 코드(토큰 미매핑) 사용 징후
   - 클릭 가능 요소의 hover/focus 상태 누락
   - Empty State 디자인 부재 (데이터 0 시 레이아웃 붕괴)
 
 ## AI Slop 게이트 검증 (필수)
 
-무작위로 **10개** 컴포넌트를 샘플링하여 다음 토큰 매핑 여부를 확인한다:
+무작위로 **10개** 컴포넌트를 샘플링하여 설계 계약 `tokens`에 대한 다음 매핑 여부를 확인한다:
 색상 / 타이포그래피 / 간격(4·8pt) / border-radius / shadow.
 
-- **8개 미만**이 선택된 토큰에 매핑되었다면 `FAIL`로 기록하고 베이스라인을 수리한다.
+- **8개 미만**이 설계 계약 `tokens`에 매핑되었다면 `FAIL`로 기록하고 베이스라인을 수리한다.
 - 수리 후 재검증도 같은 최대 5라운드에 포함한다. 수리 모드 전환으로 회차를 초기화하지 않는다.
 
 ## 실행 방법
@@ -167,6 +174,7 @@ persistence: session
 
 에이전트 B는 각 라운드 결과를 `step_archive/outputs/step049_검증_rN.md`에 저장한다.
 - 현재 Step `49`, 라운드, 최종 판정, 뷰포트·페이지, 필수 기준, finding 중요도와 증거 경로를 기록한다.
+- 설계 계약 `exclude` 항목마다 준수·위반·채택 예외 중 하나와 근거 스크린샷 영역을 기록한다.
 - 도중 발생한 FAIL도 해결 여부·재검증 결과와 함께 보존한다. 참고 의견은 필수 finding과 분리한다.
 - 중단 시 남은 필수 finding, 차단 원인, 시도한 수정, 다음 안전한 조치를 적는다.
 - 비밀값·개인정보·원시 로그를 복사하지 않고 필요한 요약과 프로젝트 상대 증거 경로만 남긴다.

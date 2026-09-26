@@ -111,7 +111,7 @@ test('report replacement or source mutation while binding quality cannot pass', 
 const currentPluginRoot = fileURLToPath(new URL('../../', import.meta.url));
 const finalVisualIds = ['final-desktop-screenshot', 'final-mobile-screenshot', 'final-visual-inspection'];
 // Declarations added after a published release; receipts written before them lack this evidence.
-const laterIds = [...finalVisualIds, 'browser-backend-lock'];
+const laterIds = [...finalVisualIds, 'browser-backend-lock', 'design-exclusion-contract'];
 function historicalEvidence(contract) {
   return contract.acceptance.filter(item => item.required && !laterIds.includes(item.id)).map(item => {
     if (item.id === 'c8-disposition') return { acceptance_id: 'c8-version', kind: 'command',
@@ -124,7 +124,7 @@ function historicalEvidence(contract) {
   });
 }
 
-for (const step of [3, 5, 50]) {
+for (const step of [3, 5, 30, 50]) {
   test(`current real step ${step} contract recovers its legacy receipt without new evidence or file reads`, async () => {
     const root = await makeWorkspace();
     const contract = await loadStepContract(currentPluginRoot, step);

@@ -58,7 +58,7 @@ Codex 단계부터 harness50 플러그인의 `codex/scripts/harness-state.mjs`(`
      - 단일 HTML 인터랙티브 웹 튜토리얼
      - 독립 화면마다 고유 URL 부여, 기본 hash 라우팅, 지원 HTTP(S)에서는 Navigation API 우선 및 호환 backend 제공, docs/ROUTING.md 계약 준수
      - 파일 직접 열기를 지원하려면 hash manifest 선택, history manifest는 HTTP(S) 필요, 실행 환경에 따른 mode 암묵 변환 금지
-     - AI Slop 방지 전역 제약 준수
+     - 디자인 제외(하네스 기본, 설계가 채택 사유를 기록하면 예외): 크림·오프화이트 페이지 바탕 / 제목 속 이탤릭 강조어 / 01·02·03 장식 번호 섹션 라벨 / 코드 밖 모노스페이스 라벨 / 알약형 버튼 / 맹목적 Inter·Roboto·Arial / 보라 계열 그라데이션 배경 / 무조건 중앙정렬 카드 / 과도한 border-radius / 획일적 단색 배경
      - 한국어 본문 + 기술 용어 영문 병기
    ```
 
