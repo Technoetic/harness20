@@ -205,6 +205,59 @@ test('step bodies and a subfolder run state never receive hook approval; step re
     assert.match(run(root, 'auto-approve', write(target)).output, /"allow"/, target);
   }
 });
+// The approval policy the auto-approve relay asks, run directly with node (no PowerShell start):
+// 'eligible' or '' in auto mode, 'protected' or '' in guard mode.
+function policy(root, file_path, mode = 'auto') {
+  const result = spawnSync(process.execPath, [path.join(repo, 'hooks', 'lib', 'approval-policy.mjs'), mode], {
+    input: JSON.stringify(write(file_path)), encoding: 'utf8', timeout: 30000,
+    env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+  });
+  assert.equal(result.error, undefined);
+  assert.equal(result.stderr, '', result.stderr);
+  return result.stdout;
+}
+// Windows opens one file under several spellings. Auto-approval judges the path the file system
+// opens as well as the typed one, so no alias reaches a protected file. On POSIX ':' is an
+// ordinary character; the same judgement there only keeps the prompt, so the stream cases run on
+// every OS.
+test('stream, 8.3, trailing-dot and home-level aliases never receive hook approval', t => {
+  const root = fixture(t);
+  for (const dir of ['.claude/commands', '.git/hooks', '.codex']) fs.mkdirSync(path.join(root, dir), { recursive: true });
+  for (const file of ['.claude/settings.json', '.git/config', '.npmrc', '.env', '.codex/config.toml']) fs.writeFileSync(path.join(root, file), '');
+  assert.equal(policy(root, 'src/app.js'), 'eligible');
+  const streams = ['.claude::$INDEX_ALLOCATION/settings.json', '.claude::$INDEX_ALLOCATION/settings.local.json',
+    '.claude:$I30:$INDEX_ALLOCATION/settings.json', '.git::$INDEX_ALLOCATION/config', '.git::$INDEX_ALLOCATION/hooks/pre-commit',
+    '.git::$INDEX_ALLOCATION/hooks/new-hook', '.git ::$INDEX_ALLOCATION/config', '.codex::$INDEX_ALLOCATION/config.toml',
+    '.npmrc::$DATA', '.env:secret', '.env::$DATA', path.join(root, '.git::$INDEX_ALLOCATION', 'hooks', 'pre-commit')];
+  // 8.3 short names, where the volume creates them.
+  const shortNames = Object.entries({ '.git': ['/config', '/hooks/pre-commit', '/hooks/new-hook'], '.claude': ['/settings.json', '/commands/evil.md'],
+    '.codex': ['/config.toml'], '.npmrc': [''], '.env': [''], step_archive: ['/archived/step002.md'] })
+    .flatMap(([name, tails]) => { const alias = shortName(path.join(root, name)); return alias ? tails.map(tail => alias + tail) : []; });
+  // PR #1 C-3: a project rooted at the home folder (login units, PATH entries, the pip index).
+  const homeLevel = ['.config/systemd/user/x.service', '.config/autostart/x.desktop', '.local/bin/git', '.bin/node', 'pip.conf'];
+  for (const target of [...streams, ...shortNames, ...homeLevel]) assert.equal(policy(root, target), '', target);
+  // No over-blocking: streams of ordinary paths and names that only contain git or env.
+  for (const target of ['src/lib::$INDEX_ALLOCATION/x.js', 'src/app.js::$DATA', 'docs/git-notes.md', 'src/env.js']) {
+    assert.equal(policy(root, target), 'eligible', target);
+  }
+  // The guard mode keeps the typed path and its meaning.
+  assert.equal(policy(root, '.git/config', 'guard'), 'protected');
+  // Once through the shipping hook.
+  assert.equal(run(root, 'auto-approve', write('.claude::$INDEX_ALLOCATION/settings.json')).output, '');
+});
+// Flat step bodies are the fallback location of the step bodies (harness-activity stepBody), and
+// archived/ and tools/ under a subfolder step_archive are the same material. Step 1 writes
+// TOPIC.md itself, so it stays eligible.
+test('flat step bodies and subfolder archived/tools stay out of approval; TOPIC.md and step results stay in', t => {
+  const root = fixture(t);
+  for (const target of ['step_archive/step002.md', 'STEP_ARCHIVE/STEP050.MD', 'step_archive/step002.md.', 'step_archive/step002.md::$DATA',
+    'sub/step_archive/archived/step001.md', 'a/STEP_ARCHIVE/Archived/x.md', 'sub/step_archive/tools/html-bundler.ps1']) {
+    assert.equal(policy(root, target), '', target);
+  }
+  for (const target of ['step_archive/TOPIC/TOPIC.md', 'step_archive/step002_result.md', 'step_archive/step0021.md', 'sub/step_archive_x/archived/a.md', 'docs/archived/x.md']) {
+    assert.equal(policy(root, target), 'eligible', target);
+  }
+});
 test('the guard mode leaves execution-linked edits to the normal prompt instead of denying them', t => {
   const root = fixture(t);
   const guard = run(root, 'permission-request-guard', { hook_event_name: 'PermissionRequest', ...write('package.json') });

@@ -34,8 +34,9 @@ H50_WRITER_INSPECTOR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/q
 if command -v cygpath >/dev/null 2>&1; then H50_WRITER_INSPECTOR="$(cygpath -m "$H50_WRITER_INSPECTOR")"; fi
 export RAW PROGRESS_FILE ARCHIVED_DIR H50_WRITER_INSPECTOR
 
-# writer_py probe: prints "idle" for a paused run with no new completion line, else "work"; reads
-# only. writer_py write: records the completions and rewrites progress.json.
+# writer_py probe: prints "idle" for a paused run with no new completion line and an aligned cursor
+# (current_step on the first unfinished step), else "work"; reads only. writer_py write: records the
+# completions, puts a drifted cursor back and rewrites progress.json.
 writer_py() {
 python3 - "$1" <<'PY'
 import json, os, re, sys, datetime, tempfile, shutil, subprocess
@@ -50,8 +51,9 @@ except Exception: raise SystemExit(0)
 
 # Named pause (harness-rules 2-1): hooks/lib/harness-activity.mjs starts this hook for a paused run
 # so that the completion lines of the turn that paused are recorded; the pause fields are kept as
-# they are. With no new line to record nothing changes (probe below): no lock file, no log line,
-# no rewrite. Same judgement as scripts/lib/pause-state.mjs isPaused.
+# they are. A drifted cursor is put back as well (below). With no new line to record and the cursor
+# on the first unfinished step nothing changes (probe below): no lock file, no log line, no rewrite.
+# Same judgement as scripts/lib/pause-state.mjs isPaused.
 p=progress
 paused=isinstance(p,dict) and (('paused' in p and p['paused'] is not False) or p.get('status')=='paused')
 if mode=="probe" and not paused:
@@ -146,9 +148,12 @@ for line in response.split("\n"):
 
 valid={n for n in found if (os.path.isfile(os.path.join(a_dir,f"step{n:03d}.md")) or os.path.isfile(os.path.join(os.path.dirname(a_dir),f"step{n:03d}.md")))}
 existing=set(int(x) for x in (progress.get("completed_steps") or []))
+first=next((n for n in range(1,total+1) if n not in existing),None)
+cursor=progress.get("current_step")
+aligned=first is None or (type(cursor) is int and cursor==first)
 
 if mode=="probe":
-    print("work" if valid - existing else "idle")
+    print("work" if (valid - existing) or not aligned else "idle")
     raise SystemExit(0)
 
 if total == 50:
@@ -185,6 +190,13 @@ if new_ones:
     progress["completed_steps"]=all_done
     progress["current_step"]=next((n for n in range(1,total+1) if n not in all_done),total)
     print(f"newly completed: {new_ones}, total {len(all_done)}/{total}")
+elif not aligned:
+    # Cursor drift (harness-activity 'drift'): nothing new to record, but current_step is not the
+    # first unfinished step, for example after a hand edit of progress.json. Put it back so the run
+    # reads as active again; a paused run keeps its pause fields. A finished run keeps its cursor.
+    # Mirrors step-progress-writer.ps1.
+    progress["current_step"]=first
+    print(f"current_step {cursor} -> {first} (cursor drift)")
 
 progress["last_updated"]=datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 

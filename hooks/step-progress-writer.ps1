@@ -167,8 +167,9 @@ function Get-ReportedSteps($state) {
 
 # Named pause (harness-rules 2-1): hooks/lib/harness-activity.mjs starts this hook for a paused run
 # so that the completion lines of the turn that paused are recorded; the pause fields are kept as
-# they are. With no new line to record it changes nothing: no progress.json rewrite, no .bak, no
-# log line. Same judgement as scripts/lib/pause-state.mjs isPaused.
+# they are. A drifted cursor is put back as well (below). With no new line to record and the cursor
+# on the first unfinished step it changes nothing: no progress.json rewrite, no .bak, no log line.
+# Same judgement as scripts/lib/pause-state.mjs isPaused.
 $peek = $null
 try { $peek = Get-Content -LiteralPath $progressFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop } catch {}
 $hasPaused = @($peek.PSObject.Properties.Name) -ccontains 'paused'
@@ -177,7 +178,10 @@ if ($null -ne $peek -and $isPaused) {
     $recorded = New-Object System.Collections.Generic.HashSet[int]
     foreach ($s in @($peek.completed_steps)) { try { [void]$recorded.Add([int]$s) } catch {} }
     $pending = @((Get-ReportedSteps $peek) | Where-Object { -not $recorded.Contains([int]$_) })
-    if ($pending.Count -eq 0) { exit 0 }
+    $peekFirst = $null
+    for ($i = 1; $i -le [int]$peek.total_steps; $i++) { if (-not $recorded.Contains($i)) { $peekFirst = $i; break } }
+    $peekAligned = ($null -eq $peekFirst) -or (($peek.current_step -is [int] -or $peek.current_step -is [long]) -and $peek.current_step -eq $peekFirst)
+    if ($pending.Count -eq 0 -and $peekAligned) { exit 0 }
 }
 
 Write-WriterLog "=== invoked ==="
@@ -284,6 +288,18 @@ if ($completedNew.Count -gt 0) {
 
     Write-WriterLog "Newly completed: $($completedNew -join ', ')"
     Write-WriterLog "Total: $($progress.completed_steps.Count)/$($progress.total_steps) (next=first-gap=$($progress.current_step))"
+} else {
+    # Cursor drift (harness-activity 'drift'): nothing new to record, but current_step is not the
+    # first unfinished step, for example after a hand edit of progress.json. Put it back so the run
+    # reads as active again; a paused run keeps its pause fields. A finished run keeps its cursor.
+    # Mirrors step-progress-writer.sh.
+    $driftGap = $null
+    for ($i = 1; $i -le $totalSteps; $i++) { if (-not $existing.Contains($i)) { $driftGap = $i; break } }
+    $cursorOk = ($progress.current_step -is [int] -or $progress.current_step -is [long]) -and $progress.current_step -eq $driftGap
+    if ($null -ne $driftGap -and -not $cursorOk) {
+        Write-WriterLog "current_step $($progress.current_step) -> $driftGap (cursor drift)"
+        $progress.current_step = $driftGap
+    }
 }
 
 # 4) 세션 이력 업데이트 (필드 없으면 생성)
@@ -324,7 +340,9 @@ try {
     Write-WriterLog "moai_features update FAILED: $_"
 }
 
-$progress.last_updated = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss')
+# Add-Member -Force: a hand-edited progress.json may lack the field, and plain assignment would
+# then print an error (step-progress-writer.sh assigns the key either way).
+$progress | Add-Member -NotePropertyName 'last_updated' -NotePropertyValue (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss') -Force
 
 # B-P2-7 fix: 비원자적 truncate 대신 temp 파일 → rename
 try {

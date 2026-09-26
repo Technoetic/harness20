@@ -5,14 +5,16 @@
 // print where it stopped. The progress writer also starts there, to record completion lines of the
 // turn that paused (claude-named-pause P1); its Stop here carries the pause report instead, so it
 // has nothing to record and still nothing is written. The two guards start only in Harness50
-// workspaces (paused, finished, Codex or active); on these harmless events they stay silent and
-// write no log.
+// workspaces (paused, drift, finished, Codex or active); on these harmless events they stay silent
+// and write no log. A run whose cursor alone is off (drift) starts only the progress writer among
+// the step hooks, and that writer puts current_step back (tested separately below).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { spawn } from 'node:child_process';
+import { setTimeout as sleep } from 'node:timers/promises';
 
 import { pausedLine } from '../../scripts/lib/pause-state.mjs';
 import { installPlugin, repo, runDispatcher, tempRoot, testEachName, tree, windows } from './helpers/claude-hooks.mjs';
@@ -146,7 +148,8 @@ const WORKSPACES = {
   'stale-loader': project => writeProgress(project, STALE_LOADER_PROGRESS),
   paused: project => { writeProgress(project, PAUSED_RUN); writeBodies(project, [1]); },
   'total 107': project => { writeProgress(project, { ...valid, total_steps: 107 }); writeBodies(project, [1]); },
-  'gap-inconsistent': project => { writeProgress(project, { ...valid, completed_steps: [2], current_step: 3 }); writeBodies(project, [1, 2, 3]); },
+  // A cursor that is no step number is damage, not drift (drift has its own test below).
+  'cursor not a step number': project => { writeProgress(project, { ...valid, completed_steps: [2], current_step: '3' }); writeBodies(project, [1, 2, 3]); },
   corrupt: project => writeProgress(project, '{broken'),
   'step_archive link outside the project': (project, base, t) => {
     const outside = join(base, 'outside');
@@ -212,6 +215,47 @@ testEachName('finished run (50/50): only the trust5 gate speaks; progress, specs
   assert.equal(existsSync(f.npx.log), false);
 });
 
+// A hand edit moved current_step off the first unfinished step (drift). Among the step hooks only
+// the progress writer starts; its Stop puts the cursor back, and from then on the run is active.
+// The other hooks get the first payload of their event only, which keeps the dispatches few; the
+// guards are covered in 'the guards run only in harness workspaces'.
+testEachName('cursor drift: only the progress writer starts, and it puts current_step back on the first unfinished step', async (t, name) => {
+  const f = setup(t, name);
+  writeProgress(f.project, { ...valid, last_updated: '', completed_steps: [2], current_step: 3 });
+  writeBodies(f.project, [1, 2, 3]);
+  const before = tree(f.project);
+  const byEvent = events(f.project);
+  const tasks = [];
+  for (const [event, hooks] of Object.entries(registrations())) {
+    for (const hook of hooks) {
+      if (['destructive-guard', 'permission-request-guard', 'step-progress-writer'].includes(hook)) continue;
+      tasks.push(async () => [hook, await dispatch(f.plugin, hook, byEvent[event][0], { cwd: f.project, env: f.env })]);
+    }
+  }
+  for (const [hook, result] of await inPool(tasks)) assert.deepEqual(result, { status: 0, stdout: '', stderr: '' }, hook);
+  assert.deepEqual(tree(f.project), before);
+
+  const stop = { hook_event_name: 'Stop', session_id: 's', stop_hook_active: false, last_assistant_message: '', cwd: f.project };
+  const read = () => JSON.parse(readFileSync(join(f.project, 'step_archive', 'progress.json'), 'utf8').replace(/^\uFEFF/, ''));
+  // The PowerShell writer skips its write while another test file holds the machine-wide
+  // Global\step-progress-writer-mutex, so rerun it (bounded) until the cursor is back.
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    const writer = await dispatch(f.plugin, 'step-progress-writer', stop, { cwd: f.project, env: f.env });
+    assert.equal(writer.status, 0, writer.stderr);
+    assert.equal(writer.stderr, '');
+    if (read().current_step === 1) break;
+    await sleep(500 * attempt);
+  }
+  const after = read();
+  assert.deepEqual(after.completed_steps, [2]);
+  assert.equal(after.current_step, 1);
+  const continued = await dispatch(f.plugin, 'step-auto-continue', stop, { cwd: f.project, env: f.env });
+  assert.equal(continued.status, 0, continued.stderr);
+  const reason = JSON.parse(continued.stdout).reason;
+  assert.ok(reason.includes('step_archive/archived/step001.md'), reason);
+  assert.equal(existsSync(f.npx.log), false);
+});
+
 // The two guards run only in Harness50 workspaces: an active, paused or finished Claude run, or a
 // Codex workspace. In an unrelated folder, or next to a loader-created progress.json, no shell
 // starts and the host's permission checks decide. A block writes the guard log next to the
@@ -248,9 +292,11 @@ testEachName('the guards run only in harness workspaces', (t, name) => {
   assert.match(ask.stdout, /"permissionDecision":"ask"/);
   assert.deepEqual(guard('permission-request-guard', f.project, bash('git commit -m "remove sudo usage"', 'PermissionRequest')), silent);
 
-  // Paused, finished (50/50) and Codex workspaces keep the guards as well.
+  // Paused, drift, finished (50/50) and Codex workspaces keep the guards as well: moving the
+  // cursor by hand never turns them off.
   const workspaces = {
     paused: project => { writeProgress(project, PAUSED_RUN); writeBodies(project, [1]); },
+    drift: project => { writeProgress(project, { ...valid, completed_steps: [2], current_step: 3 }); writeBodies(project, [1]); },
     finished: project => writeProgress(project, { ...valid, completed_steps: Array.from({ length: 50 }, (_, index) => index + 1), current_step: 50 }),
     codex: project => {
       mkdirSync(join(project, 'step_archive', '.harness50-codex'), { recursive: true });

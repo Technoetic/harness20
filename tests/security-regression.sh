@@ -11,7 +11,8 @@
 #   - MUST_DEFER: ordinary shell commands retain host permission checks.
 #   - GATE: progress.json 부재 시 auto-approve가 allow를 발급하지 않아야 함 (전역 자동승인 결함 방지)
 #   - CODEX STATE: .harness50-codex/ 편집과 Codex state.json 옆의 progress.json은 allow 미발급 (Stop 게이트 우회 방지)
-#   - EXEC-LINKED: 실행과 연결되는 파일(.husky/, .mcp.json, package.json, CLAUDE.md, CI, 편집기 설정) 편집은 활성 중에도 allow 미발급
+#   - EXEC-LINKED: 실행과 연결되는 파일(.husky/, .mcp.json, package.json, CLAUDE.md, CI, 편집기 설정, 평면 단계 본문 step_archive/stepNNN.md) 편집은 활성 중에도 allow 미발급
+#   - ALIAS: 보호 경로의 NTFS 스트림 별칭(.claude::$INDEX_ALLOCATION, .git::$INDEX_ALLOCATION, .npmrc::$DATA) 편집은 allow 미발급 (파일 시스템이 실제로 여는 경로로 판정)
 #   - STALE: 현재 단계 본문이 없는 progress.json(옛 로더가 만든 파일)은 allow 미발급
 #
 # 사용: bash tests/security-regression.sh
@@ -177,9 +178,15 @@ if printf '%s' "$out" | grep -q '"permissionDecision":"allow"'; then fail "Codex
 rm -rf "$TMP/step_archive/.harness50-codex"
 
 echo "== EXEC-LINKED: 실행과 연결되는 파일 편집은 활성 중에도 allow 미발급 =="
-for p in '.husky/pre-commit' '.mcp.json' 'package.json' 'CLAUDE.md' '.github/workflows/ci.yml' '.vscode/tasks.json'; do
+for p in '.husky/pre-commit' '.mcp.json' 'package.json' 'CLAUDE.md' '.github/workflows/ci.yml' '.vscode/tasks.json' 'step_archive/step002.md'; do
   out="$(json_write "$p" | bash "$AA" 2>/dev/null)"
   if printf '%s' "$out" | grep -q '"permissionDecision":"allow"'; then fail "실행과 연결되는 파일 편집에 allow 발급됨: $p"; else ok; fi
+done
+
+echo "== ALIAS: 보호 경로의 스트림 별칭 편집은 allow 미발급 =="
+for p in '.claude::$INDEX_ALLOCATION/settings.json' '.git::$INDEX_ALLOCATION/hooks/pre-commit' '.npmrc::$DATA'; do
+  out="$(json_write "$p" | bash "$AA" 2>/dev/null)"
+  if printf '%s' "$out" | grep -q '"permissionDecision":"allow"'; then fail "보호 경로의 별칭 편집에 allow 발급됨: $p"; else ok; fi
 done
 
 echo "== STALE: 현재 단계 본문이 없는 progress.json은 allow 미발급 =="
