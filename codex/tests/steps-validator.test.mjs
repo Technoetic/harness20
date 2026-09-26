@@ -3639,7 +3639,7 @@ const EXPECTED_REVIEW_ROWS = [
     phase: "review",
     source: "assets/steps/step044.md",
     target: "codex/assets/steps/step044.md",
-    source_sha256: "bad68534ce5d04e52a1b4ff933f15fcb5dcaa6a03958f695810b044682489f35",
+    source_sha256: "d238b47246569421402b3eebf755345943fb3e74a1ef285506c0cba97541325d",
     inputs: [
       "step_archive/step030_레이아웃설계_chunk1.md",
       "step_archive/step030_전체설계_chunk1.md",
@@ -3701,7 +3701,7 @@ test("review source hashes bind reviewed source steps 039 through 044", async ()
     step041: "8c203e922eda2b5a043bf7ab2e878d07b7d4248169fcd53f84db31acef863c4a",
     step042: "fff6c60ac51bf80144528ba17454efbd5938f34b26c32a95d813c8039f72b1c0",
     step043: "d232ead02f2fcfcc01e32432f6d318f4a128e981297848027a66ac9a98a2aad8",
-    step044: "bad68534ce5d04e52a1b4ff933f15fcb5dcaa6a03958f695810b044682489f35"
+    step044: "d238b47246569421402b3eebf755345943fb3e74a1ef285506c0cba97541325d"
   });
 });
 

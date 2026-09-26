@@ -61,3 +61,9 @@ visual inspection is unavailable.
    `validated 50 indexed step(s)`.
 7. Put a per-step table in the pull request: source digest change, Codex
    decision and reason.
+
+## Review follow-up (2026-09-26)
+
+| Source | Reviewed digest change | Codex decision and reason |
+| --- | --- | --- |
+| step044 | `bad68534ce5d04e52a1b4ff933f15fcb5dcaa6a03958f695810b044682489f35` → `d238b47246569421402b3eebf755345943fb3e74a1ef285506c0cba97541325d` | Keep the Codex target and acceptance unchanged. It already records failed checks in the routing report, prohibits Step 45 after failure, and leaves progress to the workflow manager and receipts. The Claude change adds named-pause codes and CLI evidence/note syntax, which this contract does not port. |

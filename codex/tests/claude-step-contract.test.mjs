@@ -45,7 +45,12 @@ const RETRY = '3회 재시도 후에도';
 const SELF_CAL_STEPS = [1, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 21, 31, 33, 34, 37, 41, 42];
 const FIX_LEAD_STEPS = [37, 41, 42];
 const ERROR_STEPS = [2, 16, 18, 20, 22, 23, 26, 27, 28, 29, 30, 33, 34, 41, 42, 46];
-const LOOP_STEPS = [24, 25, 29, 39, 40, 43, 47, 48, 49, 50];
+const LOOP_STEPS = [24, 25, 29, 39, 40, 43, 44, 47, 48, 49, 50];
+// Steps whose body carries the loop tail twice (step 44: the trust5 r2 re-check and Self-Calibration;
+// step 50: exit conditions and final regression).
+const DOUBLE_LOOP_STEPS = [44, 50];
+// A bare stop is the ending the loop tail replaced; no body keeps it.
+const BARE_STOP = /현재 단계에서 (?:\*\*)?(?:정지한다|멈춘다)/;
 const count = (content, needle) => content.split(needle).length - 1;
 
 // A '## heading' section runs to the next '## ' heading or '---' rule.
@@ -91,9 +96,18 @@ function assertTailSections(n, content) {
 }
 
 // C3: bounded review loops name the pause codes; step 49's last transition line ends in a named
-// pause, not a bare stop.
+// pause, not a bare stop. Step 44 ends both of its three re-check budgets with the tail and names
+// the routing report as the pause evidence.
+const STEP44_EVIDENCE = '멈춤의 증거 파일(`--evidence`)은 라우팅 검증 보고서 `step_archive/step044_routing검증.md`이고, ' +
+  '`--note`는 헌법 §2-1대로 작은따옴표로 감싼 사용자가 할 일 1문장이다.';
 function assertLoopTail(n, content) {
   assert.ok(content.split('\n').includes(LOOP_TAIL), `step${pad(n)}: loop tail line`);
+  assert.doesNotMatch(content, BARE_STOP, `step${pad(n)}: a bare stop remains`);
+  if (DOUBLE_LOOP_STEPS.includes(n)) assert.equal(count(content, LOOP_TAIL), 2, `step${pad(n)}: two loop tails`);
+  if (n === 44) {
+    assert.ok(content.split('\n').includes(STEP44_EVIDENCE), 'step044: pause evidence line');
+    assert.ok(!content.includes('--note "'), 'step044: a double-quoted note');
+  }
   if (n === 49) {
     const last = content.trimEnd().split('\n').at(-1);
     assert.match(last, /명명된 멈춤/, 'step049: last transition line names the pause');
@@ -208,10 +222,12 @@ test('C2 every exhausted three-retry budget ends with the one named-pause tail i
 test('C3 bounded review loops end with the loop tail and step 49 ends in a named pause', () => {
   let loops = 0;
   for (const n of LOOP_STEPS) assertLoopTail(n, claudeStep(n));
-  for (const [, content] of claudeBodies()) loops += count(content, LOOP_TAIL);
-  assert.equal(loops, 11, 'loop tails (step 50 has two)');
-  assert.equal(count(claudeStep(50), LOOP_TAIL), 2, 'step050: exit conditions and final regression');
-  assert.doesNotMatch(claudeStep(49), /현재 단계에서 멈춘다/, 'step049: a bare stop remains');
+  for (const [name, content] of claudeBodies()) {
+    loops += count(content, LOOP_TAIL);
+    assert.doesNotMatch(content, BARE_STOP, `${name}: a bare stop remains`);
+  }
+  assert.equal(loops, LOOP_STEPS.length + DOUBLE_LOOP_STEPS.length, 'loop tails (steps 44 and 50 have two)');
+  assert.equal(loops, 13);
 });
 
 test('C4 step bodies name only the pause codes the model may choose', () => {
@@ -229,8 +245,23 @@ test('C5 no step body edits progress.json or cites the missing loader or rule fi
   }
 });
 
-test('C6 no Claude step body runs an unbundled validator or a .claude/hooks script', () => {
+// The Claude skills, agents and commands that the step bodies trigger or cite follow the same rule
+// (chunk-writer is activated by the bodies' '청크 단위로 저장' wording).
+function claudeInstructionFiles() {
+  const files = [
+    ...readdirSync(join(repo, 'skills')).map(name => `skills/${name}/SKILL.md`),
+    ...readdirSync(join(repo, 'agents')).filter(name => name.endsWith('.md')).map(name => `agents/${name}`),
+    ...readdirSync(join(repo, 'commands')).filter(name => name.endsWith('.md')).map(name => `commands/${name}`)
+  ];
+  assert.ok(files.includes('skills/chunk-writer/SKILL.md'), 'chunk-writer is scanned');
+  return new Map(files.map(file => [file, text(file)]));
+}
+
+test('C6 no Claude step body, skill, agent or command runs an unbundled validator or a .claude/hooks script', () => {
   for (const [name, content] of claudeBodies()) assertNoUnbundledValidators(name, content);
+  for (const [name, content] of claudeInstructionFiles()) assertNoUnbundledValidators(name, content);
+  assert.match(text('skills/chunk-writer/SKILL.md'), /직접 확인한다\. 자동 검증 훅은 번들되지 않는다\(`docs\/RETIRED-VALIDATORS\.md`\)\./,
+    'chunk-writer: manual chunk check');
 });
 
 test('C7 both hosts and the Codex index check Biome with the scoped package name', () => {
@@ -266,6 +297,14 @@ test('C6m/C7m the validator and Biome checks reject a reintroduced hook or unsco
   const bare = step8.replace('## 검증\n', '## 검증\n\n`jscpd-validator.ps1`을 실행한다.\n');
   assert.notEqual(bare, step8);
   assert.throws(() => assertNoUnbundledValidators('step008 bare', bare));
+
+  const chunkWriter = text('skills/chunk-writer/SKILL.md');
+  const oldChunk = chunkWriter.replace('### 검증\n', '### 검증\n- 수동 재검증: `powershell -File .claude/hooks/research-chunk-validator.ps1 -FilePath <경로>`\n');
+  assert.notEqual(oldChunk, chunkWriter);
+  assert.throws(() => assertNoUnbundledValidators('chunk-writer mutated', oldChunk));
+  const oldChunkBare = chunkWriter.replace('### 검증\n', '### 검증\n- 저장 후 research-chunk-validator.ps1이 PostToolUse(Write|Edit) 훅으로 자동 검증\n');
+  assert.notEqual(oldChunkBare, chunkWriter);
+  assert.throws(() => assertNoUnbundledValidators('chunk-writer bare', oldChunkBare));
 
   const step1 = claudeStep(1);
   const biome = step1.replace(`| Biome | ${SCOPED_BIOME} |`, '| Biome | `npx biome --version` |');
@@ -331,6 +370,20 @@ test('C11 the tail, loop, pause-code and constitution checks reject the old word
   const bareStop = step49.replace('`INCOMPLETE`이면 완료를 보고하지 않고 헌법 §2-1 명명된 멈춤으로 끝낸다.', '`INCOMPLETE`이면 현재 단계에서 멈춘다.');
   assert.notEqual(bareStop, step49);
   assert.throws(() => assertLoopTail(49, bareStop));
+
+  // Step 44 before the fix: both three re-check budgets ended in a bare stop without a code.
+  const step44 = claudeStep(44);
+  const handoff = '현재 Step을 INCOMPLETE로 인계한다. 완료 보고와 다음 Step 진입은 금지한다.\n';
+  const oldStep44 = step44.replace(`${handoff}${LOOP_TAIL}\n${STEP44_EVIDENCE}\n`,
+    '**현재 단계에서 정지한다**. 실패 상태로 다음 Step을 진행하지 않는다.\n');
+  assert.notEqual(oldStep44, step44);
+  assert.throws(() => assertLoopTail(44, oldStep44));
+  const oneTail44 = step44.replace(`${handoff}${LOOP_TAIL}\n모두 Y`, `${handoff}모두 Y`);
+  assert.notEqual(oneTail44, step44);
+  assert.throws(() => assertLoopTail(44, oneTail44));
+  const noEvidence44 = step44.replace(`${STEP44_EVIDENCE}\n`, '');
+  assert.notEqual(noEvidence44, step44);
+  assert.throws(() => assertLoopTail(44, noEvidence44));
 
   const step41UserRequest = `${step41}\n멈추면 \`harness-pause.mjs\`를 reason user-request로 실행한다.\n`;
   assert.notEqual(step41UserRequest, step41);

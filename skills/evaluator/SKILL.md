@@ -69,7 +69,7 @@ Step 3이 `step_archive/outputs/browser-backend.json`에 고정한 브라우저 
 > 4. 필수 판정과 참고 점수를 분리한다:
 >    - 필수 검사·증거가 모두 통과하고 미해결 `Critical`/`Important` finding이 없을 때만 `PASS`다.
 >    - 필수 기준 위반은 `FAIL`이며, 필수 입력·증거·실행 기능 부재 또는 라운드 중단 조건 충족은 `INCOMPLETE`다.
->    - `Critical`/`Important` finding은 요구사항·기능·접근성·보안·선택된 디자인 토큰·제외 목록(30단계 `harness50-design-contract`, `docs/DESIGN-CONTRACT.md`)과 관찰 증거에 연결한다. 채택되지 않은 제외 항목 위반은 `Important`다.
+>    - `Critical`/`Important` finding은 요구사항·기능·접근성·보안·선택된 디자인 토큰·제외 목록(30단계 `harness50-design-contract`, `docs/DESIGN-CONTRACT.md`)과 관찰 증거에 연결한다. 채택되지 않은 제외 항목 위반은 `Important`다. 계약 블록이 없는 이전 실행은 헌법 §11대로 계약을 복원하지 않고 §5의 수치만 기준으로 쓴다(`host` 제외 항목은 필수 기준이 아니다).
 >    - 근거 없는 미관·선호 의견은 `advisory`다. 필수 실패를 참고 의견으로 강등하지 않는다.
 >    - 필수 finding마다 위치(소스 `file:line`, 또는 route·viewport·selector·스크린샷 파일과 영역), 기준 출처, 기대/관찰, 재현(route·viewport·선행 조작)을 모두 쓴다. 기준을 인용할 수 없는 지적은 `advisory`다.
 >

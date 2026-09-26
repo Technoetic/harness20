@@ -1,9 +1,11 @@
 # Design contract: visual tokens and exclusions
 
 Step 30 fixes the visual tokens and the named list of design styles to leave out in
-one block. Steps 37, 43 and 49 and the evaluator use only this block as "the selected
-design tokens" and "the exclusion list". Both hosts write and read the same format;
-only the default list differs.
+one block. Steps 37, 43 and 49 (and the Claude evaluator skill) use only this block as
+"the selected design tokens" and "the exclusion list". Both hosts write and read the
+same format. Four rules differ by host and are marked **Claude** or **Codex** below:
+the default list, a TOPIC that both asks for and excludes a style, the step 43
+notation, and a workspace without a contract.
 
 ## Location and format
 
@@ -58,10 +60,10 @@ The values are an example.
 
 ## Defaults per host
 
-- Claude: the five `legacy` items and the five `host` items. The `host` items are the
+- **Claude**: the five `legacy` items and the five `host` items. The `host` items are the
   default styles named by the Opus 5.5 prompting guide (2026-09); the harness keeps
   them as a Claude default only.
-- Codex: the five `legacy` items and no `host` items. Nothing shows that other models
+- **Codex**: the five `legacy` items and no `host` items. Nothing shows that other models
   fall back on those five styles.
 - Both: every style the TOPIC asks to leave out becomes a `topic-N` item. Claude
   writes them on the `디자인 제외(사용자):` line of `constraints`; Codex reads
@@ -74,15 +76,23 @@ The values are an example.
 A `legacy` or `host` item may be adopted only when the TOPIC asks for that style or
 the selected aesthetic cannot exist without it. Step 30 then sets `adopted: true`,
 writes the reason in `exception_reason` and repeats it in the layout design as one
-`결정/사유: <id> 채택 — <사유>` line, so the step 50 summary lists it. A `topic` item
-is never adopted; a TOPIC that both asks for and excludes a style blocks step 30.
+`결정/사유: <id> 채택 — <사유>` line (the Claude step 50 summary lists these lines).
+A `topic` item is never adopted. When the TOPIC both asks for and excludes the same
+style:
+
+- **Claude**: the exclusion wins. The `topic` item stays `adopted: false`, the design
+  leaves the style out, and step 30 records the choice as one `결정/사유` line. An
+  ambiguous request is decided, not a reason for a named pause (constitution §1 and
+  §2-1).
+- **Codex**: step 30 blocks instead of guessing (Codex step 30, 시각 토큰·제외 계약).
 
 ## Precedence and judgement
 
 - The contract wins over reference fidelity. Step 37 does not copy an excluded
-  element from a capture, step 43 does not report it as missing (it records
-  `excluded-by-contract` with the id), and the evaluator does not deduct design
-  fidelity for it.
+  element from a capture, step 43 does not report it as missing, and the Claude
+  evaluator does not deduct design fidelity for it. Step 43 records the difference
+  with the item id: **Claude** as `제외 계약: <id>`, **Codex** as
+  `excluded-by-contract` and the id.
 - At step 49 an element that matches an item with `adopted: false` is at least an
   `Important` finding. A style preference outside the contract is advisory.
 - Values outside `tokens` are token violations, as before.
@@ -90,10 +100,18 @@ is never adopted; a TOPIC that both asks for and excludes a style blocks step 30
 ## Workspaces without a contract
 
 A workspace that finished step 30 before this contract existed has no block. Do not
-edit the step 30 outputs. The current step writes the contract it uses once in its
-own report, marked `reconstructed`: `tokens` from the values the layout design
-already names, `exclude` from the default list of the host that runs the step and
-the TOPIC exclusions. Missing values stay missing; do not invent them.
+edit the step 30 outputs.
+
+- **Codex** (steps 37, 43 and 49 read this procedure): the current step writes the
+  contract it uses once in its own report, marked `reconstructed`: `tokens` from the
+  values the layout design already names, `exclude` from the Codex defaults (the five
+  `legacy` items) and the TOPIC exclusions. Missing values stay missing; do not
+  invent them.
+- **Claude**: do not reconstruct a contract. Such a run started before the upgrade and
+  keeps its archived step bodies. Its verifiers and the evaluator use the constitution
+  §5 numbers only (`skills/harness-rules/SKILL.md` §11), and the `host` items are not
+  required criteria for it, so a 2.10.0 design that chose one of those styles is not
+  an `Important` finding.
 
 ## Asking again
 

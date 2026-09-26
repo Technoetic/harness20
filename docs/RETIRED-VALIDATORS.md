@@ -31,7 +31,7 @@ harness50의 옛 step 본문은 아래 `*-validator.ps1` / `*-checker.ps1` 스�
 |:---|:---|:---|
 | tokei-validator.ps1 | `tokei` | step011 |
 | dependency-checker.ps1 | `madge` / `knip` | step031 |
-| research-chunk-validator.ps1 | (청크 500줄 규칙 — chunk-writer 스킬) | 조사 step 다수 |
+| research-chunk-validator.ps1 | (청크 줄 수·BOM 직접 확인 — chunk-writer 스킬 `### 검증`) | 조사 step 다수 |
 | research-validator.ps1 | (수동 검토) | 조사 step |
 | build-validator.ps1 | `html-bundler.ps1` + 브라우저 백엔드(`verify-output.mjs`) | step038 (본문에 retired 명시됨) |
 | c8-validator.ps1 | `c8` | 디버깅 step |

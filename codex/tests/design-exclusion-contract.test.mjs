@@ -71,11 +71,103 @@ test("the shared format document lists every item, both host defaults and the fa
   for (const id of LEGACY) assert.match(doc, new RegExp("^\\| `" + id + "` \\| legacy \\|", "m"), id);
   for (const id of HOST) assert.match(doc, new RegExp("^\\| `" + id + "` \\| host \\|", "m"), id);
   assert.match(doc, /^\| `topic-N` \| topic \|/m);
-  assert.match(doc, /Codex: the five `legacy` items and no `host` items/);
+  assert.match(doc, /\*\*Codex\*\*: the five `legacy` items and no `host` items/);
   assert.match(doc, /## Workspaces without a contract[^]*Do not\s+edit the step 30 outputs/);
   const blocks = contractBlocks(doc);
   assert.equal(blocks.length, 1);
   assertContractShape(blocks[0], "docs/DESIGN-CONTRACT.md");
+});
+
+// The rules that differ by host (B-R2-1, B-R1-1/B-R2-2): a TOPIC that both asks for and excludes a
+// style, the step 43 notation and a workspace without a contract. Each document states the rule the
+// step bodies of that host actually carry, and the constitution, the evaluator and the shared
+// document give one Claude fallback. Pure function, so the mutation cases below can reuse it.
+function sectionOf(text, heading) {
+  return new RegExp("^## " + heading + "\\n([^]*?)(?=^## |(?![^]))", "m").exec(text)?.[1] ?? null;
+}
+function hostLine(section, host, label) {
+  const lines = section.replace(/\n  /g, " ").split("\n").filter((line) => line.startsWith("- **" + host + "**"));
+  assert.equal(lines.length, 1, `${label}: one ${host} line`);
+  return lines[0];
+}
+function assertHostSplit({ doc, rules, evaluator, claude30, codex30, claude43, codex43 }) {
+  const exceptions = sectionOf(doc, "Exceptions");
+  assert.ok(exceptions, "doc: Exceptions section");
+  const flat = exceptions.replace(/\s+/g, " ");
+  assert.doesNotMatch(flat, /excludes a style blocks step 30/, "doc: the Codex block rule is written for both hosts");
+  assert.match(hostLine(exceptions, "Claude", "Exceptions"), /the exclusion wins\. The `topic` item stays `adopted: false`[^]*`결정\/사유`/);
+  assert.match(hostLine(exceptions, "Codex", "Exceptions"), /step 30 blocks instead of guessing/);
+  assert.match(claude30, /`topic` 항목은 채택하지 않는다\./, "claude step030: the exclusion wins");
+  assert.doesNotMatch(claude30, /모순되면[^\n]*차단/, "claude step030 has no block rule");
+  assert.match(codex30.replace(/\s+/g, " "), /TOPIC 요구와 제외 항목이 모순되면 추정하지 않고 차단한다/, "codex step030 blocks");
+
+  const precedence = sectionOf(doc, "Precedence and judgement").replace(/\s+/g, " ");
+  assert.match(precedence, /\*\*Claude\*\* as `제외 계약: <id>`, \*\*Codex\*\* as `excluded-by-contract`/, "doc: step 43 notation per host");
+  assert.doesNotMatch(precedence, /\(it records `excluded-by-contract`/, "doc: the Codex notation is written for both hosts");
+  assert.match(claude43, /`제외 계약: <id>`/, "claude step043 notation");
+  assert.doesNotMatch(claude43, /excluded-by-contract/, "claude step043 uses the Codex notation");
+  assert.match(codex43, /`excluded-by-contract`/, "codex step043 notation");
+  assert.doesNotMatch(codex43, /제외 계약: <id>/, "codex step043 uses the Claude notation");
+
+  const fallback = sectionOf(doc, "Workspaces without a contract");
+  assert.ok(fallback, "doc: Workspaces without a contract section");
+  assert.doesNotMatch(fallback.replace(/\s+/g, " "), /the default list of the host that runs the step/, "doc: one reconstruction rule for both hosts");
+  const codexLine = hostLine(fallback, "Codex", "fallback");
+  assert.match(codexLine, /`reconstructed`/);
+  assert.match(codexLine, /`exclude` from the Codex defaults \(the five `legacy` items\) and the TOPIC exclusions/);
+  const claudeLine = hostLine(fallback, "Claude", "fallback");
+  assert.match(claudeLine, /do not reconstruct a contract/);
+  assert.match(claudeLine, /§5 numbers only \(`skills\/harness-rules\/SKILL\.md` §11\)/);
+  assert.match(claudeLine, /the `host` items are not required criteria/);
+
+  const s11 = /^## 11\. 검증 판정과 finding 형식\n([^]*?)(?=^## |^---$)/m.exec(rules)?.[1];
+  assert.ok(s11, "harness-rules has no section 11");
+  assert.match(s11, /계약이 없는 이전 실행은 §5의 수치를 기준으로 쓴다\. 이 실행에서는 계약을 복원하지 않으며, §5 '기본 제외 목록'\(`host` 5종\)은 필수 기준이 아니다/);
+  assert.match(evaluator, /계약 블록이 없는 이전 실행은 헌법 §11대로 계약을 복원하지 않고 §5의 수치만 기준으로 쓴다\(`host` 제외 항목은 필수 기준이 아니다\)\./);
+}
+
+async function hostSplitInputs() {
+  return {
+    doc: await read("docs/DESIGN-CONTRACT.md"),
+    rules: await read("skills/harness-rules/SKILL.md"),
+    evaluator: await read("skills/evaluator/SKILL.md"),
+    claude30: await read("assets/steps/step030.md"),
+    codex30: await read("codex/assets/steps/step030.md"),
+    claude43: await read("assets/steps/step043.md"),
+    codex43: await read("codex/assets/steps/step043.md")
+  };
+}
+
+test("host-specific rules in the shared document match each host's step bodies and one Claude fallback", async () => {
+  const inputs = await hostSplitInputs();
+  assertHostSplit(inputs);
+  for (const number of ["037", "043", "049"]) {
+    const text = (await read(`codex/assets/steps/step${number}.md`)).replace(/\s+/g, " ");
+    assert.match(text, /계약 없는 작업 공간 절차/, `codex step${number} reads the Codex fallback`);
+  }
+});
+
+test("the host split check rejects the earlier shared wording", async () => {
+  const inputs = await hostSplitInputs();
+  const { doc, rules, evaluator } = inputs;
+  const earlierBlock = doc.replace(/A `topic` item is never adopted\. When the TOPIC[^]*?\n\n## Precedence/,
+    "A `topic` item is never adopted; a TOPIC that both asks for and excludes a style blocks step 30.\n\n## Precedence");
+  const earlierNotation = doc.replace(/step 43 does not report it as missing, and the Claude\n  evaluator[^]*?`excluded-by-contract` and the id\./,
+    "step 43 does not report it as missing (it records\n  `excluded-by-contract` with the id), and the evaluator does not deduct design\n  fidelity for it.");
+  const earlierFallback = doc.replace(/edit the step 30 outputs\.\n\n- \*\*Codex\*\*[^]*?an `Important` finding\.\n/,
+    "edit the step 30 outputs. The current step writes the contract it uses once in its\nown report, marked `reconstructed`: `tokens` from the values the layout design\nalready names, `exclude` from the default list of the host that runs the step and\nthe TOPIC exclusions. Missing values stay missing; do not invent them.\n");
+  const mutations = {
+    earlierBlock: { ...inputs, doc: earlierBlock },
+    earlierNotation: { ...inputs, doc: earlierNotation },
+    earlierFallback: { ...inputs, doc: earlierFallback },
+    constitutionReconstructs: { ...inputs, rules: rules.replace(" 이 실행에서는 계약을 복원하지 않으며, §5 '기본 제외 목록'(`host` 5종)은 필수 기준이 아니다", "") },
+    evaluatorWithoutFallback: { ...inputs, evaluator: evaluator.replace(" 계약 블록이 없는 이전 실행은 헌법 §11대로 계약을 복원하지 않고 §5의 수치만 기준으로 쓴다(`host` 제외 항목은 필수 기준이 아니다).", "") },
+    claudeBlocks: { ...inputs, claude30: inputs.claude30.replace("`topic` 항목은 채택하지 않는다.", "`topic` 항목은 채택하지 않으며 TOPIC 요구와 제외 항목이 모순되면 차단한다.") }
+  };
+  for (const [name, mutated] of Object.entries(mutations)) {
+    assert.ok(Object.keys(mutated).some((key) => mutated[key] !== inputs[key]), `${name}: mutation changed nothing`);
+    assert.throws(() => assertHostSplit(mutated), undefined, name);
+  }
 });
 
 test("both hosts' step 30 write one contract block in the same place with the same fields", async () => {
