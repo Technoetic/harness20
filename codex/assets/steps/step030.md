@@ -113,13 +113,33 @@ unknown fallback 복원, 수정키 클릭·다른 target·download·외부 링�
 실제 한 화면이면 한 경로만 선언하며 불필요한 화면을 만들지 않는다.
 실제 Navigation API 분기와 앱 시작 전 API를 제거한 호환 분기를 검증할 방법도 기록한다.
 
+## 시각 토큰·제외 계약
+
+`step_archive/step030_레이아웃설계_chunk1.md`에 fence 정보 문자열이 `json harness50-design-contract`인
+JSON 블록을 정확히 하나 기록한다. 형식·항목 뜻·예외 규칙은 플러그인 `docs/DESIGN-CONTRACT.md`를
+따른다. 37·43·49단계가 쓰는 selected design token과 제외 목록은 이 블록뿐이다. 필드는
+`schema_version`(1), `tokens`(`colors`, `fonts`, `type`, `spacing`, `radius`, `shadow`)와
+`exclude` 배열이며, `exclude` 항목은 `id`, `source`, `signature`, `adopted`, `exception_reason`을 가진다.
+
+`exclude`는 두 출처를 모두 담는다. 이 호스트는 `host` 출처의 기본 항목을 두지 않는다.
+
+- `legacy`: `generic-sans`, `purple-gradient`, `centered-cards`, `excess-radius`, `flat-background`
+- `topic`: TOPIC `constraints`와 요청 전문이 피하라고 명시한 각 시각 스타일. `topic-1`부터 번호를 붙이고
+  원문을 `signature`에 보존한다.
+
+`legacy` 항목은 TOPIC이 그 스타일을 직접 요구했거나 선택된 안이 그것 없이는 성립하지 않을 때만
+`adopted: true`로 채택하고 `exception_reason`에 근거를 적는다. 같은 근거를 레이아웃 설계 본문에
+`결정/사유: <id> 채택 — <사유>` 한 줄로도 남긴다. `topic` 항목은 채택하지 않으며 TOPIC 요구와
+제외 항목이 모순되면 추정하지 않고 차단한다. 조사 capture가 제외 항목을 사용하면 계약이 우선하고
+설계에는 대체 방식을 적는다.
+
 각 설계 청크는 500줄 이하이다. 첫 청크 manifest에 입력 digest, 선택 문서 digest,
 포함 diagram, 요구 추적과 줄 수를 기록한다. 선언되지 않은 추가 청크를 만들지 않는다.
 
 ## 최종 독립 검증
 
 최종 독립 검증자는 대안의 실질적 차이, 선택의 독립성, 선택된 안만의 구현,
-요구 추적, Class·async·반응형·접근성 계약을 입력부터 다시 확인한다. 모든 라운드는
+요구 추적, Class·async·반응형·접근성 계약과 시각 토큰·제외 계약을 입력부터 다시 확인한다. 모든 라운드는
 `step_archive/outputs/step030_최종검증.md`라는 동일한 선언 보고서의 라운드별 섹션에
 기록하고 최대 5라운드만 수행한다.
 
@@ -165,6 +185,7 @@ unknown fallback 복원, 수정키 클릭·다른 target·download·외부 링�
 - `class-architecture-contract`: Class 경계, 주입과 API가 완전하다.
 - `async-lifecycle-contract`: 비동기 lifecycle, 오류·취소·병렬·성능이 완전하다.
 - `responsive-accessibility-contract`: 반응형·상태·접근성 계약이 완전하다.
+- `design-exclusion-contract`: 레이아웃 설계에 토큰·제외 계약 블록 하나가 있고 기본 목록과 TOPIC 제외 항목을 모두 담았다.
 - `design-chunks-bounded`: manifest와 각 청크가 일치하며 500줄 이하이다.
 - `pass-verdict`: 최종 독립 검증자가 근거 있는 `PASS`를 기록했다.
 

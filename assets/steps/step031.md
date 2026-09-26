@@ -15,27 +15,9 @@ persistence: session
 >
 > **위치**: 구현·정리 구간 (E2E 검증 step045 전)
 
-## 🔒 사전 조건 확인
-
-**자동 실행 Hook:** `.claude/hooks/dependency-checker.ps1`
-
-- 프로젝트 기술 스택 자동 감지 (package.json, requirements.txt 등)
-- step030_레이아웃설계_chunk*.md (레이아웃 설계)에서 필요 라이브러리 추출
-- step030_전체설계_chunk*.md (전체 설계)에서 필요 라이브러리 추출
-- 설치 여부 자동 확인
-- 실행 로그: `.claude/hooks/dependency-checker.log`
-
-**⚠️ 미설치 패키지 발견 시:**
-
-- Hook이 강제 실패 (exit 1)
-- 설치 명령 자동 제안
-- Claude에게 오류 전달
-
----
-
 ## 실행 내용
 
-`dependency-checker.ps1`의 자동 검증 결과를 확인하고, 필요 시 패키지를 설치한다.
+step030 설계 청크(`step030_레이아웃설계_chunk*.md`, `step030_전체설계_chunk*.md`)에서 필요한 라이브러리를 추출해 `package.json`·lockfile과 대조한다. 빠진 패키지만 프로젝트의 패키지 관리자로 설치하고(정상 권한 확인 유지) 설치 여부를 명령 종료 코드로 확인해 `step_archive/step031_환경준비.md`에 기록한다. 자동 검사 훅은 번들되지 않는다.
 
 ## 브라우저 검증 백엔드 유지
 
@@ -49,7 +31,7 @@ persistence: session
 
 - 이 Step의 목표가 100% 달성되었는가? (Y/N)
 - 불확실한 부분이 있는가? (있으면 구체적으로 명시)
-- N 또는 불확실한 부분이 있으면 재실행한다. 3회 재시도 후에도 미달이면 오류 기록 후 다음 Step 진행.
+- 불확실한 부분은 결정하고 `결정/사유: <결정> — <사유>` 줄로 기록한다(헌법 §1). N이면 재실행한다. 3회 재시도 후에도 해결되지 않으면 오류·미해결 항목·다음 검사를 현재 Step 결과 파일에 기록하고 현재 Step을 INCOMPLETE로 인계한다. 완료 보고와 다음 Step 진입은 금지하고 헌법 §2-1 명명된 멈춤으로 끝낸다(필수 도구 실패 `required-tool-failed`, 권한 거부 `permission-denied`, 그 밖의 한도 소진 `required-input-missing`). 선택 도구를 쓸 수 없는 것은 미달이 아니다 — `SKIP`과 사유를 기록한다.
 
 ---
 

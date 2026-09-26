@@ -331,7 +331,7 @@ test("source drift raises a structured review-required error without rewriting i
       assert.equal(error.code, "SOURCE_CHANGED_REVIEW_REQUIRED");
       assert.deepEqual(error.details, {
         source: "assets/steps/step021.md",
-        expected: "c36004a40bd93ed6bc79043cd7120629f2f71e6582feb89ca3e3a6d20cc7da54",
+        expected: "849e25eae349bd231fac96c0adc5bd5fc7fe4d6c32b0c6230803b65af66b52a9",
         actual: sha256(sourceAfter)
       });
       return true;
@@ -365,7 +365,7 @@ test("visual set and representative boundary contracts stay repository-executabl
       { number: 16, phase: "research", network: true, visual_review: false, next: "step017", acceptance_ids: ["research-chunk-1", "research-raw-primary", "research-screenshot-primary", "research-attribution", "research-chunks-bounded", "code-baseline-disposition", "tokei-baseline"] },
       { number: 21, phase: "research", network: false, visual_review: false, next: "step022", acceptance_ids: ["step001-preflight-artifact", "dependency-gate-status", "step001-receipt-and-artifact", "project-conditional-prerequisites", "optional-step-deps"] },
       { number: 22, phase: "research", network: true, visual_review: true, next: "step023", acceptance_ids: ["awwwards-collection-chunk-1", "awwwards-raw-primary", "awwwards-screenshot-primary", "selected-url-input", "capture-attribution", "visual-capture-inspection", "bounded-capture-scope"] },
-      { number: 30, phase: "planning", network: true, visual_review: false, next: "step031", acceptance_ids: ["design-alternatives", "design-selection", "layout-design-chunk-1", "overall-design-chunk-1", "final-design-verification", "structured-brainstorming-first", "independent-selector", "class-architecture-contract", "async-lifecycle-contract", "responsive-accessibility-contract", "design-chunks-bounded", "pass-verdict"] },
+      { number: 30, phase: "planning", network: true, visual_review: false, next: "step031", acceptance_ids: ["design-alternatives", "design-selection", "layout-design-chunk-1", "overall-design-chunk-1", "final-design-verification", "structured-brainstorming-first", "independent-selector", "class-architecture-contract", "async-lifecycle-contract", "responsive-accessibility-contract", "design-exclusion-contract", "design-chunks-bounded", "pass-verdict"] },
       { number: 38, phase: "implementation", network: false, visual_review: false, next: "step039", acceptance_ids: ["build-smoke-report", "implementation-milestone", "dist-index-html", "project-build-command", "dist-html-boundary", "zero-cycle-gate", "advisory-diagnostics", "pass-only-build-gate", "measured-quality-report"] },
       { number: 45, phase: "e2e", network: true, visual_review: false, next: "step046", acceptance_ids: ["e2e-test-report", "project-e2e-command", "project-e2e-runner-only", "bounded-browser-readiness", "dynamic-scenario-coverage", "edge-case-coverage", "independent-e2e-verifier", "bounded-pass-loop"] },
       { number: 50, phase: "e2e", network: false, visual_review: true, next: null, acceptance_ids: ["console-error-report", "final-quality-milestone", "final-dist-index-html", "browser-output-report", "console-errors-zero", "final-build", "final-dist-html-boundary", "reachable-state-manifest", "warning-classification", "bounded-settle-no-fixed-sleep", "secret-redaction", "independent-console-verifier", "receipt-first-completion", "pass-only-final-milestone", "measured-quality-report", "final-regression-report", "final-desktop-screenshot", "final-mobile-screenshot", "final-visual-inspection"] }

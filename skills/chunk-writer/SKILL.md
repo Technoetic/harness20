@@ -33,10 +33,8 @@ disable-model-invocation: false
 - LF 줄바꿈 (CRLF 금지)
 
 ### 검증
-- 저장 후 research-chunk-validator.ps1이 PostToolUse(Write|Edit) 훅으로 자동 검증
-  (2026-06-10부터 실바인딩 — 규격 위반 시 additionalContext로 교정 지시가 주입됨)
-- 수동 재검증: `powershell -File .claude/hooks/research-chunk-validator.ps1 -FilePath <경로>`
-- 검증 실패 시 즉시 수정하고 재저장
+- 저장 후 각 청크가 499줄·50KB 이하이고 UTF-8(BOM 없음)·LF인지 직접 확인한다. 자동 검증 훅은 번들되지 않는다(`docs/RETIRED-VALIDATORS.md`).
+- 규격을 벗어나면 즉시 분할·수정하고 재저장한다.
 
 ### 파일 쓰기 도구
 - Write/Edit 도구를 기본으로 사용한다 (전역 CLAUDE.md 파일 쓰기 규칙).

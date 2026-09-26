@@ -30,7 +30,7 @@ Step 37 구현이 완료된 후, 다음 단계로 진행하기 전 빌드 안전
 
 ### 2. 린트/포매팅 검증 (경고 — 실패해도 진행)
 
-1. Biome 포매팅+린팅: `npx biome check src/`
+1. Biome 포매팅+린팅: `npx --no-install @biomejs/biome check src/`
 2. Stylelint CSS 검사: `npx stylelint "src/css/*.css"`
 3. 타입 체크: jsconfig.json 기반
 

@@ -150,6 +150,7 @@ function assertStep30SectionContract(content) {
     "Class 설계 계약",
     "비동기와 성능 계약",
     "레이아웃·상호작용·접근성 계약",
+    "시각 토큰·제외 계약",
     "최종 독립 검증",
     "완료 조건"
   ];
@@ -161,6 +162,7 @@ function assertStep30SectionContract(content) {
   const classDesign = sections["Class 설계 계약"].replace(/\s+/g, " ");
   const asyncDesign = sections["비동기와 성능 계약"].replace(/\s+/g, " ");
   const accessibility = sections["레이아웃·상호작용·접근성 계약"].replace(/\s+/g, " ");
+  const contract = sections["시각 토큰·제외 계약"].replace(/\s+/g, " ");
   const verification = sections["최종 독립 검증"].replace(/\s+/g, " ");
   const completion = sections["완료 조건"].replace(/\s+/g, " ");
 
@@ -198,6 +200,18 @@ function assertStep30SectionContract(content) {
   assert.match(accessibility, /반응형 breakpoint[^]*화면 상태/);
   assert.match(accessibility, /loading[^]*empty[^]*error[^]*disabled/);
 
+  assert.match(contract, /`step_archive\/step030_레이아웃설계_chunk1\.md`[^]*`json harness50-design-contract`[^]*정확히 하나/);
+  assert.match(contract, /`docs\/DESIGN-CONTRACT\.md`/);
+  assert.match(contract, /`tokens`[^]*`colors`[^]*`fonts`[^]*`type`[^]*`spacing`[^]*`radius`[^]*`shadow`[^]*`exclude`/);
+  assert.match(contract, /`id`[^]*`source`[^]*`signature`[^]*`adopted`[^]*`exception_reason`/);
+  assert.match(contract, /`host` 출처의 기본 항목을 두지 않는다/);
+  assert.match(contract, /`generic-sans`[^]*`purple-gradient`[^]*`centered-cards`[^]*`excess-radius`[^]*`flat-background`/);
+  assert.match(contract, /TOPIC `constraints`와 요청 전문[^]*`topic-1`/);
+  assert.match(contract, /`adopted: true`[^]*`exception_reason`[^]*결정\/사유/);
+  assert.match(contract, /`topic` 항목은 채택하지 않/);
+  assert.match(contract, /계약이 우선/);
+  assert.doesNotMatch(contract, /cream-background|italic-heading-accent|numbered-section-labels|monospace-labels|pill-buttons/);
+  assert.match(verification, /시각 토큰·제외 계약/);
   const reportReferences = [...new Set(
     [...verification.matchAll(/`(step_archive\/outputs\/step030_최종검증(?:_r\d+)?\.md)`/g)]
       .map((match) => match[1])
@@ -218,6 +232,7 @@ function assertStep30SectionContract(content) {
     "class-architecture-contract",
     "async-lifecycle-contract",
     "responsive-accessibility-contract",
+    "design-exclusion-contract",
     "pass-verdict"
   ]) {
     assert.match(completion, new RegExp("`" + acceptanceId + "`"));
@@ -285,6 +300,7 @@ const EXPECTED_PLANNING_ACCEPTANCE_DESCRIPTIONS = {
     "class-architecture-contract": "Confirms SRP classes, composition, constructor injection, state ownership, and public/private APIs.",
     "async-lifecycle-contract": "Confirms asynchronous initialization, start, I/O, cancellation, errors, parallelism, and performance contracts.",
     "responsive-accessibility-contract": "Confirms responsive breakpoints, states, keyboard, focus, reduced motion, touch, and contrast contracts.",
+    "design-exclusion-contract": "Confirms the layout design holds exactly one visual token and exclusion contract that merges the host default and TOPIC exclusions and records a reason for every adopted exception.",
     "design-chunks-bounded": "Confirms design manifests match declared chunks of at most 500 lines.",
     "pass-verdict": "Requires the final independent verifier to record an evidenced PASS."
   }
@@ -317,10 +333,10 @@ test("index records SHA-256 digests of the unmodified Claude source bytes", asyn
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(0, 5));
 
   assert.deepEqual(hashes, {
-    step001: "2aee375edd23d80a0e1f87d5276d4be59435abfb2f02d16598e47ebb2b93eec5",
-    step002: "3138e7a161fe488b3c1777da7e72820d1c5d3faa992380f1cbd73a74103b3e89",
-    step003: "971e337ad3eba825d3260949ae19b8d9ddfcae37e9ebc7ea7dd8ea377e03a500",
-    step004: "5d40b076c3d1cae5e13a64ad16488f73d46c7beae6e2756b9a091544bbd4db1e",
+    step001: "6690075e5774aa3455ba4fb9c5c0497081f48fee22302923127533ed58314966",
+    step002: "1dd9112ab7bf0aa3f72ec51794fb0bbc9144c88c14ae0b5bbc909ef7382f57ca",
+    step003: "2bdcad6fb02b18b425a107d3d37d4c8f1e7098ebdc1764e83715daaf569e3633",
+    step004: "f12500e805c8b69cc5c29955254a8e71fb244474d2d0d6ff61f333cc42180f9a",
     step005: "902d5a5ce9f8eaff9121b54ececc9206955c50326b7c86ad26965f9bd9d0339b"
   });
 });
@@ -336,7 +352,7 @@ test("preflight batch declares the exact Codex-native step contracts", async () 
       phase: "preflight",
       source: "assets/steps/step001.md",
       target: "codex/assets/steps/step001.md",
-      source_sha256: "2aee375edd23d80a0e1f87d5276d4be59435abfb2f02d16598e47ebb2b93eec5",
+      source_sha256: "6690075e5774aa3455ba4fb9c5c0497081f48fee22302923127533ed58314966",
       inputs: ["step_archive/TOPIC/TOPIC.md"],
       outputs: ["step_archive/step001_preflight.md"],
       requires: [],
@@ -395,7 +411,7 @@ test("preflight batch declares the exact Codex-native step contracts", async () 
       phase: "preflight",
       source: "assets/steps/step002.md",
       target: "codex/assets/steps/step002.md",
-      source_sha256: "3138e7a161fe488b3c1777da7e72820d1c5d3faa992380f1cbd73a74103b3e89",
+      source_sha256: "1dd9112ab7bf0aa3f72ec51794fb0bbc9144c88c14ae0b5bbc909ef7382f57ca",
       inputs: [
         "step_archive/TOPIC/TOPIC.md",
         "step_archive/step001_preflight.md"
@@ -436,7 +452,7 @@ test("preflight batch declares the exact Codex-native step contracts", async () 
       phase: "preflight",
       source: "assets/steps/step003.md",
       target: "codex/assets/steps/step003.md",
-      source_sha256: "971e337ad3eba825d3260949ae19b8d9ddfcae37e9ebc7ea7dd8ea377e03a500",
+      source_sha256: "2bdcad6fb02b18b425a107d3d37d4c8f1e7098ebdc1764e83715daaf569e3633",
       inputs: ["step_archive/step001_preflight.md"],
       outputs: [
         "step_archive/step003_playwright_test.md",
@@ -487,7 +503,7 @@ test("preflight batch declares the exact Codex-native step contracts", async () 
       phase: "preflight",
       source: "assets/steps/step004.md",
       target: "codex/assets/steps/step004.md",
-      source_sha256: "5d40b076c3d1cae5e13a64ad16488f73d46c7beae6e2756b9a091544bbd4db1e",
+      source_sha256: "f12500e805c8b69cc5c29955254a8e71fb244474d2d0d6ff61f333cc42180f9a",
       inputs: ["step_archive/step003_playwright_test.md"],
       outputs: ["step_archive/step004_axe_core_test.md"],
       requires: ["step003"],
@@ -898,7 +914,7 @@ test("tooling batch declares the exact portable capability contracts", async () 
           id: "biome-version",
           kind: "command",
           required: true,
-          command: "npx biome --version"
+          command: "npx --no-install @biomejs/biome --version"
         },
         {
           id: "biome-environment-report",
@@ -958,16 +974,16 @@ test("tooling source hashes bind the untouched Claude steps 006 through 015", as
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(5, 15));
 
   assert.deepEqual(hashes, {
-    step006: "dd92b07f8da8b0e71ef386b22ce85e93b19c71ce581bcddae41da78cde28b47d",
-    step007: "53209e43a2145950d76a9eac0e36e11ffb71b99350cbd466d8072c98ad22bca5",
-    step008: "14976722eba206b66ad917115ddac28413fb31dfc8e49c1f7128e1fa4a2a984d",
-    step009: "3c2f99310df7c9690ffaf22f4174882b29563b64e6c6ecc026e83f99f7cbf06c",
-    step010: "dc6fb1cec685b10b315f4fa77cc85e9dfbbd00aaa4442f114d950a947eb08ea0",
-    step011: "f4c6f789452c1a4920e8ea69ce6ad1cee1871400234c73d5d240bac2eef0a948",
-    step012: "bf5dd150944bc2774679d6a04a366ed77386446ca5823e62cd3d10a1259f5735",
-    step013: "2245a7a78b2a21c546ab12b78849b3a7c2c85f54c8ea69a8b142de69f33a9f2e",
-    step014: "5bf9523b046adac78fbd28872c4388aeeca32220a541719884abf208c8b99075",
-    step015: "46c4a588eceb39df1b1dcdd798b4d3b3d5d2a818d6063bb98e558a13fd6be23b"
+    step006: "463c998455a17e60570ae84c23d8f9ab238391506f882f09e63b5d15870c19d2",
+    step007: "53a97249c1e7ecb361060e4a4bc61495eca87c989015a8bee499496a76b02df6",
+    step008: "8bcbbbb53562898562ecca2b3708aa4201b8195ce69517e7e88f0ea1a9d26804",
+    step009: "6597da53fa43498627efdb3f6e9699fb8acb4be5624b23231ceed543adc53d26",
+    step010: "e70d4ee42dd1ba93bef0c5bcc89eb5f97eb77a3a39d5f0a1a426b31a11af8a03",
+    step011: "c04882c5dd36e3bdc0ea5ed8ee58e4abf5e5258e8a7633f777b0f90ac591a2e6",
+    step012: "1ce157b79aff145cbb5ed9d37ee6207a676586e95ba2a6211efda14618c560a6",
+    step013: "44940effc7ffbbae942950448b592f7e741c70102d19fcc7093c563809a5dd8b",
+    step014: "80d122f3efc2e7a4a954e7d29b6f08106bf07624d3916b1e54a311230342c112",
+    step015: "d926d99e1df12fae63baeeada6c6118b24d66c63911dba7fe8a0d40275038f09"
   });
 });
 
@@ -1127,7 +1143,7 @@ test("research batch declares the exact Codex-native evidence contracts", async 
       phase: "research",
       source: "assets/steps/step016.md",
       target: "codex/assets/steps/step016.md",
-      source_sha256: "83814c556556da24504ae20772146930fa52354fb6a1d3cf86a7387814be3eb2",
+      source_sha256: "2ee59157b76cba85b004c49c76daff3b7812b86308d8023c8ff9ba6e6b49e176",
       inputs: [
         "step_archive/TOPIC/TOPIC.md",
         "step_archive/step001_preflight.md",
@@ -1191,7 +1207,7 @@ test("research batch declares the exact Codex-native evidence contracts", async 
       phase: "research",
       source: "assets/steps/step018.md",
       target: "codex/assets/steps/step018.md",
-      source_sha256: "d9f419671463c41d66e4261352d56743a053b13436f82ca9966697b118650014",
+      source_sha256: "7205da602ce035fc4f372798523f028fa21e1002da7425948d3731b90e290263",
       inputs: [
         "step_archive/TOPIC/TOPIC.md",
         "step_archive/step016_조사결과_chunk1.md"
@@ -1251,7 +1267,7 @@ test("research batch declares the exact Codex-native evidence contracts", async 
       phase: "research",
       source: "assets/steps/step020.md",
       target: "codex/assets/steps/step020.md",
-      source_sha256: "eb729885309aaa07e489bc2a1a2987606161fba43e3b6a996a552e15298d425b",
+      source_sha256: "90773dc6f6b658373eb3fe6a1bca1dc6d0a63a1c3fcff8d4238b28f9e2cf9b87",
       inputs: [
         "step_archive/TOPIC/TOPIC.md",
         "step_archive/step016_조사결과_chunk1.md"
@@ -1281,7 +1297,7 @@ test("research batch declares the exact Codex-native evidence contracts", async 
       phase: "research",
       source: "assets/steps/step021.md",
       target: "codex/assets/steps/step021.md",
-      source_sha256: "c36004a40bd93ed6bc79043cd7120629f2f71e6582feb89ca3e3a6d20cc7da54",
+      source_sha256: "849e25eae349bd231fac96c0adc5bd5fc7fe4d6c32b0c6230803b65af66b52a9",
       inputs: ["step_archive/step001_preflight.md"],
       outputs: ["step_archive/step021_gate_status.md"],
       requires: ["step001"],
@@ -1305,7 +1321,7 @@ test("research batch declares the exact Codex-native evidence contracts", async 
       phase: "research",
       source: "assets/steps/step022.md",
       target: "codex/assets/steps/step022.md",
-      source_sha256: "2d16baba92f09b0ab7811731517979c048434a3ab2f9a570c5e0ce7a690dd93c",
+      source_sha256: "3d311d4bf02f8476d01be2d13220590e60b9ca412d38f29e476dbf3859fce88d",
       inputs: [
         "step_archive/step020_선정URL.md",
         "step_archive/research-raw-step020-awwwards.txt"
@@ -1338,7 +1354,7 @@ test("research batch declares the exact Codex-native evidence contracts", async 
       phase: "research",
       source: "assets/steps/step023.md",
       target: "codex/assets/steps/step023.md",
-      source_sha256: "6efdd52549990ea26e16968a6da65c576edcf46e5e914f8a6708292c81b8c461",
+      source_sha256: "d9e8d4343416266b2757d21aeaf130bd945225ef74b9e04817873741fc9f9d0b",
       inputs: [
         "step_archive/step016_조사결과_chunk1.md",
         "step_archive/step022_수집결과_chunk1.md",
@@ -1368,7 +1384,7 @@ test("research batch declares the exact Codex-native evidence contracts", async 
       phase: "research",
       source: "assets/steps/step024.md",
       target: "codex/assets/steps/step024.md",
-      source_sha256: "a57a38272cde57d70d86503a58b175b69434238a28c80b3210392ca1a5ab85f5",
+      source_sha256: "feef8544a175f0acf352c4c776d62046b315b867aabfae43d7795bb213413ea8",
       inputs: [
         "step_archive/step016_조사결과_chunk1.md",
         "step_archive/step020_선정URL.md",
@@ -1402,15 +1418,15 @@ test("research source hashes bind the untouched Claude steps 016 through 024", a
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(15, 24));
 
   assert.deepEqual(hashes, {
-    step016: "83814c556556da24504ae20772146930fa52354fb6a1d3cf86a7387814be3eb2",
+    step016: "2ee59157b76cba85b004c49c76daff3b7812b86308d8023c8ff9ba6e6b49e176",
     step017: "941288a9368915036af4f69ddac2ef1a605b8dd6181c277314f38c1b489f3fe9",
-    step018: "d9f419671463c41d66e4261352d56743a053b13436f82ca9966697b118650014",
+    step018: "7205da602ce035fc4f372798523f028fa21e1002da7425948d3731b90e290263",
     step019: "d34370dc09411a8724906cc17965188f6d9f179a69b0997b0b036ccbfe9225c0",
-    step020: "eb729885309aaa07e489bc2a1a2987606161fba43e3b6a996a552e15298d425b",
-    step021: "c36004a40bd93ed6bc79043cd7120629f2f71e6582feb89ca3e3a6d20cc7da54",
-    step022: "2d16baba92f09b0ab7811731517979c048434a3ab2f9a570c5e0ce7a690dd93c",
-    step023: "6efdd52549990ea26e16968a6da65c576edcf46e5e914f8a6708292c81b8c461",
-    step024: "a57a38272cde57d70d86503a58b175b69434238a28c80b3210392ca1a5ab85f5"
+    step020: "90773dc6f6b658373eb3fe6a1bca1dc6d0a63a1c3fcff8d4238b28f9e2cf9b87",
+    step021: "849e25eae349bd231fac96c0adc5bd5fc7fe4d6c32b0c6230803b65af66b52a9",
+    step022: "3d311d4bf02f8476d01be2d13220590e60b9ca412d38f29e476dbf3859fce88d",
+    step023: "d9e8d4343416266b2757d21aeaf130bd945225ef74b9e04817873741fc9f9d0b",
+    step024: "feef8544a175f0acf352c4c776d62046b315b867aabfae43d7795bb213413ea8"
   });
 });
 
@@ -1736,7 +1752,7 @@ test("planning batch declares the exact Codex-native artifact contracts", async 
       phase: "planning",
       source: "assets/steps/step025.md",
       target: "codex/assets/steps/step025.md",
-      source_sha256: "856546680563f1c919baada5af17a340937bdfad2c48f5d09a967646751a1153",
+      source_sha256: "0cc2be6f4cc2785c73bc836236a868915bb058c61532eac9abe235e48e438c0c",
       inputs: [
         "step_archive/TOPIC/TOPIC.md",
         "step_archive/step016_조사결과_chunk1.md",
@@ -1771,7 +1787,7 @@ test("planning batch declares the exact Codex-native artifact contracts", async 
       phase: "planning",
       source: "assets/steps/step026.md",
       target: "codex/assets/steps/step026.md",
-      source_sha256: "6f356e9081084e224aca6f0a4cffbedcff90455de9e5dee03a4c7204a4f9df0c",
+      source_sha256: "0bb2cb849d90f624ca2a5e28fe7e30f3cd41e342f3dbfb1b3b900cc869f5b288",
       inputs: [
         "step_archive/step025_planning_chunk1.md",
         "step_archive/outputs/step025_검증.md",
@@ -1805,7 +1821,7 @@ test("planning batch declares the exact Codex-native artifact contracts", async 
       phase: "planning",
       source: "assets/steps/step027.md",
       target: "codex/assets/steps/step027.md",
-      source_sha256: "92e6538f33b3beb7a4be49460de06dcc45817296c5ca43f1f96af47be5ee9fe4",
+      source_sha256: "fe4d854999ffb844df3ed0b08d9a19ae6f69b48dbcb9cab5568af87725661154",
       inputs: [
         "step_archive/step026_planning_chunk1.md",
         "step_archive/outputs/step026_검증.md",
@@ -1839,7 +1855,7 @@ test("planning batch declares the exact Codex-native artifact contracts", async 
       phase: "planning",
       source: "assets/steps/step028.md",
       target: "codex/assets/steps/step028.md",
-      source_sha256: "681e4901e23093f5caff6420431835fdacd37d6f3ac3e7f628c7c3566d7f93af",
+      source_sha256: "668fccf59d666c9f910db6db5f65f728296075c9b3b57a3d1c502b837173b0f0",
       inputs: [
         "step_archive/step027_planning_chunk1.md",
         "step_archive/outputs/step027_검증.md",
@@ -1873,7 +1889,7 @@ test("planning batch declares the exact Codex-native artifact contracts", async 
       phase: "planning",
       source: "assets/steps/step029.md",
       target: "codex/assets/steps/step029.md",
-      source_sha256: "01ea1d8a424937393aa0827ab9f41c952200f04a771e90b121c9a5569e364d40",
+      source_sha256: "1fd555a48ff56181aa51ec4b6c4ee35c6396fd78cfaa8d2e1ca6b2318782b5db",
       inputs: [
         "step_archive/step028_planning_chunk1.md",
         "step_archive/outputs/step028_검증.md",
@@ -1912,7 +1928,7 @@ test("planning batch declares the exact Codex-native artifact contracts", async 
       phase: "planning",
       source: "assets/steps/step030.md",
       target: "codex/assets/steps/step030.md",
-      source_sha256: "5f8643da4e1deb4c3451f3ce39cc443c8fd654aa39ef015243121defe092b9fc",
+      source_sha256: "362a1eefab0c424fd66b3e18f1a7bb04285f64b55a281e8ab7ec93e3aa308076",
       inputs: [
         "step_archive/TOPIC/TOPIC.md",
         "step_archive/step029_planning_chunk1.md",
@@ -1940,6 +1956,7 @@ test("planning batch declares the exact Codex-native artifact contracts", async 
         { id: "class-architecture-contract", kind: "check", required: true },
         { id: "async-lifecycle-contract", kind: "check", required: true },
         { id: "responsive-accessibility-contract", kind: "check", required: true },
+        { id: "design-exclusion-contract", kind: "check", required: true },
         { id: "design-chunks-bounded", kind: "check", required: true },
         { id: "pass-verdict", kind: "check", required: true }
       ],
@@ -1954,12 +1971,12 @@ test("planning source hashes bind the reviewed source steps 025 through 030", as
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(24, 30));
 
   assert.deepEqual(hashes, {
-    step025: "856546680563f1c919baada5af17a340937bdfad2c48f5d09a967646751a1153",
-    step026: "6f356e9081084e224aca6f0a4cffbedcff90455de9e5dee03a4c7204a4f9df0c",
-    step027: "92e6538f33b3beb7a4be49460de06dcc45817296c5ca43f1f96af47be5ee9fe4",
-    step028: "681e4901e23093f5caff6420431835fdacd37d6f3ac3e7f628c7c3566d7f93af",
-    step029: "01ea1d8a424937393aa0827ab9f41c952200f04a771e90b121c9a5569e364d40",
-    step030: "5f8643da4e1deb4c3451f3ce39cc443c8fd654aa39ef015243121defe092b9fc"
+    step025: "0cc2be6f4cc2785c73bc836236a868915bb058c61532eac9abe235e48e438c0c",
+    step026: "0bb2cb849d90f624ca2a5e28fe7e30f3cd41e342f3dbfb1b3b900cc869f5b288",
+    step027: "fe4d854999ffb844df3ed0b08d9a19ae6f69b48dbcb9cab5568af87725661154",
+    step028: "668fccf59d666c9f910db6db5f65f728296075c9b3b57a3d1c502b837173b0f0",
+    step029: "1fd555a48ff56181aa51ec4b6c4ee35c6396fd78cfaa8d2e1ca6b2318782b5db",
+    step030: "362a1eefab0c424fd66b3e18f1a7bb04285f64b55a281e8ab7ec93e3aa308076"
   });
 });
 
@@ -2609,7 +2626,7 @@ const EXPECTED_IMPLEMENTATION_TARGET_SHA256 = Object.freeze({
   step034: "28ccaea5e66abc407ed9ad0f1543c2c989b9bcdd4648580e5e252131605d7892",
   step035: "9db05334af746fe8e0f02bac6ba1f9c4fce56855adbad3667ff30a8d1b65e249",
   step036: "309f1fc4c9ab8f7d23eb31b8d37d5648ce35e274154f4e70ffd7213cb4f05c7e",
-  step037: "149083bcba53e7df3f783e4885e3f3eb438f5637298318d042d8944360474d67",
+  step037: "241f4e199ffa3567fa1b84c5e973223ea6789e854af2714688fc0221d373fffd",
   step038: "dae26106a224c11fdf7becbd6941659569bcd182e1c2b9909962bacd156e5198"
 });
 
@@ -2667,7 +2684,7 @@ test("implementation batch declares the exact Codex-native evidence contracts", 
       phase: "implementation",
       source: "assets/steps/step031.md",
       target: "codex/assets/steps/step031.md",
-      source_sha256: "148c8f75e79c31a42790ab0d95b70cea9ec86d7a9ecf4711a5571ac8e210c4c9",
+      source_sha256: "6a59cd2c9d191a467a6631ce1439572476a96d54ad11c3b9f44e61cd87b3dc4f",
       inputs: [
         "step_archive/outputs/step030_설계선택.md",
         "step_archive/step030_레이아웃설계_chunk1.md",
@@ -2695,7 +2712,7 @@ test("implementation batch declares the exact Codex-native evidence contracts", 
       phase: "implementation",
       source: "assets/steps/step032.md",
       target: "codex/assets/steps/step032.md",
-      source_sha256: "8ad499b3f827f5a8028c94226f7b7960b324819487b01dca9562ef5999962696",
+      source_sha256: "a94cb387abd7269c81d22cacd62deec1b7d3e9c585b8294df94fd4e9ed3989b0",
       inputs: [
         "step_archive/step030_레이아웃설계_chunk1.md",
         "step_archive/step030_전체설계_chunk1.md",
@@ -2723,7 +2740,7 @@ test("implementation batch declares the exact Codex-native evidence contracts", 
       phase: "implementation",
       source: "assets/steps/step033.md",
       target: "codex/assets/steps/step033.md",
-      source_sha256: "1d92fd81e2ecf485817a5a78f8846b5376e40e3ab58cb45fad606c09a2a74659",
+      source_sha256: "87c3fc9ecdceb656ce18da6550f4acffb8551078deecb19a8f23617e977192d4",
       inputs: ["step_archive/step032_파일인덱스_chunk1.md"],
       outputs: ["step_archive/step033_jscpd베이스라인.md"],
       requires: ["step032"],
@@ -2748,7 +2765,7 @@ test("implementation batch declares the exact Codex-native evidence contracts", 
       phase: "implementation",
       source: "assets/steps/step034.md",
       target: "codex/assets/steps/step034.md",
-      source_sha256: "f82ed6a8cd582b740d39d53e75b8b31b75b4b9b759b48d8d63add97cd24f4671",
+      source_sha256: "c28f7b8f168135793d8e982441ed89888adc216bbaaf7185581d763c0a383c68",
       inputs: ["step_archive/step032_파일인덱스_chunk1.md"],
       outputs: ["step_archive/step034_knip베이스라인.md"],
       requires: ["step032"],
@@ -2797,7 +2814,7 @@ test("implementation batch declares the exact Codex-native evidence contracts", 
       phase: "implementation",
       source: "assets/steps/step036.md",
       target: "codex/assets/steps/step036.md",
-      source_sha256: "27787a5adeff811a6ce6b1f8c58fe9afc0703139f049e88a705b6e911b2fcec0",
+      source_sha256: "29ef9de9458af31433321b92d4ce8ec68a201cd29714195dca04b514130e37b7",
       inputs: ["step_archive/step032_파일인덱스_chunk1.md", "step_archive/step035_컨텍스트정책.md"],
       outputs: ["step_archive/step036_인코딩정책.md"],
       requires: ["step032", "step035"],
@@ -2821,7 +2838,7 @@ test("implementation batch declares the exact Codex-native evidence contracts", 
       phase: "implementation",
       source: "assets/steps/step037.md",
       target: "codex/assets/steps/step037.md",
-      source_sha256: "4fde6cd81a22e429563170db70497a765508eaece81bf8dadc4297dbd3bf5e10",
+      source_sha256: "7cd1c1a434257be3e233191fc532119e83824504b8830a55f380ac6cb786475a",
       inputs: [
         "step_archive/outputs/step024_검증_r1.md",
         "step_archive/TOPIC/TOPIC.md",
@@ -2862,7 +2879,7 @@ test("implementation batch declares the exact Codex-native evidence contracts", 
       phase: "implementation",
       source: "assets/steps/step038.md",
       target: "codex/assets/steps/step038.md",
-      source_sha256: "f250caba0c63b654ecbe011b7591e6dff23cdeb8c83e4e6347dde937a94be8f0",
+      source_sha256: "14bf849a1dcc72535fb91647fa5a1b5c02b36d11f42484fb9da4fb4d259356f2",
       inputs: [
         "step_archive/step031_환경준비.md",
         "step_archive/step033_jscpd베이스라인.md",
@@ -2896,14 +2913,14 @@ test("implementation source hashes bind the reviewed source steps 031 through 03
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(30, 38));
 
   assert.deepEqual(hashes, {
-    step031: "148c8f75e79c31a42790ab0d95b70cea9ec86d7a9ecf4711a5571ac8e210c4c9",
-    step032: "8ad499b3f827f5a8028c94226f7b7960b324819487b01dca9562ef5999962696",
-    step033: "1d92fd81e2ecf485817a5a78f8846b5376e40e3ab58cb45fad606c09a2a74659",
-    step034: "f82ed6a8cd582b740d39d53e75b8b31b75b4b9b759b48d8d63add97cd24f4671",
+    step031: "6a59cd2c9d191a467a6631ce1439572476a96d54ad11c3b9f44e61cd87b3dc4f",
+    step032: "a94cb387abd7269c81d22cacd62deec1b7d3e9c585b8294df94fd4e9ed3989b0",
+    step033: "87c3fc9ecdceb656ce18da6550f4acffb8551078deecb19a8f23617e977192d4",
+    step034: "c28f7b8f168135793d8e982441ed89888adc216bbaaf7185581d763c0a383c68",
     step035: "664d663cc7ed8cbb8605e3c5c5d2653fb139421eb469e81d1f08201fbf284acd",
-    step036: "27787a5adeff811a6ce6b1f8c58fe9afc0703139f049e88a705b6e911b2fcec0",
-    step037: "4fde6cd81a22e429563170db70497a765508eaece81bf8dadc4297dbd3bf5e10",
-    step038: "f250caba0c63b654ecbe011b7591e6dff23cdeb8c83e4e6347dde937a94be8f0"
+    step036: "29ef9de9458af31433321b92d4ce8ec68a201cd29714195dca04b514130e37b7",
+    step037: "7cd1c1a434257be3e233191fc532119e83824504b8830a55f380ac6cb786475a",
+    step038: "14bf849a1dcc72535fb91647fa5a1b5c02b36d11f42484fb9da4fb4d259356f2"
   });
 });
 
@@ -3184,6 +3201,7 @@ function assertStep37ImplementationContract(content) {
   assert.match(section, /step022-primary-desktop\.png[^]*실제로 열어[^]*CSS[^]*화면 영역/);
   assert.match(section, /시각 검사 기능[^]*사용할 수 없으면[^]*차단/);
   assert.match(section, /구현manifest\.md[^]*파일[^]*digest[^]*요구 추적/);
+  assert.match(section, /`harness50-design-contract` `tokens`로만[^]*`adopted`가 false[^]*구현하지 않는다\(목록 우선\)/);
   assert.doesNotMatch(section, /(?:브레인스토밍|brainstorm)|대안을 새로|선택을 변경/i);
 }
 
@@ -3377,7 +3395,7 @@ const EXPECTED_REVIEW_TARGET_SHA256 = Object.freeze({
   step040: "54ac1baac5086ce382de0147f66f568deebc30a997aa26471cf42a659b8669e0",
   step041: "c7062942a31f2ce520dfdcad0634082be2a21500ead63cc402fda1be6240e19d",
   step042: "a94fcec2f5371b57985e37587356aa00a866af34adaaf0c7cd9832812ad74ca0",
-  step043: "6d070a4fca012d4e3bfddbcd7d59cc3fdcd651dc9031bb9a64b10fb315960e4b",
+  step043: "96d6c4085abc4fba0ad0a8a9914cd320731ab503c91890b9630acea41a922a1f",
   step044: "3c16321a6741e5efa04d10aa9173ba50a19eb625f13c5abd47a12491bc2f8023"
 });
 
@@ -3433,7 +3451,7 @@ const EXPECTED_REVIEW_ROWS = [
     phase: "review",
     source: "assets/steps/step039.md",
     target: "codex/assets/steps/step039.md",
-    source_sha256: "3826f6f36f9f733407327335ea13d71f0e30f2ffa392ed18d5212440cd03dca9",
+    source_sha256: "3bb496a9dd3a525272e56eaabe99a9dc4c21735f14f9ffbcc7227db5852348c4",
     inputs: [
       "step_archive/step030_레이아웃설계_chunk1.md",
       "step_archive/step030_전체설계_chunk1.md",
@@ -3473,7 +3491,7 @@ const EXPECTED_REVIEW_ROWS = [
     phase: "review",
     source: "assets/steps/step040.md",
     target: "codex/assets/steps/step040.md",
-    source_sha256: "b95e68b9b3d412184127288c10af0cb82d74ca66c745152498cf3d0a3ae0e0a3",
+    source_sha256: "ba1801ce1f1c530fc1fba503d5fb4b08f4711452ccf68ae96384245d5f7036f7",
     inputs: [
       "step_archive/step022_수집결과_chunk1.md",
       "step_archive/awwwards-step022-primary.txt",
@@ -3518,7 +3536,7 @@ const EXPECTED_REVIEW_ROWS = [
     phase: "review",
     source: "assets/steps/step041.md",
     target: "codex/assets/steps/step041.md",
-    source_sha256: "d3bd6bc9850aa09868a3925349fd826a898230a5200e1a384f14d058921b883c",
+    source_sha256: "8c203e922eda2b5a043bf7ab2e878d07b7d4248169fcd53f84db31acef863c4a",
     inputs: [
       "step_archive/step030_전체설계_chunk1.md",
       "step_archive/step037_구현manifest.md",
@@ -3550,7 +3568,7 @@ const EXPECTED_REVIEW_ROWS = [
     phase: "review",
     source: "assets/steps/step042.md",
     target: "codex/assets/steps/step042.md",
-    source_sha256: "de60366a82b20ca40f7d8fa0fb43df0194d723039155f0ee6714df1fdff83e16",
+    source_sha256: "fff6c60ac51bf80144528ba17454efbd5938f34b26c32a95d813c8039f72b1c0",
     inputs: [
       "step_archive/step030_레이아웃설계_chunk1.md",
       "step_archive/step030_전체설계_chunk1.md",
@@ -3580,7 +3598,7 @@ const EXPECTED_REVIEW_ROWS = [
     phase: "review",
     source: "assets/steps/step043.md",
     target: "codex/assets/steps/step043.md",
-    source_sha256: "6b4db388b8176cdbef2bddc462e3a6547c7f69aec6597a1eb8286d8427748173",
+    source_sha256: "d232ead02f2fcfcc01e32432f6d318f4a128e981297848027a66ac9a98a2aad8",
     inputs: [
       "step_archive/step022_수집결과_chunk1.md",
       "step_archive/awwwards-step022-primary.txt",
@@ -3621,7 +3639,7 @@ const EXPECTED_REVIEW_ROWS = [
     phase: "review",
     source: "assets/steps/step044.md",
     target: "codex/assets/steps/step044.md",
-    source_sha256: "bad68534ce5d04e52a1b4ff933f15fcb5dcaa6a03958f695810b044682489f35",
+    source_sha256: "d238b47246569421402b3eebf755345943fb3e74a1ef285506c0cba97541325d",
     inputs: [
       "step_archive/step030_레이아웃설계_chunk1.md",
       "step_archive/step030_전체설계_chunk1.md",
@@ -3678,12 +3696,12 @@ test("review source hashes bind reviewed source steps 039 through 044", async ()
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(38, 44));
 
   assert.deepEqual(hashes, {
-    step039: "3826f6f36f9f733407327335ea13d71f0e30f2ffa392ed18d5212440cd03dca9",
-    step040: "b95e68b9b3d412184127288c10af0cb82d74ca66c745152498cf3d0a3ae0e0a3",
-    step041: "d3bd6bc9850aa09868a3925349fd826a898230a5200e1a384f14d058921b883c",
-    step042: "de60366a82b20ca40f7d8fa0fb43df0194d723039155f0ee6714df1fdff83e16",
-    step043: "6b4db388b8176cdbef2bddc462e3a6547c7f69aec6597a1eb8286d8427748173",
-    step044: "bad68534ce5d04e52a1b4ff933f15fcb5dcaa6a03958f695810b044682489f35"
+    step039: "3bb496a9dd3a525272e56eaabe99a9dc4c21735f14f9ffbcc7227db5852348c4",
+    step040: "ba1801ce1f1c530fc1fba503d5fb4b08f4711452ccf68ae96384245d5f7036f7",
+    step041: "8c203e922eda2b5a043bf7ab2e878d07b7d4248169fcd53f84db31acef863c4a",
+    step042: "fff6c60ac51bf80144528ba17454efbd5938f34b26c32a95d813c8039f72b1c0",
+    step043: "d232ead02f2fcfcc01e32432f6d318f4a128e981297848027a66ac9a98a2aad8",
+    step044: "d238b47246569421402b3eebf755345943fb3e74a1ef285506c0cba97541325d"
   });
 });
 
@@ -3990,6 +4008,11 @@ function assertStep43Contract(content) {
   assert.match(loop, /연구 screenshot[^]*구현 screenshot[^]*실제로 열어/i);
   assertBoundedVisualLoop(sections["증거 제한 보강 루프"]);
   assertStep43RemediationOrder(content);
+  const exclusion = extractMarkdownSection(content, "설계 제외 계약 우선").replace(/\s+/g, " ");
+  assert.match(exclusion, /`step_archive\/step030_레이아웃설계_chunk1\.md`[^]*`harness50-design-contract`/);
+  assert.match(exclusion, /`adopted`가 false[^]*누락 finding으로 판정하지 않는다[^]*목록 우선/);
+  assert.match(exclusion, /`excluded-by-contract`[^]*보정 구현자는 그 스타일을 들여오지 않는다/);
+  assert.match(exclusion, /계약 블록이 없으면[^]*30단계 산출물은 고치지 않는다/);
 }
 
 function assertStep43RemediationOrder(content) {
@@ -4095,6 +4118,8 @@ test("review semantic checks reject missing evidence, unavailable-visual bypasse
     ["step042-contrast", assertStep42Contract, step42.replace("contrast", "색감")],
     ["step043-unbounded", assertStep43Contract, step43.replace("최대 5라운드", "제한 없이 반복")],
     ["step043-visual-bypass", assertStep43Contract, step43.replace("시각 검사 기능을 사용할 수 없으면", "시각 검사 기능을 사용할 수 없어도")],
+    ["step043-reference-over-contract", assertStep43Contract, step43.replace("누락 finding으로 판정하지 않는다", "누락 finding으로 판정한다")],
+    ["step043-rewrites-step30", assertStep43Contract, step43.replace("30단계 산출물은 고치지 않는다", "30단계 산출물에 계약을 추가한다")],
     ["step044-premature-milestone", assertStep44Contract, step44.replace("모두 `PASS`인 뒤에만", "검사 전에")],
     ["step044-reordered", assertStep44Contract, step44
       .replace("## 현재 build 검증", "## __TEMP_BUILD__")
@@ -4287,7 +4312,7 @@ const EXPECTED_E2E_ROWS = [
     phase: "e2e",
     source: "assets/steps/step046.md",
     target: "codex/assets/steps/step046.md",
-    source_sha256: "c290f0b81e68da011996abaa3a6fb2dd753d5c7199b8f6acaab2b8b3f606d1d9",
+    source_sha256: "0ea05ced6d5fd23280ead9f00a7327548966317489e71eeabbbafcaf9b415d80",
     inputs: [
       "step_archive/step030_레이아웃설계_chunk1.md",
       "step_archive/step030_전체설계_chunk1.md",
@@ -4325,7 +4350,7 @@ const EXPECTED_E2E_ROWS = [
     phase: "e2e",
     source: "assets/steps/step047.md",
     target: "codex/assets/steps/step047.md",
-    source_sha256: "e35c1b210e06b1cb4742573941a789e166aa4a131a2cc012481b3747ffdc04be",
+    source_sha256: "f2a50ec4541efb9512aef33b87ba1fdd1dbed10adf596bc17fa2ca433a799eab",
     inputs: [
       "step_archive/step030_레이아웃설계_chunk1.md",
       "step_archive/step038_smoke_test.md",
@@ -4365,7 +4390,7 @@ const EXPECTED_E2E_ROWS = [
     phase: "e2e",
     source: "assets/steps/step048.md",
     target: "codex/assets/steps/step048.md",
-    source_sha256: "b171cb98e9ca33de2e7ff5f58f721dd1590c5df213b8598268726125176982d0",
+    source_sha256: "57025c19da2d0e672975c117d69654f84de0053e4a874d880878346541b37f78",
     inputs: [
       "step_archive/step030_레이아웃설계_chunk1.md",
       "step_archive/step038_smoke_test.md",
@@ -4408,7 +4433,7 @@ const EXPECTED_E2E_ROWS = [
     phase: "e2e",
     source: "assets/steps/step049.md",
     target: "codex/assets/steps/step049.md",
-    source_sha256: "3cebc468c5ed9c815e616d0070111a61adc55aa2015880728c242918d6c77c30",
+    source_sha256: "ec9c64fb7ca4c88d0d55d1433b31338995222918161f87b3c82204bff5c5f4f4",
     inputs: [
       "step_archive/step030_레이아웃설계_chunk1.md",
       "step_archive/step030_전체설계_chunk1.md",
@@ -4450,7 +4475,7 @@ const EXPECTED_E2E_ROWS = [
     phase: "e2e",
     source: "assets/steps/step050.md",
     target: "codex/assets/steps/step050.md",
-    source_sha256: "fe19984ab5614cc4c10db56a79a75ac3d5cd8af7a787849250e48767f794cd3d",
+    source_sha256: "892710c82b634ed4658966167c8f560e4f460ed36b1149a54116fc175a747c5d",
     inputs: [
       "step_archive/step038_smoke_test.md",
       "dist/index.html",
@@ -4521,11 +4546,11 @@ test("e2e source hashes bind reviewed source steps 045 through 050", async () =>
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(44, 50));
   assert.deepEqual(hashes, {
     step045: "631828447c6154675d2f6b7a651717b9e211d1cc67ca62c829b65ecd20b34e9f",
-    step046: "c290f0b81e68da011996abaa3a6fb2dd753d5c7199b8f6acaab2b8b3f606d1d9",
-    step047: "e35c1b210e06b1cb4742573941a789e166aa4a131a2cc012481b3747ffdc04be",
-    step048: "b171cb98e9ca33de2e7ff5f58f721dd1590c5df213b8598268726125176982d0",
-    step049: "3cebc468c5ed9c815e616d0070111a61adc55aa2015880728c242918d6c77c30",
-    step050: "fe19984ab5614cc4c10db56a79a75ac3d5cd8af7a787849250e48767f794cd3d"
+    step046: "0ea05ced6d5fd23280ead9f00a7327548966317489e71eeabbbafcaf9b415d80",
+    step047: "f2a50ec4541efb9512aef33b87ba1fdd1dbed10adf596bc17fa2ca433a799eab",
+    step048: "57025c19da2d0e672975c117d69654f84de0053e4a874d880878346541b37f78",
+    step049: "ec9c64fb7ca4c88d0d55d1433b31338995222918161f87b3c82204bff5c5f4f4",
+    step050: "892710c82b634ed4658966167c8f560e4f460ed36b1149a54116fc175a747c5d"
   });
 });
 
@@ -4543,8 +4568,8 @@ const EXPECTED_E2E_TARGET_SHA256 = Object.freeze({
   step046: "187a619f02da34101426d23f466182758b7d0b6bc0977ab3518c8c6bb2bfd93d",
   step047: "d2ed158f4fb15f52e21d76438776bbe0b1e5a0124a46eb4e7bd511c31398dfde",
   step048: "d858de0ea976dbce2a85c62ec71722964d2615528c2235fdf8e877b1d2a1558b",
-  step049: "b151cd00e427077405015452618825bd5b7443c26b2dbe3c8eb08d3ec34e5518",
-  step050: "d267d4f2f588f42f04eebc51641319cebe52b7f090af0b629de0e85026d107bd"
+  step049: "764cf2132e9197a95a84c9e65d549956e7dc6ef37ee1ea513e48d649987ece1b",
+  step050: "7f7c186628672579fc4d6589fd6b9fe3e7e825142ffca429eba1f50184501177"
 });
 
 async function assertE2eTargetDigests(root) {
@@ -4689,6 +4714,9 @@ function assertStep49Contract(content) {
   ]) assert.match(sample, new RegExp(axis.replace("/", "\\/"), "i"));
   assert.match(sample, /selected design token[^]*persisted research evidence/i);
   assert.match(sample, /font family[^]*이름만으로 금지하지 않는다/i);
+  assert.match(sample, /`step_archive\/step030_레이아웃설계_chunk1\.md`[^]*`harness50-design-contract`/);
+  assert.match(sample, /`adopted`가 false[^]*최소 `Important` finding/);
+  assert.match(sample, /계약에 없는 스타일 선호는 finding으로 만들지 않는다/);
   assert.match(loop, /step_archive\/screenshots\/design\/step049-primary-r1\.png/);
   assert.match(loop, /독립 검증자[^]*판정[^]*보정자[^]*수정/i);
   assert.match(loop, /persisted evidence[^]*최종 screenshot[^]*실제로 열어/i);
@@ -4874,6 +4902,7 @@ test("e2e semantic checks reject bypasses, missing interactions, weak sampling, 
     ["step048-false-na", assertStep48Contract, step48.replace("실제로 존재하지 않음을", "검사가 어려움을")],
     ["step049-small-sample", assertStep49Contract, step49.replace("min(10, component count)", "min(3, component count)")],
     ["step049-font-ban", assertStep49Contract, step49.replace(/이름만으로 금지하지\s*않는다/, "이름만으로 금지한다")],
+    ["step049-advisory-exclusion", assertStep49Contract, step49.replace("최소 `Important` finding", "advisory 의견")],
     ["step050-fixed-sleep", assertStep50Contract, step50.replace(/fixed sleep은\s*사용하지 않는다/, "fixed sleep을 사용한다")],
     ["step050-premature-milestone", assertStep50Contract, step50.replace(/모든\s*필수 gate가 `PASS`인 뒤에만/, "console 검사 전에도")],
     ["step050-receipt-after-complete", assertStep50Contract, step50.replace("내구성 있게 먼저 기록한다", "completed 뒤에 기록한다")],

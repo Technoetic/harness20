@@ -93,7 +93,9 @@ routing ownership만 변경한다. 독립 검증자는 application source, 라�
 모든 필수 검사가 `PASS`인 뒤에만 `step_archive/outputs/trust5_r2.md`를 만든다. 누락,
 실행하지 않은 검사, 오래된 증거와 실패 결과는 `PASS`가 아니다. 오류를 분석하고 수정한 뒤
 최대 3회까지 재검사할 수 있다. 3회 뒤에도 실패하면 시도별 명령, exit code와 원인을
-라우팅 검증 보고서에 기록하고 **현재 단계에서 정지한다**. 실패 상태로 다음 Step을 진행하지 않는다.
+라우팅 검증 보고서에 기록하고 현재 Step을 INCOMPLETE로 인계한다. 완료 보고와 다음 Step 진입은 금지한다.
+한도 소진이나 같은 필수 항목의 연속 미수정으로 끝나면 `required-input-missing`, 필수 실행·시각 검사 기능이 없으면 `required-tool-failed`로 헌법 §2-1 명명된 멈춤을 기록하고 턴을 끝낸다.
+멈춤의 증거 파일(`--evidence`)은 라우팅 검증 보고서 `step_archive/step044_routing검증.md`이고, `--note`는 헌법 §2-1대로 작은따옴표로 감싼 사용자가 할 일 1문장이다.
 
 ## 완료 조건
 
@@ -122,5 +124,7 @@ routing ownership만 변경한다. 독립 검증자는 application source, 라�
 - 다섯 routing 완료 조건이 모두 실제 증거로 통과했는가? (Y/N)
 - 독립 검증자가 source·보고서를 수정하지 않고 같은 결론을 냈는가? (Y/N)
 
-하나라도 N이면 보완 후 재검사한다. 최대 3회 뒤에도 N이면 실패를 기록하고 현재 단계에서
-정지한다. 모두 Y이고 품질 게이트가 PASS일 때만 workflow가 step045로 진행할 수 있다.
+하나라도 N이면 보완 후 재검사한다. 최대 3회 뒤에도 N이면 N인 항목과 시도별 원인을 라우팅 검증 보고서에
+기록하고 현재 Step을 INCOMPLETE로 인계한다. 완료 보고와 다음 Step 진입은 금지한다.
+한도 소진이나 같은 필수 항목의 연속 미수정으로 끝나면 `required-input-missing`, 필수 실행·시각 검사 기능이 없으면 `required-tool-failed`로 헌법 §2-1 명명된 멈춤을 기록하고 턴을 끝낸다.
+모두 Y이고 품질 게이트가 PASS일 때만 workflow가 step045로 진행할 수 있다.

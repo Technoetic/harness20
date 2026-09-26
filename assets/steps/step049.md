@@ -12,7 +12,7 @@ persistence: session
 > **📐 Plan → Run → Sync** (MoAI-ADK 워크플로우)
 > - **Plan**: 본 Step의 SPEC 자동 생성 `step_archive/specs/SPEC-049.md` 를 먼저 읽고 Acceptance 기준을 확정한다.
 > - **Run**: 본문 지침대로 실행. 구현 산출물에는 `@MX:NOTE` 최소 1개 부착 (위험 시 `@MX:WARN` + `@MX:REASON`, 계약 시 `@MX:ANCHOR` + `@MX:REASON`, 미완료 시 `@MX:TODO`). MoAI mx-tag-protocol SoT 준수.
-> - **Sync**: 결과 파일 `step_archive/outputs/step049_검증_rN.md` 저장. 최종 `PASS`일 때만 1줄 완료 보고 `Step 049/50 완료`. 필수 항목이 남으면 `INCOMPLETE`로 보고하고 현재 단계에서 멈춘다.
+> - **Sync**: 결과 파일 `step_archive/outputs/step049_검증_rN.md` 저장. 최종 `PASS`일 때만 1줄 완료 보고 `Step 049/50 완료`. 필수 항목이 남으면 `INCOMPLETE`를 결과 파일에 기록하고 헌법 §2-1 명명된 멈춤으로 끝낸다(아래 중단 조건).
 >
 > **모델 정책**: 조사·구현 서브에이전트 = **haiku** (CLAUDE.md 정책 준수). 평가 라운드만 sonnet.
 >
@@ -30,12 +30,13 @@ persistence: session
 
 ## 판정 기준
 
-검증 전에 Step/SPEC의 필수 acceptance, 선택된 디자인 토큰, 저장된 조사 근거를 확인한다.
+검증 전에 Step/SPEC의 필수 acceptance, 선택된 디자인 토큰과 제외 목록(`step_archive/step030_레이아웃설계_chunk1.md`의 `harness50-design-contract`, 플러그인 `docs/DESIGN-CONTRACT.md`), 저장된 조사 근거를 확인한다.
 각 finding은 해당 기준과 관찰한 스크린샷 영역 또는 실제 검사 결과에 연결한다.
 
-- **필수 finding (`Critical` / `Important`)**: 기능·접근성·보안 결함 또는 필수 acceptance/디자인 토큰 위반. 필수 검사 실패는 중요도와 관계없이 완료를 차단한다.
+- **필수 finding (`Critical` / `Important`)**: 기능·접근성·보안 결함, 필수 acceptance/디자인 토큰 위반, 또는 설계 계약 `exclude`에서 `adopted: false`인 항목에 해당하는 스타일(최소 `Important`). 필수 검사 실패는 중요도와 관계없이 완료를 차단한다.
 - **참고 의견 (`advisory`)**: 필수 기준 위반의 근거가 없는 미관·선호 제안. 필수 항목을 통과했다면 이 의견만으로 `FAIL`을 만들거나 수정을 반복하지 않는다.
 - 참고 점수나 선호 의견으로 필수 finding을 강등하거나 실패·누락·스킵을 `PASS`로 바꾸지 않는다.
+- 필수 finding마다 위치(소스 `file:line`, 또는 route·viewport·selector·스크린샷 파일과 영역), 기준(어긴 acceptance·토큰·조사 근거의 출처), 기대/관찰, 재현(route·viewport·선행 조작)을 모두 쓴다. 기준을 인용할 수 없는 지적은 `advisory`다.
 - 필수 선행 입력이 없거나 필요한 증거를 확보할 실행·시각 검사 기능이 없으면 `INCOMPLETE`로 기록하고 차단한다. 이 단계에서 만들 스크린샷은 아래 촬영 절차에서 확보하며 최종 판정 시 필수 증거의 누락을 확인한다. 코드 분석은 실제 이미지를 여는 시각 검사를 대체하지 못한다.
 
 ## 핵심 원칙: 작성 에이전트 ≠ 검증 에이전트
@@ -58,6 +59,7 @@ persistence: session
 - **스크린샷을 확대해서 본다** — 전체 레이아웃뿐 아니라 개별 컴포넌트, 텍스트 렌더링, 아이콘 선명도까지 확인한다
 - **비교 검증한다** — 같은 역할의 요소들(버튼끼리, 카드끼리, 섹션끼리)이 시각적으로 동일한 규칙을 따르는지 교차 비교한다
 - **어색함의 원인을 정확히 특정한다** — "뭔가 이상하다"로 끝내지 않고, 어떤 속성(margin, padding, font-size, color, border-radius 등)이 몇 px/어떤 값으로 잘못되었는지 명시한다
+- **관찰과 판정을 나눈다** — 위 태도로 찾은 어색함은 모두 적되, 판정 기준의 필수 기준을 인용할 수 있을 때만 `Critical`/`Important`로 올린다. 나머지는 `advisory`다
 
 ## 사전 분석 (동적 결정)
 
@@ -85,21 +87,28 @@ persistence: session
 - **여백**: 가장자리 여유, 섹션 간 간격, 내부 패딩 균일성
 - **겹침/잘림**: 위치 지정 요소 간섭, overflow 잘림, z-index 충돌
 - **시각적 완성도**: 전체적인 균형감, 시각적 노이즈, 미완성 느낌
-- **AI Slop 징후 (필수 점검)**: 아래 징후를 확인하고 선택된 토큰·필수 acceptance와 대조한다. 필수 기준 위반은 `FAIL`, 근거 없는 선호는 `advisory`로 기록한다. 폰트 이름만으로 금지하지 않는다.
-  - Inter/Roboto/Arial 폰트 노출 여부
-  - 보라 계열 그라데이션 배경의 맥락 없는 사용
-  - 모든 카드가 중앙정렬만 되어 있는 획일적 구조
-  - 과도한 border-radius (프로젝트 토큰 범위 밖)
+- **AI Slop 징후 (필수 점검)**: 아래 징후를 설계 계약·필수 acceptance와 대조한다. 계약 `exclude`에 있고 `adopted: false`인 항목의 위반은 `Important` 필수 finding(`FAIL`)이고, 계약에 없는 징후는 `advisory`로 기록한다. 폰트 이름만으로 금지하지 않는다 — 계약 항목이 근거다.
+  - Inter/Roboto/Arial 폰트 노출 여부 (`generic-sans`)
+  - 보라 계열 그라데이션 배경의 맥락 없는 사용 (`purple-gradient`)
+  - 모든 카드가 중앙정렬만 되어 있는 획일적 구조 (`centered-cards`)
+  - 과도한 border-radius — 계약 `tokens.radius` 밖 값, 헌법 §5 허용값 [0, 4, 8, 12, 16] 밖 값 (`excess-radius`)
+  - 획일적 단색 배경 (`flat-background`)
+  - 크림·오프화이트 페이지 바탕 (`cream-background`)
+  - 제목 속 이탤릭 강조어 (`italic-heading-accent`)
+  - 01·02·03 장식 번호 섹션 라벨 (`numbered-section-labels`)
+  - 코드 밖 모노스페이스 라벨 (`monospace-labels`)
+  - 알약형 버튼 (`pill-buttons`)
+  - 계약의 `topic-N` 항목 (사용자 제외)
   - 임의 헥스 코드(토큰 미매핑) 사용 징후
   - 클릭 가능 요소의 hover/focus 상태 누락
   - Empty State 디자인 부재 (데이터 0 시 레이아웃 붕괴)
 
 ## AI Slop 게이트 검증 (필수)
 
-무작위로 **10개** 컴포넌트를 샘플링하여 다음 토큰 매핑 여부를 확인한다:
+무작위로 **10개** 컴포넌트를 샘플링하여 설계 계약 `tokens`에 대한 다음 매핑 여부를 확인한다:
 색상 / 타이포그래피 / 간격(4·8pt) / border-radius / shadow.
 
-- **8개 미만**이 선택된 토큰에 매핑되었다면 `FAIL`로 기록하고 베이스라인을 수리한다.
+- **8개 미만**이 설계 계약 `tokens`에 매핑되었다면 `FAIL`로 기록하고 베이스라인을 수리한다.
 - 수리 후 재검증도 같은 최대 5라운드에 포함한다. 수리 모드 전환으로 회차를 초기화하지 않는다.
 
 ## 실행 방법
@@ -121,7 +130,7 @@ persistence: session
 - 각 관점(레이아웃, 색상, 타이포그래피 등)에서 문제 식별
 - 판정 결과:
   - **PASS**: 모든 필수 항목 통과, 미해결 `Critical`/`Important` 없음 → 해당 조합 종료. 참고 의견은 별도 기록
-  - **FAIL**: 필수 finding과 근거를 구체적으로 기록하여 에이전트 A에 전달
+  - **FAIL**: 필수 finding을 위치·기준·기대/관찰·재현 네 필드로 기록하여 에이전트 A에 전달
   - **INCOMPLETE**: 필수 증거·실행 기능 부재 또는 아래 중단 조건 충족 → 차단 사유를 기록하고 현재 단계에서 중단
 
 ### 3단계: 에이전트 A의 역할 (수정)
@@ -144,6 +153,7 @@ persistence: session
 
 미해결 `Critical` 또는 `Important`가 하나라도 있으면 완료를 차단한다.
 스킵이나 미해결 finding은 통과 또는 완료 증거가 아니다. 중단 시 다음 Step으로 진행하거나 완료 문구를 출력하지 않는다.
+한도 소진이나 같은 필수 항목의 연속 미수정으로 끝나면 `required-input-missing`, 필수 실행·시각 검사 기능이 없으면 `required-tool-failed`로 헌법 §2-1 명명된 멈춤을 기록하고 턴을 끝낸다.
 
 ## Jev 의미 체크포인트
 
@@ -166,7 +176,8 @@ persistence: session
 ## 실패 패턴 기록
 
 에이전트 B는 각 라운드 결과를 `step_archive/outputs/step049_검증_rN.md`에 저장한다.
-- 현재 Step `49`, 라운드, 최종 판정, 뷰포트·페이지, 필수 기준, finding 중요도와 증거 경로를 기록한다.
+- 현재 Step `49`, 라운드, 최종 판정, 뷰포트·페이지, 필수 기준, finding 중요도·위치·기준·기대/관찰·재현과 증거 경로를 기록한다.
+- 설계 계약 `exclude` 항목마다 준수·위반·채택 예외 중 하나와 근거 스크린샷 영역을 기록한다.
 - 도중 발생한 FAIL도 해결 여부·재검증 결과와 함께 보존한다. 참고 의견은 필수 finding과 분리한다.
 - 중단 시 남은 필수 finding, 차단 원인, 시도한 수정, 다음 안전한 조치를 적는다.
 - 비밀값·개인정보·원시 로그를 복사하지 않고 필요한 요약과 프로젝트 상대 증거 경로만 남긴다.
@@ -183,4 +194,4 @@ persistence: session
 
 ---
 
-최종 `PASS`로 이 지침을 완료한 경우에만 자동으로 step050.md를 읽고 수행한다. `INCOMPLETE`이면 현재 단계에서 멈춘다.
+최종 `PASS`로 이 지침을 완료한 경우에만 자동으로 step050.md를 읽고 수행한다. `INCOMPLETE`이면 완료를 보고하지 않고 헌법 §2-1 명명된 멈춤으로 끝낸다.

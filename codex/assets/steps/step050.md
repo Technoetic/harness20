@@ -63,6 +63,9 @@ browser 또는 application `crash`를 수집한다. 이 다섯 오류 범주는 
 0개여야 한다. warning은 메시지, 상태와 call site 근거로 분류하고 오류를 warning으로
 낮춰 기록하지 않는다.
 
+각 오류 finding에는 상태 stable key, 오류 범주, redact한 메시지와 stack의 첫 application
+`file:line`을 기록한다. stack이 없으면 없다고 적는다.
+
 각 전이에는 DOM condition, request completion, animation completion 또는 application
 ready signal 같은 state-specific `bounded settle condition`을 사용한다. fixed sleep은
 사용하지 않는다. credential, token, cookie, authorization header와 sensitive query

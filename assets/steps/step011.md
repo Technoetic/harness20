@@ -10,21 +10,13 @@ persistence: session
 > 모델 정책: **haiku** (조사·설치).
 > SPEC 자동 생성: step_archive/specs/SPEC-011.md (Stop hook).
 
-**Hook**: `.claude/hooks/tokei-validator.ps1`
-
 ## 검증
 
-Hook 실행 후 다음을 확인:
-- `step_archive/step011_tokei_test.md` 파일 생성 확인
-- `.claude/hooks/tokei-validator.log` 로그 확인
-- Hook exit code 확인 (0: 성공, 1: 실패)
+`tokei --version`로 확인한다. 없으면 `scoop install tokei`·`brew install tokei`·`cargo install tokei` 중 이 PC에서 쓸 수 있는 명령으로 설치하고 다시 확인한다. 설치와 확인을 합쳐 최대 3회 시도하며 정상 권한 확인을 유지한다.
 
-**검증 실패 시:**
-1. 로그 파일 분석
-2. 에러 원인 파악 (scoop 미설치, PATH 문제 등)
-3. 필요한 조치 수행 (scoop install tokei 등)
-4. Hook 재실행
-5. 검증 통과할 때까지 반복
+`step_archive/step011_tokei_test.md`에 명령, 종료 코드, 확인된 버전 또는 `SKIP`과 사유를 기록한다. 패키지 이름·디렉터리 존재만으로 성공을 적지 않는다.
+
+이 도구는 선택이다. 끝내 쓸 수 없으면 `SKIP`과 사유·대체 방법을 기록하고 완료한다. 자동 검증 훅은 번들되지 않는다.
 
 서브에이전트는 항상 haiku를 사용한다.
 
@@ -34,7 +26,7 @@ Hook 실행 후 다음을 확인:
 
 - 이 Step의 목표가 100% 달성되었는가? (Y/N)
 - 불확실한 부분이 있는가? (있으면 구체적으로 명시)
-- N 또는 불확실한 부분이 있으면 재실행한다. 3회 재시도 후에도 미달이면 오류 기록 후 다음 Step 진행.
+- 불확실한 부분은 결정하고 `결정/사유: <결정> — <사유>` 줄로 기록한다(헌법 §1). N이면 재실행한다. 3회 재시도 후에도 해결되지 않으면 오류·미해결 항목·다음 검사를 현재 Step 결과 파일에 기록하고 현재 Step을 INCOMPLETE로 인계한다. 완료 보고와 다음 Step 진입은 금지하고 헌법 §2-1 명명된 멈춤으로 끝낸다(필수 도구 실패 `required-tool-failed`, 권한 거부 `permission-denied`, 그 밖의 한도 소진 `required-input-missing`). 선택 도구를 쓸 수 없는 것은 미달이 아니다 — `SKIP`과 사유를 기록한다.
 
 ---
 

@@ -111,12 +111,15 @@ test('report replacement or source mutation while binding quality cannot pass', 
 const currentPluginRoot = fileURLToPath(new URL('../../', import.meta.url));
 const finalVisualIds = ['final-desktop-screenshot', 'final-mobile-screenshot', 'final-visual-inspection'];
 // Declarations added after a published release; receipts written before them lack this evidence.
-const laterIds = [...finalVisualIds, 'browser-backend-lock'];
+const laterIds = [...finalVisualIds, 'browser-backend-lock', 'design-exclusion-contract'];
 function historicalEvidence(contract) {
   return contract.acceptance.filter(item => item.required && !laterIds.includes(item.id)).map(item => {
     if (item.id === 'c8-disposition') return { acceptance_id: 'c8-version', kind: 'command',
       // Exact published b4b4b8f Step 5 declaration, verified with git show.
       detail: 'Historical c8 version verified', ok: true, command: 'npx c8 --version', exit_code: 0 };
+    if (item.id === 'biome-version') return { acceptance_id: 'biome-version', kind: 'command',
+      // Exact published 2.10.0 Step 14 declaration.
+      detail: 'Historical Biome version verified', ok: true, command: 'npx biome --version', exit_code: 0 };
     const evidence = { acceptance_id: item.id, kind: item.kind, detail: 'Historical verification', ok: true };
     if (item.kind === 'artifact') return { ...evidence, artifact_path: item.path, artifact_sha256: 'a'.repeat(64) };
     if (item.kind === 'command') return { ...evidence, command: item.command ?? 'npm run build', exit_code: 0 };
@@ -124,7 +127,7 @@ function historicalEvidence(contract) {
   });
 }
 
-for (const step of [3, 5, 50]) {
+for (const step of [3, 5, 14, 30, 50]) {
   test(`current real step ${step} contract recovers its legacy receipt without new evidence or file reads`, async () => {
     const root = await makeWorkspace();
     const contract = await loadStepContract(currentPluginRoot, step);
@@ -146,7 +149,7 @@ for (const step of [3, 5, 50]) {
     await assert.rejects(completeStep({ ...args, evidence: evidence.map((item, index) => index === 0
       ? { ...item, detail: 'Conflicting new claim' } : item) }), error => error.code === 'RECEIPT_CONFLICT');
     await assert.rejects(validateCompletionEvidence({ contract, evidence, workspaceRoot: root }),
-      error => ['ACCEPTANCE_UNKNOWN', 'ACCEPTANCE_MISSING'].includes(error.code));
+      error => ['ACCEPTANCE_UNKNOWN', 'ACCEPTANCE_MISSING', 'ACCEPTANCE_COMMAND_MISMATCH'].includes(error.code));
   });
 }
 

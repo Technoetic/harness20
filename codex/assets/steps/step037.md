@@ -61,6 +61,9 @@ CSS를 바꾸기 전에 `step_archive/screenshots/research/step022-primary-deskt
 검사 기능으로 실제로 열어 capture manifest 및 `awwwards-step022-primary.txt`와 비교한다.
 CSS 결정마다 관찰한 화면 영역, 색·간격·type·motion 근거와 구현 selector를 연결한다.
 시각 검사 기능을 사용할 수 없으면 구현 완료를 주장하지 않고 이 단계를 차단한다.
+CSS 값은 30단계 레이아웃 설계의 `harness50-design-contract` `tokens`로만 정한다. `exclude`에서
+`adopted`가 false인 항목은 capture에 보이더라도 구현하지 않는다(목록 우선). 계약 블록이 없으면
+플러그인 `docs/DESIGN-CONTRACT.md`의 계약 없는 작업 공간 절차를 따른다.
 
 `step_archive/step037_구현manifest.md`에는 work unit, 담당 파일, 변경 전후 digest,
 요구 추적 ID, test의 RED·GREEN 결과, Class·async 계약, 시각 근거의 화면 영역과 CSS

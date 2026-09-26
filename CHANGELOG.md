@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+- Claude `/webapp` and the step 1 TOPIC template replace the generic anti-slop line with one named default exclusion line. The line adds cream/off-white page backgrounds, italic accent words in headings, zero-padded 01/02/03 section labels, monospace labels outside code and pill buttons to the legacy five.
+- Both hosts' step 30 write exactly one `json harness50-design-contract` block (tokens + exclude, format in docs/DESIGN-CONTRACT.md) into the layout chunk. Steps 37, 43 and 49 and the evaluator judge only against this block: step 49 treats an unadopted exclusion as at least `Important`, and step 43 no longer asks for an excluded reference element.
+- Codex keeps the legacy list plus TOPIC exclusions. Its step 30 gains the required check `design-exclusion-contract`, and an older Step 30 receipt still replays.
+- Codex workspaces past step 30 reconstruct the contract in the current step report and never edit step 30 outputs. A Claude run without a contract does not reconstruct it: the constitution (§11), the evaluator and docs/DESIGN-CONTRACT.md now all say it keeps the §5 numbers and that the five host styles are not required findings there.
+- docs/DESIGN-CONTRACT.md marks its host-specific rules. When a TOPIC both asks for and excludes a style, Codex step 30 blocks and Claude keeps the exclusion with a `결정/사유` line. Step 43 records an excluded element as `제외 계약: <id>` on Claude and `excluded-by-contract` on Codex.
+- Porting: Codex step 1 and step 23 were reviewed without change.
+- Claude visual verifiers (steps 39, 40, 43) and step 49 block only on `Critical`/`Important` findings that cite a design spec, selected token, required acceptance or a functional/accessibility defect. Each such finding carries location, criterion, expected/observed and reproduction. Advisory opinions never fail a round. At step 43 a reference element the design did not adopt is advisory, and an excluded one is recorded as `제외 계약: <id>`. Constitution §11 reads the old 'do not miss any small awkwardness' / 'FAIL if anything is lacking' wording of in-progress runs as 'record every observation'. The evaluator's finding line and the `observation`/`next_check` guidance in docs/QA-REPORTS.md use the same fields.
+- Screenshot and error judgement never runs on haiku. A new constitution §7 row, steps 46–48 and 50 hand it to the main session or sonnet and up. `step-executor` stays on haiku, hands a visual step back with its existing '미완료' line and a capture file, and `/webapp` makes the judging caller responsible for the Jev checkpoint.
+- Claude step 50 reports console findings in six fixed fields. Codex step 50 now records the first application stack frame `file:line`. Codex steps 39, 40, 43 and 46–49 were reviewed without change.
+- Claude step bodies no longer tell the model to run the unbundled `.claude/hooks/*-validator.ps1`, `dependency-checker.ps1` or `step-dependency-gate.ps1`. Steps 8–15 check the CLI directly, with `npx --no-install` for npm tools (optional tools record `SKIP`), and chunk checks are manual.
+- The model is no longer asked to edit `progress.json`: failure patterns go to each step's verification report.
+- Step 1 takes the topic from the `session_prompt` that `/webapp` wrote into TOPIC.md. It keeps `created` and `session_prompt`, resolves the overwrite/keep contradiction and no longer claims that the loader creates `progress.json`.
+- Both hosts check Biome with `npx --no-install @biomejs/biome --version`, so the unrelated npm package `biome` is never fetched. The Codex step 14 acceptance command changes, and a Step 14 receipt that recorded `npx biome --version` still replays.
+- In-progress Claude runs keep their archived bodies, and a missing validator there stays fail-open.
+- The chunk-writer skill no longer claims a bound `research-chunk-validator.ps1` hook or gives a command for it. It checks line count, size, BOM and LF by hand, like the step bodies.
+- The 36 Claude step places that said 'after three retries record the error and go on' (or ended in a bare INCOMPLETE) now share one ending: record the error, keep the step INCOMPLETE and end with a named pause (`required-tool-failed`, `permission-denied`, otherwise `required-input-missing`). An unavailable optional tool is a `SKIP`, and ambiguity is decided with a `결정/사유` line.
+- Bounded review loops (steps 24, 25, 29, 39, 40, 43, 44, 47–50) name the same codes. Step 44's two three-re-check budgets (routing gate and Self-Calibration) now end with INCOMPLETE and the named pause instead of a bare stop. The routing report is the pause evidence. Codex step 44 was reviewed without change.
+- The constitution keeps the 2.10.0 reading for bodies archived before the upgrade.
+- claude-contract-consistency S1 now scans the step bodies of both hosts.
+- PORTING.md documents the source change procedure.
+
 ## 2.10.0 — 2026-09-26
 
 - Behaviour changes on upgrade (details in the bullets below): a run starts only from `/webapp <topic>`, because the natural-language triggers are gone; opening Claude Code no longer creates `step_archive/progress.json`; the step hooks act only for an active run, which needs `total_steps` 50, `current_step` equal to the first unfinished step and that step's body file, so an in-progress run of the older 107-step layout, one whose `total_steps` an older loader rewrote, or one without its step bodies stays inactive until `/harness-reset` and `/webapp <topic>` start it again; edits to execution-linked files always keep the normal permission prompt; and `lsp-autofix` fixes nothing without a project-local biome or stylelint.

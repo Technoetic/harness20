@@ -37,6 +37,7 @@ CSS를 작성하는 서브에이전트에게는 반드시 아래 지시를 포�
 1. `step_archive/screenshots/research/awwwards-*.png` 패턴으로 Glob 검색하여 **모두** Read할 것
 2. `step_archive/awwwards-*.txt` 패턴으로 Glob 검색하여 **모두** Read할 것
 3. 스크린샷에서 직접 디자인 패턴을 추출하여 CSS에 반영할 것
+4. `step_archive/step030_레이아웃설계_chunk1.md`의 `harness50-design-contract` 블록을 Read하고 CSS 값은 `tokens`로만 정할 것. `exclude`에서 `adopted: false`인 항목은 스크린샷에 있어도 CSS에 옮기지 말 것 (목록 우선)
 
 CSS 담당 서브에이전트는 스크린샷을 읽어야 하므로 **haiku를 사용하지 않는다** (sonnet 이상 사용).
 
@@ -106,7 +107,7 @@ Step 38에서 빌드 실패 시 이 Step으로 돌아와 수정한다.
 구현 완료 후 다음을 스스로 평가하라:
 - 요구사항이 100% 구현되었는가? (Y/N)
 - 빌드가 통과하는가? (Y/N)
-- N이면 해당 부분을 보완하고 재평가한다. 3회 재시도 후에도 미달이면 오류 기록 후 다음 Step 진행.
+- N이면 해당 부분을 보완하고 재평가한다. 3회 재시도 후에도 해결되지 않으면 오류·미해결 항목·다음 검사를 현재 Step 결과 파일에 기록하고 현재 Step을 INCOMPLETE로 인계한다. 완료 보고와 다음 Step 진입은 금지하고 헌법 §2-1 명명된 멈춤으로 끝낸다(필수 도구 실패 `required-tool-failed`, 권한 거부 `permission-denied`, 그 밖의 한도 소진 `required-input-missing`). 선택 도구를 쓸 수 없는 것은 미달이 아니다 — `SKIP`과 사유를 기록한다.
 
 ---
 

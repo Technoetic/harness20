@@ -75,7 +75,7 @@ Step NNN/50 완료
 
 멈춘 동안에는 step을 실행하지 않고 사용자 메시지를 처리한다. 재개는 사용자가 명시 요청했을 때만 `/harness-resume`(같은 CLI의 `resume`)으로 한다. 새 `/webapp <주제>`는 완료 기록이 있는 진행을 건드리지 않는다. `/harness-reset`(같은 CLI의 `reset`)은 완료 기록을 지우고 1단계의 새 실행을 `user-request` 멈춤으로 대기시킨다. 이전 멈춤과 `pause_history`도 지운다. 이어 `/webapp <주제>`는 새 주제를, `/harness-resume`은 현재 주제를 1단계부터 시작한다. 멈춘 작업을 이어가는 수단이 아니다.
 
-단계 본문 해석: "사용자 개입 요청"은 이 절차를 뜻한다. "현재 단계에서 멈춘다"는 완료를 보고하지 않고 다음 단계로 가지 않는다는 뜻이다. 원인이 위 사유면 이 절차로 멈추고, 아니면 허용된 라운드 안에서 현재 단계를 고친다. 필수 도구·필수 입력이 미달이면 "오류 기록 후 다음 Step 진행" 문구보다 이 절이 우선한다.
+단계 본문 해석: 본문의 "INCOMPLETE로 인계", "현재 단계에서 멈춘다", "중단"은 완료를 보고하지 않고 다음 단계로 가지 않는다는 뜻이다. 허용된 재시도·라운드 안에서는 현재 단계를 고친다. 한도를 다 쓰면 이 절차로 멈춘다: 필수 도구 실패는 `required-tool-failed`, 권한 거부는 `permission-denied`, 그 밖의 한도 소진과 필수 입력 부재는 `required-input-missing`. 선택 도구 실패(`SKIP`과 사유 기록), 모호함·취향(`결정/사유` 기록), 아직 생성되지 않은 `SPEC-NNN.md`(Stop 훅이 만든다 — 본문 기준으로 진행)는 멈춤 사유가 아니다. 업그레이드 전에 `step_archive/archived/`로 복사된 옛 본문은 그대로 쓰인다: 그 본문의 "사용자 개입 요청"은 이 절차를 뜻하고, "오류 기록 후 다음 Step 진행"은 필수 도구·필수 입력 미달일 때만 이 절차로 바뀌며(그 밖의 실패는 기록 후 진행), 옛 본문이 실행을 지시한 번들되지 않은 검증 훅이 없는 것은 실패가 아니다(`docs/RETIRED-VALIDATORS.md`).
 
 ## 3. 한 턴 안에서 가능한 한 많이
 
@@ -119,9 +119,25 @@ Step N 읽기(Read) → 실행 → 1줄 완료 보고 → 즉시 Step N+1 Read �
 
 ### 폰트·시각
 
-- 금지: Inter / Roboto / Arial / 보라 그라데이션 남발 / 무한 중앙정렬 / 과도한 border-radius
+- 금지: Inter / Roboto / Arial / 보라 그라데이션 남발 / 무한 중앙정렬 / 과도한 border-radius / 획일적 단색 배경
 - 허용: UI는 `Helvetica Neue` 또는 `Georgia`, 코드는 `JetBrains Mono` 또는 `Courier New`
 - 11가지 미학(Brutalism / Glassmorphism / Swiss / Dark OLED / Neumorphism / Cyberpunk 등) 중 명시 선택만
+
+### 기본 제외 목록 (역할·CSS 시그니처)
+
+"AI 느낌을 피하라" 같은 일반 지시는 한 기본값을 다른 기본값으로 바꿀 뿐이다. 아래 이름으로 전달한다. 30단계가 이 목록, 위 '금지' 줄의 구세대 항목(`generic-sans`·`purple-gradient`·`centered-cards`·`excess-radius`·`flat-background`), TOPIC의 `디자인 제외(사용자)` 항목을 설계 계약(`step_archive/step030_레이아웃설계_chunk1.md`의 `harness50-design-contract`, 형식: `docs/DESIGN-CONTRACT.md`)의 `exclude`로 고정한다. 37·43·49단계와 평가자는 이 계약만 판정 근거로 쓴다.
+
+| id | 제외하는 것 | 해당하지 않는 것 |
+|---|---|---|
+| `cream-background` | 페이지 바탕(body·main·화면 루트)의 크림·아이보리·베이지·색조 있는 오프화이트 | 순백 `#ffffff`, 무채색 연회색 표면, 어두운 바탕 |
+| `italic-heading-accent` | h1~h3 안 일부 단어만 `em`·`i`·`font-style: italic`으로 기울인 강조 | 인용·학명·작품명 같은 표기 관례 |
+| `numbered-section-labels` | 섹션 머리 장식으로 쓴 0 채움 번호 라벨(01, 02 / …, CSS counter 포함) | 실제 순서를 나타내는 `ol` 목록과 "N단계" 제목 |
+| `monospace-labels` | eyebrow·badge·태그·nav·버튼·섹션 라벨의 monospace | `code`·`pre`·`kbd`·`samp`와 코드 값·명령어 표시 |
+| `pill-buttons` | 버튼·링크 버튼의 알약형 모서리(radius ≥ 높이/2, 9999px·50%·rounded-full) | 정사각 원형 아이콘 버튼, 토글 스위치 트랙, 아바타 |
+
+- 예외: TOPIC이 그 스타일을 직접 요구했거나 명시 선택한 미학이 그것 없이는 성립하지 않으면 30단계가 `adopted: true`와 `exception_reason`을 적고 같은 사유를 `결정/사유:` 한 줄로 남긴다. 사용자 제외 항목(`topic-N`)은 채택하지 않는다.
+- 우선순위: 계약의 제외 목록 > Awwwards 참조 충실도. 참조 사례가 제외 항목을 써도 구현하거나 누락으로 요구하지 않는다.
+- 채택되지 않은 제외 항목 위반은 49단계에서 `Important` finding이다. 계약에 없는 미관 선호는 `advisory`다.
 
 ### 공간·터치·접근성
 
@@ -162,6 +178,7 @@ Sub-lines: `@MX:SPEC`, `@MX:LEGACY`, `@MX:REASON`, `@MX:TEST`, `@MX:PRIORITY`
 - 서브에이전트는 매트릭스대로 haiku / sonnet 분기:
   - 도구 설치·조사·구현: **haiku**
   - 평가·시각 검증(단계 본문이 sonnet을 지정한 단계, 예: step039·040·043·049): **sonnet**
+  - 스크린샷·이미지를 읽고 판단하는 일(PASS/FAIL, finding 중요도, 스크린샷을 보고 쓰는 CSS — step037): **메인 세션 또는 sonnet 이상**. haiku는 촬영·브라우저 조작·증거 수집만 하고 경로·viewport·URL만 돌려준다. 단계 본문이 "서브에이전트는 항상 haiku"라고 해도 판정은 이 행을 따른다. `step-executor`(haiku 고정)는 판정하지 않는다
   - 품질 마일스톤 r1·r2·r3(완료 38·44·49단계)은 모델 판정이 아니라 Stop 훅(`trust5-validator` → `scripts/quality-gate.mjs --hook`)의 측정 증거 검사다.
 
 ## 8. .claude/ 보호 (전역 규칙 상속)
@@ -184,6 +201,7 @@ Phase 3: 구현 에이전트 병렬 실행 (프롬프트에 Phase 1 산출물 �
 1. 참조할 조사 결과 파일 경로
 2. 디자인 요구사항 (조사에서 추출한 패턴)
 3. 출력 파일 경로 + UTF-8 / LF 줄바꿈
+4. 설계 계약 경로(`step_archive/step030_레이아웃설계_chunk1.md`의 `harness50-design-contract`) — `tokens` 값만 쓰고, 채택되지 않은 `exclude` 항목은 조사 패턴과 충돌해도 쓰지 않는다
 
 ## 10. 브라우저 검증 백엔드 고정
 
@@ -191,6 +209,12 @@ Phase 3: 구현 에이전트 병렬 실행 (프롬프트에 Phase 1 산출물 �
 - 다른 백엔드의 package나 browser binary를 설치하지 않는다. 예: Aside로 고정된 프로젝트에서 Playwright나 Chromium을 설치하지 않는다. 고정 백엔드를 사용할 수 없다는 오류가 나면 그 백엔드만 복구한다.
 - 잠금 파일이 없는 진행 중 프로젝트는 `step_archive/step003_playwright_test.md`의 selected 값으로 검증 체크아웃에서 `node scripts/verify-output.mjs --probe --backend <selected> --lock --workspace "<project-root>"`를 한 번 실행해 고정한다.
 - 백엔드 변경은 사용자가 요청할 때만 `--backend <name> --lock`으로 다시 고정한다. 상세: `docs/BROWSER-TOOLS.md` "Backend lock (Step 3)".
+
+## 11. 검증 판정과 finding 형식
+
+- 검증자는 필수 기준(설계 명세, 선택된 디자인 토큰, 필수 acceptance, 기능·접근성·보안)을 어긴 finding만 `Critical`/`Important`로 기록한다. 필수 검사 실패나 미해결 필수 finding이 있으면 `FAIL`이다. 인용할 기준이 없는 미관·선호 의견은 `advisory`이며, advisory만으로 `FAIL`이나 추가 라운드를 만들지 않는다. 선택된 디자인 토큰과 제외 목록은 30단계 설계 계약(`harness50-design-contract`)이고, 계약 `exclude`에서 `adopted: false`인 항목의 위반은 최소 `Important`다. 계약이 없는 이전 실행은 §5의 수치를 기준으로 쓴다. 이 실행에서는 계약을 복원하지 않으며, §5 '기본 제외 목록'(`host` 5종)은 필수 기준이 아니다(`docs/DESIGN-CONTRACT.md` "Workspaces without a contract"의 Claude 항목).
+- 필수 finding마다 위치(소스 `file:line`, 또는 route·viewport·selector·스크린샷 파일과 영역), 어긴 기준의 출처, 기대값과 관찰값, 재현 방법(route·viewport·선행 조작)을 쓴다. 스크린샷 영역과 viewport는 언제나 쓸 수 있으므로 위치를 못 찾았다는 이유로 필수 finding을 `advisory`로 낮추지 않는다.
+- 이전 버전 단계 본문의 "사소한 위화감도 놓치지 않는다"와 "부족한 부분이 있으면 FAIL"은 관찰을 빠짐없이 적으라는 뜻으로 읽는다. 판정은 이 절을 따른다.
 
 ---
 
