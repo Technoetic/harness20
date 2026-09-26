@@ -12,7 +12,7 @@ persistence: session
 > **📐 Plan → Run → Sync** (MoAI-ADK 워크플로우)
 > - **Plan**: 본 Step의 SPEC 자동 생성 `step_archive/specs/SPEC-049.md` 를 먼저 읽고 Acceptance 기준을 확정한다.
 > - **Run**: 본문 지침대로 실행. 구현 산출물에는 `@MX:NOTE` 최소 1개 부착 (위험 시 `@MX:WARN` + `@MX:REASON`, 계약 시 `@MX:ANCHOR` + `@MX:REASON`, 미완료 시 `@MX:TODO`). MoAI mx-tag-protocol SoT 준수.
-> - **Sync**: 결과 파일 `step_archive/outputs/step049_검증_rN.md` 저장. 최종 `PASS`일 때만 1줄 완료 보고 `Step 049/50 완료`. 필수 항목이 남으면 `INCOMPLETE`로 보고하고 현재 단계에서 멈춘다.
+> - **Sync**: 결과 파일 `step_archive/outputs/step049_검증_rN.md` 저장. 최종 `PASS`일 때만 1줄 완료 보고 `Step 049/50 완료`. 필수 항목이 남으면 `INCOMPLETE`를 결과 파일에 기록하고 헌법 §2-1 명명된 멈춤으로 끝낸다(아래 중단 조건).
 >
 > **모델 정책**: 조사·구현 서브에이전트 = **haiku** (CLAUDE.md 정책 준수). 평가 라운드만 sonnet.
 >
@@ -153,6 +153,7 @@ persistence: session
 
 미해결 `Critical` 또는 `Important`가 하나라도 있으면 완료를 차단한다.
 스킵이나 미해결 finding은 통과 또는 완료 증거가 아니다. 중단 시 다음 Step으로 진행하거나 완료 문구를 출력하지 않는다.
+한도 소진이나 같은 필수 항목의 연속 미수정으로 끝나면 `required-input-missing`, 필수 실행·시각 검사 기능이 없으면 `required-tool-failed`로 헌법 §2-1 명명된 멈춤을 기록하고 턴을 끝낸다.
 
 ## Jev 의미 체크포인트
 
@@ -193,4 +194,4 @@ persistence: session
 
 ---
 
-최종 `PASS`로 이 지침을 완료한 경우에만 자동으로 step050.md를 읽고 수행한다. `INCOMPLETE`이면 현재 단계에서 멈춘다.
+최종 `PASS`로 이 지침을 완료한 경우에만 자동으로 step050.md를 읽고 수행한다. `INCOMPLETE`이면 완료를 보고하지 않고 헌법 §2-1 명명된 멈춤으로 끝낸다.

@@ -15,6 +15,11 @@
 - Step 1 takes the topic from the `session_prompt` that `/webapp` wrote into TOPIC.md. It keeps `created` and `session_prompt`, resolves the overwrite/keep contradiction and no longer claims that the loader creates `progress.json`.
 - Both hosts check Biome with `npx --no-install @biomejs/biome --version`, so the unrelated npm package `biome` is never fetched. The Codex step 14 acceptance command changes, and a Step 14 receipt that recorded `npx biome --version` still replays.
 - In-progress Claude runs keep their archived bodies, and a missing validator there stays fail-open.
+- The 36 Claude step places that said 'after three retries record the error and go on' (or ended in a bare INCOMPLETE) now share one ending: record the error, keep the step INCOMPLETE and end with a named pause (`required-tool-failed`, `permission-denied`, otherwise `required-input-missing`). An unavailable optional tool is a `SKIP`, and ambiguity is decided with a `결정/사유` line.
+- Bounded review loops (steps 24, 25, 29, 39, 40, 43, 47–50) name the same codes.
+- The constitution keeps the 2.10.0 reading for bodies archived before the upgrade.
+- claude-contract-consistency S1 now scans the step bodies of both hosts.
+- PORTING.md documents the source change procedure.
 
 ## 2.10.0 — 2026-09-26
 
