@@ -92,12 +92,18 @@ try {
     if (!isActive(root)) process.exit(0);
     // Shell commands and network fetches retain ordinary host permission checks. Bash and WebFetch
     // are never eligible here, and the auto-approve matcher in hooks/hooks.json leaves them out
-    // too: widen both together or neither.
+    // too: widen both together or neither. Edit and MultiEdit text that holds a command the guard
+    // catalog (command-guard.mjs) would block or ask about keeps the prompt as well.
     if (event.tool_name === 'WebSearch') process.stdout.write('eligible');
     else if (edits.includes(event.tool_name)) {
-      const candidate = canonical(event.tool_input?.file_path || event.tool_input?.notebook_path, root);
+      // Loaded here, not at the top: a missing or broken catalog must not stop guard mode below
+      // from failing closed. In this branch an import error only means no grant.
+      const { contentNeedsPrompt } = await import('./command-guard.mjs');
+      const input = event.tool_input;
+      const texts = [input?.new_string, ...(Array.isArray(input?.edits) ? input.edits.map(e => e?.new_string) : [])];
+      const candidate = canonical(input?.file_path || input?.notebook_path, root);
       if (within(candidate, root) && !sensitive(candidate) && singlyLinked(candidate) && candidate !== root &&
-          !workflowState(candidate, root) && !executionLinked(candidate, root)) process.stdout.write('eligible');
+          !workflowState(candidate, root) && !executionLinked(candidate, root) && !texts.some(contentNeedsPrompt)) process.stdout.write('eligible');
     }
   } else if (mode === 'guard' && edits.includes(event.tool_name)) {
     const candidate = canonical(event.tool_input?.file_path || event.tool_input?.notebook_path, root);

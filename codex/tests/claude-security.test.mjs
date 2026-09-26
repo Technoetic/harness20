@@ -211,17 +211,22 @@ test('the guard mode leaves execution-linked edits to the normal prompt instead 
   assert.equal(guard.status, 0);
   assert.equal(guard.output, '');
 });
+// Without node (no HARNESS50_NODE from run-hook.mjs and none on PATH) the relays make no decision:
+// auto-approve grants nothing, and destructive-guard lets the host decide (documented fail-open).
 test('missing Node runtime cannot grant approval', t => {
   const root = fixture(t);
-  const script = path.join(repo, 'hooks', windows ? 'auto-approve.ps1' : 'auto-approve.sh');
   const executable = windows ? path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe') : '/bin/bash';
-  const result = spawnSync(executable, windows ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script] : [script], {
-    cwd: root, input: JSON.stringify(write('src/app.js')), encoding: 'utf8', timeout: hookShellTimeout(windows ? 'ps1' : 'sh'),
-    env: { ...process.env, PATH: root, CLAUDE_PROJECT_DIR: root },
-  });
-  assert.equal(result.error, undefined);
-  assert.equal(result.status, 0);
-  assert.equal(result.stdout.trim(), '');
+  const withoutNode = (hook, event) => {
+    const script = path.join(repo, 'hooks', `${hook}.${windows ? 'ps1' : 'sh'}`);
+    const result = spawnSync(executable, windows ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script] : [script], {
+      cwd: root, input: JSON.stringify(event), encoding: 'utf8', timeout: hookShellTimeout(windows ? 'ps1' : 'sh'),
+      env: { ...process.env, PATH: root, CLAUDE_PROJECT_DIR: root, HARNESS50_NODE: '' },
+    });
+    assert.equal(result.error, undefined);
+    return { status: result.status, stdout: result.stdout.trim() };
+  };
+  assert.deepEqual(withoutNode('auto-approve', write('src/app.js')), { status: 0, stdout: '' });
+  assert.deepEqual(withoutNode('destructive-guard', { tool_name: 'Bash', tool_input: { command: 'rm -rf /' } }), { status: 0, stdout: '' });
 });
 
 // The guards read the whole command text, quoted strings and heredoc bodies included. A block
@@ -268,4 +273,36 @@ test('permission-request-guard explains the file route for Bash denies only', t 
   assert.equal(edit.status, 2);
   assert.match(edit.stdout, /"deny"/);
   assert.equal(edit.stderr, '');
+});
+
+// One catalog decides both guards, so permission-request-guard denies only what destructive-guard
+// blocks: a command it passes or asks about is never refused at the permission prompt.
+test('permission-request-guard never refuses what destructive-guard leaves to the user', t => {
+  const { run } = installedGuard(t);
+  const bash = (command, hook_event_name) => ({ hook_event_name, tool_name: 'Bash', tool_input: { command } });
+  const guards = command => [run('destructive-guard', bash(command, 'PreToolUse')), run('permission-request-guard', bash(command, 'PermissionRequest'))];
+  for (const command of ['git commit -m "remove sudo usage"', 'rm -rf ./dist', 'rm -rf /tmp/h50-x', 'git branch -d feature']) {
+    const [pre, permission] = guards(command);
+    assert.deepEqual({ status: pre.status, stdout: pre.stdout }, { status: 0, stdout: '' }, command);
+    assert.deepEqual({ status: permission.status, stdout: permission.stdout }, { status: 0, stdout: '' }, command);
+  }
+  for (const command of ['sudo apt install jq', 'pip install semgrep', 'git config core.hooksPath .githooks', 'echo x > .claude/settings.json']) {
+    const [pre, permission] = guards(command);
+    assert.equal(pre.status, 0, command);
+    assert.match(pre.stdout, /"permissionDecision":"ask"/, command);
+    assert.deepEqual({ status: permission.status, stdout: permission.stdout }, { status: 0, stdout: '' }, command);
+  }
+});
+// Writing text that names a command is not running it: the permission guard never denies an edit
+// for its content. Auto-approval keeps the prompt for such text instead (approval-policy auto mode).
+test('edit content never makes permission-request-guard deny', t => {
+  const installed = installedGuard(t);
+  const edit = new_string => ({ tool_name: 'Edit', tool_input: { file_path: 'README.md', old_string: 'x', new_string } });
+  const permission = installed.run('permission-request-guard', { hook_event_name: 'PermissionRequest', ...edit('sudo apt install jq') });
+  assert.deepEqual({ status: permission.status, stdout: permission.stdout }, { status: 0, stdout: '' });
+  // In an active run the same edit keeps the prompt, and harmless text is still approved.
+  const root = fixture(t);
+  assert.equal(run(root, 'auto-approve', edit('sudo apt install jq')).output, '');
+  assert.equal(run(root, 'auto-approve', { tool_name: 'MultiEdit', tool_input: { file_path: 'README.md', edits: [{ old_string: 'a', new_string: 'b' }, { old_string: 'c', new_string: 'rm -rf /' }] } }).output, '');
+  assert.match(run(root, 'auto-approve', edit('const a = 1')).output, /"permissionDecision":"allow"/);
 });

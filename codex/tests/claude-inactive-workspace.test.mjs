@@ -4,7 +4,9 @@
 // pause, harness-rules 2-1) is the one exception that speaks: the loader and the prompt guard
 // print where it stopped. The progress writer also starts there, to record completion lines of the
 // turn that paused (claude-named-pause P1); its Stop here carries the pause report instead, so it
-// has nothing to record and still nothing is written.
+// has nothing to record and still nothing is written. The two guards start only in Harness50
+// workspaces (paused, finished, Codex or active); on these harmless events they stay silent and
+// write no log.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -12,9 +14,8 @@ import { availableParallelism } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { spawn } from 'node:child_process';
 
-import { HOOK_GATES } from '../../hooks/lib/harness-activity.mjs';
 import { pausedLine } from '../../scripts/lib/pause-state.mjs';
-import { PROJECT_NAMES, installPlugin, repo, runDispatcher, tempRoot, testEachName, tree, windows } from './helpers/claude-hooks.mjs';
+import { installPlugin, repo, runDispatcher, tempRoot, testEachName, tree, windows } from './helpers/claude-hooks.mjs';
 
 // Loader-created progress.json from the incident workspace: step 1 of 50 and no step bodies.
 const STALE_LOADER_PROGRESS = {
@@ -117,8 +118,12 @@ async function inPool(tasks, limit = 6) {
   return results;
 }
 
-const guards = new Set(Object.keys(HOOK_GATES).filter(name => HOOK_GATES[name] === 'always'));
 const hookList = plugin => readdirSync(join(plugin, 'hooks')).sort();
+// The two guards start a shell in paused and finished runs. They get one event per decision path
+// (destructive-guard: its Bash matcher; permission-request-guard: a command, an edit and a fetch),
+// which keeps the PowerShell starts few enough that a loaded runner stays inside their 4.5 s budget.
+const GUARD_TOOLS = { 'destructive-guard': ['Bash'], 'permission-request-guard': ['Bash', 'Write', 'WebFetch'] };
+const payloadsFor = (hook, payloads) => Object.hasOwn(GUARD_TOOLS, hook) ? payloads.filter(payload => GUARD_TOOLS[hook].includes(payload.tool_name)) : payloads;
 const writeProgress = (project, state) => {
   mkdirSync(join(project, 'step_archive'), { recursive: true });
   writeFileSync(join(project, 'step_archive', 'progress.json'), typeof state === 'string' ? state : JSON.stringify(state));
@@ -166,8 +171,8 @@ for (const [kind, prepare] of Object.entries(WORKSPACES)) {
     const byEvent = events(f.project, kind);
     const tasks = [];
     for (const [event, hooks] of Object.entries(registrations())) {
-      for (const hook of hooks.filter(hook => !guards.has(hook))) {
-        for (const payload of byEvent[event]) tasks.push(async () => [`${hook} ${JSON.stringify(payload).slice(0, 80)}`, await dispatch(f.plugin, hook, payload, { cwd: f.project, env: f.env })]);
+      for (const hook of hooks) {
+        for (const payload of payloadsFor(hook, byEvent[event])) tasks.push(async () => [`${hook} ${JSON.stringify(payload).slice(0, 80)}`, await dispatch(f.plugin, hook, payload, { cwd: f.project, env: f.env })]);
       }
     }
     assert.ok(tasks.length >= 30, `only ${tasks.length} hook calls`);
@@ -193,8 +198,8 @@ testEachName('finished run (50/50): only the trust5 gate speaks; progress, specs
   const byEvent = events(f.project);
   const tasks = [];
   for (const [event, hooks] of Object.entries(registrations())) {
-    for (const hook of hooks.filter(hook => !guards.has(hook))) {
-      for (const payload of byEvent[event]) tasks.push(async () => [hook, await dispatch(f.plugin, hook, payload, { cwd: f.project, env: f.env })]);
+    for (const hook of hooks) {
+      for (const payload of payloadsFor(hook, byEvent[event])) tasks.push(async () => [hook, await dispatch(f.plugin, hook, payload, { cwd: f.project, env: f.env })]);
     }
   }
   for (const [hook, result] of await inPool(tasks)) {
@@ -207,14 +212,58 @@ testEachName('finished run (50/50): only the trust5 gate speaks; progress, specs
   assert.equal(existsSync(f.npx.log), false);
 });
 
-test('the two guards still apply in every folder the plugin is installed for', t => {
-  const f = setup(t, PROJECT_NAMES[0]);
-  const deny = runDispatcher(f.plugin, 'permission-request-guard', { hook_event_name: 'PermissionRequest', tool_name: 'Write', tool_input: { file_path: '.claude/settings.json', content: '{}' }, cwd: f.project }, { cwd: f.project, env: f.env, timeoutMs: 60000 });
+// The two guards run only in Harness50 workspaces: an active, paused or finished Claude run, or a
+// Codex workspace. In an unrelated folder, or next to a loader-created progress.json, no shell
+// starts and the host's permission checks decide. A block writes the guard log next to the
+// installed hooks, so this test does not compare the hooks folder.
+testEachName('the guards run only in harness workspaces', (t, name) => {
+  const f = setup(t, name);
+  const guard = (hook, project, event) => runDispatcher(f.plugin, hook, { cwd: project, ...event }, { cwd: project, env: f.env, timeoutMs: 60000 });
+  const settingsWrite = { hook_event_name: 'PermissionRequest', tool_name: 'Write', tool_input: { file_path: '.claude/settings.json', content: '{}' } };
+  const bash = (command, hook_event_name = 'PreToolUse') => ({ hook_event_name, tool_name: 'Bash', tool_input: { command } });
+  const silent = { status: 0, stdout: '', stderr: '' };
+
+  const stale = join(f.base, `${name} stale`);
+  mkdirSync(stale);
+  writeProgress(stale, STALE_LOADER_PROGRESS);
+  const staleBefore = tree(stale);
+  for (const project of [f.project, stale]) {
+    assert.deepEqual(guard('permission-request-guard', project, settingsWrite), silent, project);
+    assert.deepEqual(guard('destructive-guard', project, bash('git reset --hard')), silent, project);
+  }
+  assert.equal(existsSync(join(f.project, 'step_archive')), false);
+  assert.deepEqual(tree(stale), staleBefore);
+
+  // After /webapp <topic> the same folder is an active run: block, deny and ask apply, and a
+  // command that destructive-guard leaves to the user is never refused by permission-request-guard.
+  assert.equal(guard('webapp-trigger', f.project, { hook_event_name: 'UserPromptSubmit', prompt: '/webapp fractions' }).status, 0);
+  const deny = guard('permission-request-guard', f.project, settingsWrite);
   assert.equal(deny.status, 2, deny.stderr);
   assert.match(deny.stdout, /"deny"/);
-  const block = runDispatcher(f.plugin, 'destructive-guard', { hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'git reset --hard' }, cwd: f.project }, { cwd: f.project, env: f.env, timeoutMs: 60000 });
+  const block = guard('destructive-guard', f.project, bash('git reset --hard'));
   assert.equal(block.status, 2, block.stderr);
-  assert.equal(existsSync(join(f.project, 'step_archive')), false);
+  assert.match(block.stderr, /Rule: git-reset-hard/);
+  const ask = guard('destructive-guard', f.project, bash('sudo apt install jq'));
+  assert.equal(ask.status, 0, ask.stderr);
+  assert.match(ask.stdout, /"permissionDecision":"ask"/);
+  assert.deepEqual(guard('permission-request-guard', f.project, bash('git commit -m "remove sudo usage"', 'PermissionRequest')), silent);
+
+  // Paused, finished (50/50) and Codex workspaces keep the guards as well.
+  const workspaces = {
+    paused: project => { writeProgress(project, PAUSED_RUN); writeBodies(project, [1]); },
+    finished: project => writeProgress(project, { ...valid, completed_steps: Array.from({ length: 50 }, (_, index) => index + 1), current_step: 50 }),
+    codex: project => {
+      mkdirSync(join(project, 'step_archive', '.harness50-codex'), { recursive: true });
+      writeFileSync(join(project, 'step_archive', '.harness50-codex', 'state.json'), '{}');
+    }
+  };
+  for (const [kind, prepare] of Object.entries(workspaces)) {
+    const project = join(f.base, `${name} ${kind}`);
+    mkdirSync(project);
+    prepare(project);
+    const result = guard('destructive-guard', project, bash('git reset --hard'));
+    assert.equal(result.status, 2, `${kind}: ${result.stderr}`);
+  }
 });
 
 // Runs one registered hook through the installed dispatcher and returns trimmed stdout.

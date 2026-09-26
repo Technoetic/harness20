@@ -12,6 +12,7 @@ $protectedPaths = @(
     "hooks/hooks.json",
     "hooks/html-bundler.ps1",
     "hooks/lib/approval-policy.mjs",
+    "hooks/lib/command-guard.mjs",
     "hooks/lib/harness-activity.mjs",
     "hooks/lsp-autofix.ps1",
     "hooks/mx-tag-validator.ps1",

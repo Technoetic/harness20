@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 import {
-  ACTIVE_STATUSES, EXPLICIT_WEBAPP, HOOK_GATES, MAX_PROGRESS_BYTES, STEP_COUNT,
+  ACTIVE_STATUSES, EXPLICIT_WEBAPP, GUARD_PHASES, HOOK_GATES, MAX_PROGRESS_BYTES, STEP_COUNT,
   classifyProgress, codexOwned, isActive, readRun, shouldRunHook, webappPrecheck
 } from '../../hooks/lib/harness-activity.mjs';
 import { repo, tempRoot, tree, windows } from './helpers/claude-hooks.mjs';
@@ -22,6 +22,8 @@ test('constants keep the documented values', () => {
   assert.deepEqual([...ACTIVE_STATUSES], ['active', 'running', 'in_progress']);
   assert.equal(MAX_PROGRESS_BYTES, 1024 * 1024);
   assert.ok(Object.isFrozen(HOOK_GATES));
+  assert.deepEqual([...GUARD_PHASES], ['active', 'paused', 'finished', 'codex']);
+  assert.ok(Object.isFrozen(GUARD_PHASES));
 });
 
 test('classifyProgress: invalid structures', () => {
@@ -163,9 +165,10 @@ test('codexOwned counts any entry, dangling links included', t => {
 
 const HOOKS = Object.keys(HOOK_GATES);
 const PHASES = ['absent', 'stale', 'paused', 'stopped', 'invalid', 'finished', 'codex', 'active'];
+// The two guards run only where a Harness50 run is established; elsewhere the host decides.
 const EXPECTED = {
-  'destructive-guard': PHASES,
-  'permission-request-guard': PHASES,
+  'destructive-guard': ['paused', 'finished', 'codex', 'active'],
+  'permission-request-guard': ['paused', 'finished', 'codex', 'active'],
   'webapp-trigger': [],
   'step-progress-loader': ['paused', 'codex', 'active'],
   'trust5-validator': ['finished', 'active'],
@@ -209,12 +212,12 @@ test('shouldRunHook: 12 hooks by run phase', t => {
   }
 });
 
-test('shouldRunHook: broken events start only the guards; unknown names use the active gate', t => {
+test('shouldRunHook: broken events start no hook; unknown names use the active gate', t => {
   const active = phaseProject(t, 'active');
   const absent = phaseProject(t, 'absent');
   for (const raw of ['{broken', '', 'null', '[]', '"text"', '42']) {
     for (const hook of HOOKS) {
-      assert.equal(shouldRunHook(hook, raw, { CLAUDE_PROJECT_DIR: active }, active), HOOK_GATES[hook] === 'always', `${hook} with ${JSON.stringify(raw)}`);
+      assert.equal(shouldRunHook(hook, raw, { CLAUDE_PROJECT_DIR: active }, active), false, `${hook} with ${JSON.stringify(raw)}`);
     }
   }
   assert.equal(shouldRunHook('future-hook', JSON.stringify({ cwd: active }), { CLAUDE_PROJECT_DIR: '' }, active), true);

@@ -15,8 +15,8 @@
 // reads as stale and never turns hooks on.
 // A named pause (scripts/harness-pause.mjs, harness-rules 2-1) is judged on the same rules with
 // the pause flag removed: 'paused' only when that run would be active, else finished, stale,
-// stopped or invalid. Only the loader, the prompt guard and the progress writer start for a paused
-// run.
+// stopped or invalid. Only the two guards, the loader, the prompt guard and the progress writer
+// start for a paused run.
 //
 // It never writes and never imports codex/: installed copies and hook fixtures may ship hooks/
 // without it. The CLI prints one ASCII line and always exits 0.
@@ -29,15 +29,18 @@ export const ACTIVE_STATUSES = Object.freeze(['active', 'running', 'in_progress'
 export const MAX_PROGRESS_BYTES = 1024 * 1024;
 // First line only: '^' without the m flag anchors at the start of the prompt. Case-sensitive.
 export const EXPLICIT_WEBAPP = /^[ \t]*\/(?:harness50:)?webapp[ \t]+\S/;
-// Which run phases start each registered hook. 'always' runs everywhere the plugin is installed;
-// 'explicit-webapp' runs only for a '/webapp <topic>' prompt. In a paused run the loader and the
-// prompt guard start, to say where the run stopped, and the writer starts to record the completion
-// lines the model reported in the turn it paused (harness-rules 2-1 lets it finish steps first). The
-// writer never tells the model to continue, so the pause keeps its meaning. Stop continuation,
-// approval, quality, SPEC, MX and LSP stay off until /harness-resume.
+// Which run phases start each registered hook. The two guards run only where a Harness50 run is
+// established (active, paused or finished Claude run, or a Codex workspace, where a Claude session
+// has no other plugin guard); elsewhere the host permission checks apply, and Bash is never
+// auto-approved. 'explicit-webapp' runs only for a '/webapp <topic>' prompt. In a paused run the
+// loader and the prompt guard start, to say where the run stopped, and the writer starts to record
+// the completion lines the model reported in the turn it paused (harness-rules 2-1 lets it finish
+// steps first). The writer never tells the model to continue, so the pause keeps its meaning. Stop
+// continuation, approval, quality, SPEC, MX and LSP stay off until /harness-resume.
+export const GUARD_PHASES = Object.freeze(['active', 'paused', 'finished', 'codex']);
 export const HOOK_GATES = Object.freeze({
-  'destructive-guard': 'always',
-  'permission-request-guard': 'always',
+  'destructive-guard': GUARD_PHASES,
+  'permission-request-guard': GUARD_PHASES,
   'webapp-trigger': 'explicit-webapp',
   'step-progress-loader': Object.freeze(['active', 'codex', 'paused']),
   'trust5-validator': Object.freeze(['active', 'finished']),
@@ -159,7 +162,6 @@ export const isActive = root => readRun(root).phase === 'active';
 export function shouldRunHook(name, raw, env = process.env, cwd = process.cwd()) {
   try {
     const gate = Object.hasOwn(HOOK_GATES, name) ? HOOK_GATES[name] : DEFAULT_GATE;
-    if (gate === 'always') return true;
     const text = typeof raw === 'string' ? raw : Buffer.isBuffer(raw) ? raw.toString('utf8') : '';
     const event = JSON.parse(text.replace(/^﻿/, ''));
     if (!event || typeof event !== 'object' || Array.isArray(event)) return false;

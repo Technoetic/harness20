@@ -16,6 +16,7 @@ protected_paths=(
   "hooks/html-bundler.ps1"
   "hooks/html-bundler.sh"
   "hooks/lib/approval-policy.mjs"
+  "hooks/lib/command-guard.mjs"
   "hooks/lib/harness-activity.mjs"
   "hooks/lsp-autofix.ps1"
   "hooks/lsp-autofix.sh"
