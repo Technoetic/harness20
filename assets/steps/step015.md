@@ -23,21 +23,13 @@ persistence: session
 npm install -D madge
 ```
 
-**Hook**: `.claude/hooks/madge-validator.ps1`
-
 ## 검증
 
-Hook 실행 후 다음을 확인:
-- `step_archive/step015_madge_test.md` 파일 생성 확인
-- `.claude/hooks/madge-validator.log` 로그 확인
-- Hook exit code 확인 (0: 성공, 1: 실패)
+`npx --no-install madge --version`로 확인한다. `npx`에는 `--no-install`을 붙여 설치되지 않은 패키지를 내려받지 않는다. 없으면 위 `## 설치` 명령으로 설치하고 다시 확인한다. 설치와 확인을 합쳐 최대 3회 시도하며 정상 권한 확인을 유지한다.
 
-**검증 실패 시:**
-1. 로그 파일 분석
-2. 에러 원인 파악 (npm 설치 실패, Node.js 버전 문제 등)
-3. 필요한 조치 수행 (npm install -D madge 등)
-4. Hook 재실행
-5. 검증 통과할 때까지 반복
+`step_archive/step015_madge_test.md`에 명령, 종료 코드, 확인된 버전 또는 `SKIP`과 사유를 기록한다. 패키지 이름·디렉터리 존재만으로 성공을 적지 않는다.
+
+이 도구는 선택이다. 끝내 쓸 수 없으면 `SKIP`과 사유·대체 방법을 기록하고 완료한다. 자동 검증 훅은 번들되지 않는다.
 
 서브에이전트는 항상 haiku를 사용한다.
 

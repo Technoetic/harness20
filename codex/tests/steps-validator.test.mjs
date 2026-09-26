@@ -333,8 +333,8 @@ test("index records SHA-256 digests of the unmodified Claude source bytes", asyn
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(0, 5));
 
   assert.deepEqual(hashes, {
-    step001: "0653c4110f62fc0451c0ebcf40964fd78a6c4029f15ebf23b6f4ab995fe22a20",
-    step002: "3138e7a161fe488b3c1777da7e72820d1c5d3faa992380f1cbd73a74103b3e89",
+    step001: "5e6e8ed72f0ca27f71448c5697b7f0c45965a0fddd1790249df53c3807df2374",
+    step002: "2a2bf2840870bc0267a02bb999545cf12c930378be0c1427eedc1d0063f9ef0a",
     step003: "971e337ad3eba825d3260949ae19b8d9ddfcae37e9ebc7ea7dd8ea377e03a500",
     step004: "5d40b076c3d1cae5e13a64ad16488f73d46c7beae6e2756b9a091544bbd4db1e",
     step005: "902d5a5ce9f8eaff9121b54ececc9206955c50326b7c86ad26965f9bd9d0339b"
@@ -352,7 +352,7 @@ test("preflight batch declares the exact Codex-native step contracts", async () 
       phase: "preflight",
       source: "assets/steps/step001.md",
       target: "codex/assets/steps/step001.md",
-      source_sha256: "0653c4110f62fc0451c0ebcf40964fd78a6c4029f15ebf23b6f4ab995fe22a20",
+      source_sha256: "5e6e8ed72f0ca27f71448c5697b7f0c45965a0fddd1790249df53c3807df2374",
       inputs: ["step_archive/TOPIC/TOPIC.md"],
       outputs: ["step_archive/step001_preflight.md"],
       requires: [],
@@ -411,7 +411,7 @@ test("preflight batch declares the exact Codex-native step contracts", async () 
       phase: "preflight",
       source: "assets/steps/step002.md",
       target: "codex/assets/steps/step002.md",
-      source_sha256: "3138e7a161fe488b3c1777da7e72820d1c5d3faa992380f1cbd73a74103b3e89",
+      source_sha256: "2a2bf2840870bc0267a02bb999545cf12c930378be0c1427eedc1d0063f9ef0a",
       inputs: [
         "step_archive/TOPIC/TOPIC.md",
         "step_archive/step001_preflight.md"
@@ -914,7 +914,7 @@ test("tooling batch declares the exact portable capability contracts", async () 
           id: "biome-version",
           kind: "command",
           required: true,
-          command: "npx biome --version"
+          command: "npx --no-install @biomejs/biome --version"
         },
         {
           id: "biome-environment-report",
@@ -976,14 +976,14 @@ test("tooling source hashes bind the untouched Claude steps 006 through 015", as
   assert.deepEqual(hashes, {
     step006: "dd92b07f8da8b0e71ef386b22ce85e93b19c71ce581bcddae41da78cde28b47d",
     step007: "53209e43a2145950d76a9eac0e36e11ffb71b99350cbd466d8072c98ad22bca5",
-    step008: "14976722eba206b66ad917115ddac28413fb31dfc8e49c1f7128e1fa4a2a984d",
-    step009: "3c2f99310df7c9690ffaf22f4174882b29563b64e6c6ecc026e83f99f7cbf06c",
-    step010: "dc6fb1cec685b10b315f4fa77cc85e9dfbbd00aaa4442f114d950a947eb08ea0",
-    step011: "f4c6f789452c1a4920e8ea69ce6ad1cee1871400234c73d5d240bac2eef0a948",
-    step012: "bf5dd150944bc2774679d6a04a366ed77386446ca5823e62cd3d10a1259f5735",
-    step013: "2245a7a78b2a21c546ab12b78849b3a7c2c85f54c8ea69a8b142de69f33a9f2e",
-    step014: "5bf9523b046adac78fbd28872c4388aeeca32220a541719884abf208c8b99075",
-    step015: "46c4a588eceb39df1b1dcdd798b4d3b3d5d2a818d6063bb98e558a13fd6be23b"
+    step008: "95a7df285244b7ac960665ceb738641f4f76fc42b417309a037f2223fda48b11",
+    step009: "cfea2f9a904ef1d9a0a16c54c5bc3299b9053d602a7a5dd5e9f435ffc7ef6f74",
+    step010: "5f7717c5dd544c62831c7af780ce31aa5525645118d94735013fa09faee073e8",
+    step011: "0f9cc7ed771a54d81c3f018937b0b2b03c614491e3544ab08f088c0264bff738",
+    step012: "56798455e2564b089d9dc702eb0c45be3a9277450432921126d588456b6017ca",
+    step013: "f349bc77cb5ec770e2ab49a8c856c14656ea8e34d66f563244123942e72c19a8",
+    step014: "61b5423e3b986dff5fd41812c98fc66ff92d5f2284a20a558a86277c44d764ca",
+    step015: "69d707b042f428fe58f2214c2bd45519fb344e1105851aaf5c8d9e33d5c5ff0b"
   });
 });
 
@@ -1143,7 +1143,7 @@ test("research batch declares the exact Codex-native evidence contracts", async 
       phase: "research",
       source: "assets/steps/step016.md",
       target: "codex/assets/steps/step016.md",
-      source_sha256: "83814c556556da24504ae20772146930fa52354fb6a1d3cf86a7387814be3eb2",
+      source_sha256: "430463c27976bfddb7f9557cb54087c22116219b0721c94002a535d6446ed92a",
       inputs: [
         "step_archive/TOPIC/TOPIC.md",
         "step_archive/step001_preflight.md",
@@ -1207,7 +1207,7 @@ test("research batch declares the exact Codex-native evidence contracts", async 
       phase: "research",
       source: "assets/steps/step018.md",
       target: "codex/assets/steps/step018.md",
-      source_sha256: "d9f419671463c41d66e4261352d56743a053b13436f82ca9966697b118650014",
+      source_sha256: "7c7c52c0d580a825561f155ccc6a19e3ac0956a48c160d50b6721c8b5d8e0a9d",
       inputs: [
         "step_archive/TOPIC/TOPIC.md",
         "step_archive/step016_조사결과_chunk1.md"
@@ -1267,7 +1267,7 @@ test("research batch declares the exact Codex-native evidence contracts", async 
       phase: "research",
       source: "assets/steps/step020.md",
       target: "codex/assets/steps/step020.md",
-      source_sha256: "eb729885309aaa07e489bc2a1a2987606161fba43e3b6a996a552e15298d425b",
+      source_sha256: "38ba3a7d254b78dcf250f2f38a02985463c7f8b499c6be18aa79520fb18d825e",
       inputs: [
         "step_archive/TOPIC/TOPIC.md",
         "step_archive/step016_조사결과_chunk1.md"
@@ -1297,7 +1297,7 @@ test("research batch declares the exact Codex-native evidence contracts", async 
       phase: "research",
       source: "assets/steps/step021.md",
       target: "codex/assets/steps/step021.md",
-      source_sha256: "c36004a40bd93ed6bc79043cd7120629f2f71e6582feb89ca3e3a6d20cc7da54",
+      source_sha256: "e1795b2f1923c8e81d0e682489c0e2900fc139268525263d1f5ba7771bef1496",
       inputs: ["step_archive/step001_preflight.md"],
       outputs: ["step_archive/step021_gate_status.md"],
       requires: ["step001"],
@@ -1354,7 +1354,7 @@ test("research batch declares the exact Codex-native evidence contracts", async 
       phase: "research",
       source: "assets/steps/step023.md",
       target: "codex/assets/steps/step023.md",
-      source_sha256: "9ebd0a2e029e47d88e58a005e9de54ff8b16529bf275b4adc85c99d4ce0dc4be",
+      source_sha256: "d62493c5fdaefb3788bcf71f864c770ae4d57387d044713619627cf9d5251ea3",
       inputs: [
         "step_archive/step016_조사결과_chunk1.md",
         "step_archive/step022_수집결과_chunk1.md",
@@ -1418,14 +1418,14 @@ test("research source hashes bind the untouched Claude steps 016 through 024", a
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(15, 24));
 
   assert.deepEqual(hashes, {
-    step016: "83814c556556da24504ae20772146930fa52354fb6a1d3cf86a7387814be3eb2",
+    step016: "430463c27976bfddb7f9557cb54087c22116219b0721c94002a535d6446ed92a",
     step017: "941288a9368915036af4f69ddac2ef1a605b8dd6181c277314f38c1b489f3fe9",
-    step018: "d9f419671463c41d66e4261352d56743a053b13436f82ca9966697b118650014",
+    step018: "7c7c52c0d580a825561f155ccc6a19e3ac0956a48c160d50b6721c8b5d8e0a9d",
     step019: "d34370dc09411a8724906cc17965188f6d9f179a69b0997b0b036ccbfe9225c0",
-    step020: "eb729885309aaa07e489bc2a1a2987606161fba43e3b6a996a552e15298d425b",
-    step021: "c36004a40bd93ed6bc79043cd7120629f2f71e6582feb89ca3e3a6d20cc7da54",
+    step020: "38ba3a7d254b78dcf250f2f38a02985463c7f8b499c6be18aa79520fb18d825e",
+    step021: "e1795b2f1923c8e81d0e682489c0e2900fc139268525263d1f5ba7771bef1496",
     step022: "2d16baba92f09b0ab7811731517979c048434a3ab2f9a570c5e0ce7a690dd93c",
-    step023: "9ebd0a2e029e47d88e58a005e9de54ff8b16529bf275b4adc85c99d4ce0dc4be",
+    step023: "d62493c5fdaefb3788bcf71f864c770ae4d57387d044713619627cf9d5251ea3",
     step024: "a57a38272cde57d70d86503a58b175b69434238a28c80b3210392ca1a5ab85f5"
   });
 });
@@ -1752,7 +1752,7 @@ test("planning batch declares the exact Codex-native artifact contracts", async 
       phase: "planning",
       source: "assets/steps/step025.md",
       target: "codex/assets/steps/step025.md",
-      source_sha256: "856546680563f1c919baada5af17a340937bdfad2c48f5d09a967646751a1153",
+      source_sha256: "a43622b14c89f87c039b7b20d77e8c26b011d5f3318f0e06abf3b2ea701049a3",
       inputs: [
         "step_archive/TOPIC/TOPIC.md",
         "step_archive/step016_조사결과_chunk1.md",
@@ -1787,7 +1787,7 @@ test("planning batch declares the exact Codex-native artifact contracts", async 
       phase: "planning",
       source: "assets/steps/step026.md",
       target: "codex/assets/steps/step026.md",
-      source_sha256: "6f356e9081084e224aca6f0a4cffbedcff90455de9e5dee03a4c7204a4f9df0c",
+      source_sha256: "c38c994e3a37117a4bceb55aeeab6555ca195e17fb758298487e9653573a4f74",
       inputs: [
         "step_archive/step025_planning_chunk1.md",
         "step_archive/outputs/step025_검증.md",
@@ -1821,7 +1821,7 @@ test("planning batch declares the exact Codex-native artifact contracts", async 
       phase: "planning",
       source: "assets/steps/step027.md",
       target: "codex/assets/steps/step027.md",
-      source_sha256: "92e6538f33b3beb7a4be49460de06dcc45817296c5ca43f1f96af47be5ee9fe4",
+      source_sha256: "219923fbb0dfa401356ae4651defecad427b2fe0d1bcec7e82f1073a742e9e85",
       inputs: [
         "step_archive/step026_planning_chunk1.md",
         "step_archive/outputs/step026_검증.md",
@@ -1855,7 +1855,7 @@ test("planning batch declares the exact Codex-native artifact contracts", async 
       phase: "planning",
       source: "assets/steps/step028.md",
       target: "codex/assets/steps/step028.md",
-      source_sha256: "681e4901e23093f5caff6420431835fdacd37d6f3ac3e7f628c7c3566d7f93af",
+      source_sha256: "20342394d9d3403eaf5e3d6812bd16b88aed2a87f6e92fdfacd1a9ff3ed7e785",
       inputs: [
         "step_archive/step027_planning_chunk1.md",
         "step_archive/outputs/step027_검증.md",
@@ -1889,7 +1889,7 @@ test("planning batch declares the exact Codex-native artifact contracts", async 
       phase: "planning",
       source: "assets/steps/step029.md",
       target: "codex/assets/steps/step029.md",
-      source_sha256: "01ea1d8a424937393aa0827ab9f41c952200f04a771e90b121c9a5569e364d40",
+      source_sha256: "f5b6668a0bb9494f5f37b4fc26739787730da27d6bffdfa016426126a0e186dc",
       inputs: [
         "step_archive/step028_planning_chunk1.md",
         "step_archive/outputs/step028_검증.md",
@@ -1928,7 +1928,7 @@ test("planning batch declares the exact Codex-native artifact contracts", async 
       phase: "planning",
       source: "assets/steps/step030.md",
       target: "codex/assets/steps/step030.md",
-      source_sha256: "8581ac1abd5b8d68dd9127cbecd001f5038f168414aa4dad102bc5c2276d3dca",
+      source_sha256: "be915a095de37c9090c7147051f3985ac7579fcead12c700724b91f9b8e70c70",
       inputs: [
         "step_archive/TOPIC/TOPIC.md",
         "step_archive/step029_planning_chunk1.md",
@@ -1971,12 +1971,12 @@ test("planning source hashes bind the reviewed source steps 025 through 030", as
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(24, 30));
 
   assert.deepEqual(hashes, {
-    step025: "856546680563f1c919baada5af17a340937bdfad2c48f5d09a967646751a1153",
-    step026: "6f356e9081084e224aca6f0a4cffbedcff90455de9e5dee03a4c7204a4f9df0c",
-    step027: "92e6538f33b3beb7a4be49460de06dcc45817296c5ca43f1f96af47be5ee9fe4",
-    step028: "681e4901e23093f5caff6420431835fdacd37d6f3ac3e7f628c7c3566d7f93af",
-    step029: "01ea1d8a424937393aa0827ab9f41c952200f04a771e90b121c9a5569e364d40",
-    step030: "8581ac1abd5b8d68dd9127cbecd001f5038f168414aa4dad102bc5c2276d3dca"
+    step025: "a43622b14c89f87c039b7b20d77e8c26b011d5f3318f0e06abf3b2ea701049a3",
+    step026: "c38c994e3a37117a4bceb55aeeab6555ca195e17fb758298487e9653573a4f74",
+    step027: "219923fbb0dfa401356ae4651defecad427b2fe0d1bcec7e82f1073a742e9e85",
+    step028: "20342394d9d3403eaf5e3d6812bd16b88aed2a87f6e92fdfacd1a9ff3ed7e785",
+    step029: "f5b6668a0bb9494f5f37b4fc26739787730da27d6bffdfa016426126a0e186dc",
+    step030: "be915a095de37c9090c7147051f3985ac7579fcead12c700724b91f9b8e70c70"
   });
 });
 
@@ -2684,7 +2684,7 @@ test("implementation batch declares the exact Codex-native evidence contracts", 
       phase: "implementation",
       source: "assets/steps/step031.md",
       target: "codex/assets/steps/step031.md",
-      source_sha256: "148c8f75e79c31a42790ab0d95b70cea9ec86d7a9ecf4711a5571ac8e210c4c9",
+      source_sha256: "c39282cf4d680b639c54844e83bf7d67b9c7c33600bf3706c004c41e7d12c606",
       inputs: [
         "step_archive/outputs/step030_설계선택.md",
         "step_archive/step030_레이아웃설계_chunk1.md",
@@ -2712,7 +2712,7 @@ test("implementation batch declares the exact Codex-native evidence contracts", 
       phase: "implementation",
       source: "assets/steps/step032.md",
       target: "codex/assets/steps/step032.md",
-      source_sha256: "8ad499b3f827f5a8028c94226f7b7960b324819487b01dca9562ef5999962696",
+      source_sha256: "a94cb387abd7269c81d22cacd62deec1b7d3e9c585b8294df94fd4e9ed3989b0",
       inputs: [
         "step_archive/step030_레이아웃설계_chunk1.md",
         "step_archive/step030_전체설계_chunk1.md",
@@ -2814,7 +2814,7 @@ test("implementation batch declares the exact Codex-native evidence contracts", 
       phase: "implementation",
       source: "assets/steps/step036.md",
       target: "codex/assets/steps/step036.md",
-      source_sha256: "27787a5adeff811a6ce6b1f8c58fe9afc0703139f049e88a705b6e911b2fcec0",
+      source_sha256: "29ef9de9458af31433321b92d4ce8ec68a201cd29714195dca04b514130e37b7",
       inputs: ["step_archive/step032_파일인덱스_chunk1.md", "step_archive/step035_컨텍스트정책.md"],
       outputs: ["step_archive/step036_인코딩정책.md"],
       requires: ["step032", "step035"],
@@ -2879,7 +2879,7 @@ test("implementation batch declares the exact Codex-native evidence contracts", 
       phase: "implementation",
       source: "assets/steps/step038.md",
       target: "codex/assets/steps/step038.md",
-      source_sha256: "f250caba0c63b654ecbe011b7591e6dff23cdeb8c83e4e6347dde937a94be8f0",
+      source_sha256: "14bf849a1dcc72535fb91647fa5a1b5c02b36d11f42484fb9da4fb4d259356f2",
       inputs: [
         "step_archive/step031_환경준비.md",
         "step_archive/step033_jscpd베이스라인.md",
@@ -2913,14 +2913,14 @@ test("implementation source hashes bind the reviewed source steps 031 through 03
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(30, 38));
 
   assert.deepEqual(hashes, {
-    step031: "148c8f75e79c31a42790ab0d95b70cea9ec86d7a9ecf4711a5571ac8e210c4c9",
-    step032: "8ad499b3f827f5a8028c94226f7b7960b324819487b01dca9562ef5999962696",
+    step031: "c39282cf4d680b639c54844e83bf7d67b9c7c33600bf3706c004c41e7d12c606",
+    step032: "a94cb387abd7269c81d22cacd62deec1b7d3e9c585b8294df94fd4e9ed3989b0",
     step033: "1d92fd81e2ecf485817a5a78f8846b5376e40e3ab58cb45fad606c09a2a74659",
     step034: "f82ed6a8cd582b740d39d53e75b8b31b75b4b9b759b48d8d63add97cd24f4671",
     step035: "664d663cc7ed8cbb8605e3c5c5d2653fb139421eb469e81d1f08201fbf284acd",
-    step036: "27787a5adeff811a6ce6b1f8c58fe9afc0703139f049e88a705b6e911b2fcec0",
+    step036: "29ef9de9458af31433321b92d4ce8ec68a201cd29714195dca04b514130e37b7",
     step037: "ddac5165b3aa9dbb8dd029e3da89cfb6de0d876698ddaba7aa6ad7a6519f5a3c",
-    step038: "f250caba0c63b654ecbe011b7591e6dff23cdeb8c83e4e6347dde937a94be8f0"
+    step038: "14bf849a1dcc72535fb91647fa5a1b5c02b36d11f42484fb9da4fb4d259356f2"
   });
 });
 
@@ -3451,7 +3451,7 @@ const EXPECTED_REVIEW_ROWS = [
     phase: "review",
     source: "assets/steps/step039.md",
     target: "codex/assets/steps/step039.md",
-    source_sha256: "e3533aa66be031d7e45ed284cbe55af650d61df7421708d9cd7710cc51c4dd94",
+    source_sha256: "57239b2bbb537e0d7fa8c54ba7cd94d49782847195e0560a59ce0371540f9879",
     inputs: [
       "step_archive/step030_레이아웃설계_chunk1.md",
       "step_archive/step030_전체설계_chunk1.md",
@@ -3598,7 +3598,7 @@ const EXPECTED_REVIEW_ROWS = [
     phase: "review",
     source: "assets/steps/step043.md",
     target: "codex/assets/steps/step043.md",
-    source_sha256: "7e5908dc646573b521b41123deb5ab5a58af6490617e2098ceea6a6b0af543e0",
+    source_sha256: "42c30fff23edf9db4cec9b9b6c22ef26ce703f9236b746cd94babeceb9d38625",
     inputs: [
       "step_archive/step022_수집결과_chunk1.md",
       "step_archive/awwwards-step022-primary.txt",
@@ -3696,11 +3696,11 @@ test("review source hashes bind reviewed source steps 039 through 044", async ()
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(38, 44));
 
   assert.deepEqual(hashes, {
-    step039: "e3533aa66be031d7e45ed284cbe55af650d61df7421708d9cd7710cc51c4dd94",
+    step039: "57239b2bbb537e0d7fa8c54ba7cd94d49782847195e0560a59ce0371540f9879",
     step040: "aee1887200a1094b68f66f1dc30dcb1a39d85f13781b7a7838505b20b9f63be5",
     step041: "d3bd6bc9850aa09868a3925349fd826a898230a5200e1a384f14d058921b883c",
     step042: "de60366a82b20ca40f7d8fa0fb43df0194d723039155f0ee6714df1fdff83e16",
-    step043: "7e5908dc646573b521b41123deb5ab5a58af6490617e2098ceea6a6b0af543e0",
+    step043: "42c30fff23edf9db4cec9b9b6c22ef26ce703f9236b746cd94babeceb9d38625",
     step044: "bad68534ce5d04e52a1b4ff933f15fcb5dcaa6a03958f695810b044682489f35"
   });
 });

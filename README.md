@@ -742,7 +742,7 @@ PASS/FAIL/INCOMPLETE 판정이며 점수는 없다. PASS가 아니면 한 번 �
 | 3 | Windows 사용자 short name (`~/ADMINI~1`) | LLM 자발 생성 가능성 매우 낮음 | well-known 7토큰 fallback 차단 |
 | 4 | **블랙리스트 방식의 본질적 불완전성** | 셸 동치표현은 무한(변수·인터프리터·인코딩·2단계) — 알려진 우회만 차단 | `tests/security-regression`으로 회귀 고정. 근본 대응은 화이트리스트 역전(로드맵) |
 | 5 | **진행 추적이 transcript 정규식 스캔 의존** (H8) | 완료 문구 변형 시 미기록→재개, 예시 인용 시 오집계 위험 | 코드펜스·인용 가드로 오탐 완화. 상태전이가 LLM 산문에 걸리는 구조적 약점은 잔존 |
-| 6 | **step 본문이 참조하는 검증기 다수 미번들** (H5) | tokei/c8/biome/semgrep 등 `*-validator.ps1` 24종 부재 | 부재 시 해당 단계 fail-open(건너뜀). 목록·정책은 [`docs/RETIRED-VALIDATORS.md`](docs/RETIRED-VALIDATORS.md) |
+| 6 | **옛 step 본문이 참조하던 검증기 미번들** (H5) | 현재 본문은 CLI를 직접 확인하고 선택 도구는 SKIP, 업그레이드 전 실행의 archived 옛 본문은 여전히 `*-validator.ps1`을 가리킴 | 옛 본문에서는 부재 시 fail-open(건너뜀). 목록·정책은 [`docs/RETIRED-VALIDATORS.md`](docs/RETIRED-VALIDATORS.md) |
 | 7 | 가드 2종은 활성 여부와 무관하게 설치 범위 전체에서 동작하고, 명령 문자열 전체(따옴표 안 메시지·heredoc 본문 포함)를 정규식으로 검사 | 커밋 메시지나 PR 본문의 위험 문구도 승인할 수 없게 차단 | Write로 파일에 쓴 뒤 `git commit -F <파일>`·`gh pr create --body-file <파일>`. 문맥을 인식하는 검사는 후속 |
 | 8 | 훅은 hooks.json 제한 시간 전에 스스로 멈추고 결정을 내리지 않음(POSIX는 직계 자식만 종료) | 부하가 크면 자동 승인 대신 권한 창 | — |
 | 9 | 일부 가드 정규식이 병적으로 긴 편집 내용에서 느림 | 예산을 넘기면 결정 없이 종료 | 선형 패턴·시간 제한은 후속 |

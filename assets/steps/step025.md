@@ -18,7 +18,7 @@ persistence: session
 ## Memory-of-Thought
 
 기획 전에 다음을 확인하라:
-- step_archive/progress.json의 failure_patterns — 이전에 실패한 패턴을 반복하지 않는다
+- 이전 단계 검증 보고서(`step_archive/outputs/step0*_검증*.md`)의 `## 실패 패턴` 절(있으면) — 이전에 실패한 패턴을 반복하지 않는다
 - 이전 기획 Step의 결과 파일 — 중복되거나 상충되는 내용이 없는지 확인한다
 - 성공한 기획 패턴이 있으면 재활용한다
 
@@ -137,9 +137,7 @@ TOPIC의 요구와 기획의 대응 문장이 준비되면 선택한 요구가 �
 
 ## 실패 패턴 기록
 
-종료 시 (PASS 또는 INCOMPLETE) `step_archive/progress.json`의 `failure_patterns` 배열에 FAIL 항목을 추가한다.
-- PASS로 종료된 경우에도 도중 FAIL이 있었던 항목은 기록한다.
-- 형식: `{ "step": 25, "항목": "FAIL 항목 요약", "해결": true/false }`
+종료 시(PASS 또는 INCOMPLETE) 도중 FAIL 항목과 해결 여부를 이 Step 검증 보고서의 `## 실패 패턴` 절에 적는다. PASS로 끝나도 도중 FAIL은 남긴다. `step_archive/progress.json`은 수정하지 않는다(완료는 Stop 훅, 멈춤은 `harness-pause.mjs`만 기록한다).
 
 ## 주의사항
 

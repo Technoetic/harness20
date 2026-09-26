@@ -21,7 +21,7 @@ persistence: session
 
 ## 실행 내용
 
-**프로젝트 규모 파악**: `.claude/hooks/session-start.ps1`에서 자동 출력됨 (sessionStart 시)
+**프로젝트 규모 파악**: 추적 파일 수를 직접 센다(git 저장소면 `git ls-files`, 아니면 파일 목록 검색). 규모를 자동 출력하는 훅은 없다.
 
 Context 최적화 전략을 수립한다:
 
@@ -41,7 +41,7 @@ step002_context전략_chunk3.md (500줄 이하)
 **작성 규칙**:
 
 - 각 청크는 500줄 이하로 작성 (성능 최적화)
-- 저장 시 PostToolUse 훅(research-chunk-validator.ps1)이 각 청크 자동 검증 (BOM/CRLF/줄수/파일크기) — 일괄 재검증: `.claude/hooks/research-validator.ps1` 수동 실행
+- 저장 후 각 청크가 500줄 이하이고 UTF-8(BOM 없음)인지 직접 확인한다. 자동 검증 훅은 번들되지 않는다.
 - 청크 그대로 유지 (병합 안 함)
 
 ## 핵심 원칙 (이후 모든 단계 준수)

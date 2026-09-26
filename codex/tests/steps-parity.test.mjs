@@ -331,7 +331,7 @@ test("source drift raises a structured review-required error without rewriting i
       assert.equal(error.code, "SOURCE_CHANGED_REVIEW_REQUIRED");
       assert.deepEqual(error.details, {
         source: "assets/steps/step021.md",
-        expected: "c36004a40bd93ed6bc79043cd7120629f2f71e6582feb89ca3e3a6d20cc7da54",
+        expected: "e1795b2f1923c8e81d0e682489c0e2900fc139268525263d1f5ba7771bef1496",
         actual: sha256(sourceAfter)
       });
       return true;

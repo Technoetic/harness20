@@ -80,32 +80,15 @@ aside repl "<browser-research-2 스크립트 본문>"
 
 ## tokei 코드 규모 베이스라인
 
-조사 시작 전 `tokei src/ --output json > step_archive/tokei-baseline.json` 실행하여 현재 프로젝트의 코드/주석/공백 라인 수를 기록한다. 이 베이스라인을 이후 리팩토링/최적화/Dead Code 단계에서 비교 기준으로 사용한다.
+조사 시작 전 `tokei src/ --output json > step_archive/tokei-baseline.json` 실행하여 현재 프로젝트의 코드/주석/공백 라인 수를 기록한다. 이 베이스라인을 이후 리팩토링/최적화/Dead Code 단계에서 비교 기준으로 사용한다. tokei는 선택 도구다. 쓸 수 없거나 `src/`가 없으면 `SKIP`과 사유를 결과 파일에 기록하고 진행한다.
 
 ## ⚠️ 검증 체크리스트
 
 **스크린샷과 원본 데이터가 없으면 조사 무효!**
 
-### 🔧 자동 검증 스크립트
+### 청크 확인
 
-**Step 16 완료 후 실행:**
-
-```powershell
-## 전체 청크 일괄 검증 (구 step03-validator.ps1은 존재하지 않음 — 2026-06-10 M07 정정)
-.\.claude\hooks\research-validator.ps1
-```
-
-**각 조사결과 청크 검증:**
-
-```powershell
-## 단일 파일 검증
-.\.claude\hooks\research-chunk-validator.ps1 -FilePath "step016_조사결과_chunk1.md"
-
-## 모든 청크 일괄 검증
-Get-ChildItem "step016_조사결과_chunk*.md" | ForEach-Object {
-    .\.claude\hooks\research-chunk-validator.ps1 -FilePath $_.FullName
-}
-```
+각 조사결과 청크(`step016_조사결과_chunk*.md`)가 500줄 이하이고 UTF-8(BOM 없음)인지 직접 확인해 결과에 적는다. 검증 스크립트는 번들되지 않는다(docs/RETIRED-VALIDATORS.md).
 
 ## ❌ 금지 사항
 
@@ -156,7 +139,7 @@ step016_조사결과_chunk3.md (500줄 이하)
 **작성 규칙**:
 
 - 각 청크는 500줄 이하로 작성 (성능 최적화)
-- 저장 시 PostToolUse 훅(research-chunk-validator.ps1)이 각 청크 자동 검증 (BOM/CRLF/줄수/파일크기)
+- 저장 후 각 청크가 500줄 이하이고 UTF-8(BOM 없음)인지 직접 확인한다. 자동 검증 훅은 번들되지 않는다.
 - 청크 그대로 유지 (병합 안 함)
 
 서브에이전트는 항상 haiku를 사용한다.

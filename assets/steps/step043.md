@@ -143,9 +143,7 @@ Step 37에서 구현된 CSS가 Awwwards 조사 결과를 충실히 반영했는�
 
 ## 실패 패턴 기록
 
-종료 시 (PASS 또는 INCOMPLETE) `step_archive/progress.json`의 `failure_patterns` 배열에 FAIL 항목을 추가한다.
-- PASS로 종료된 경우에도 도중 FAIL이 있었던 항목은 기록한다.
-- 형식: `{ "step": 43, "항목": "FAIL 항목 요약", "해결": true/false }`
+종료 시(PASS 또는 INCOMPLETE) 도중 FAIL 항목과 해결 여부를 이 Step 검증 보고서의 `## 실패 패턴` 절에 적는다. PASS로 끝나도 도중 FAIL은 남긴다. `step_archive/progress.json`은 수정하지 않는다(완료는 Stop 훅, 멈춤은 `harness-pause.mjs`만 기록한다).
 
 ## 파일 구조 규칙
 

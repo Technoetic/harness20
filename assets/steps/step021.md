@@ -21,8 +21,7 @@ persistence: session
 
 ### 1. step-deps.json 검증
 
-step_archive/step-deps.json이 존재하는지 확인한다.
-존재하면 내용을 로드하여 각 Step의 선행 파일 목록을 확인한다.
+step_archive/step-deps.json이 있으면 로드해 각 Step의 선행 파일 목록을 확인한다. 없으면 오류가 아니다(선택 입력) — 부재를 결과 파일에 기록한다.
 
 ### 2. 이전 Phase 완료 검증
 
@@ -43,7 +42,7 @@ Phase 1 (초기화, step002~step020)의 핵심 산출물이 존재하는지 확�
 3. 고정 경로는 직접 존재 확인
 4. **누락 파일이 있으면**: 어떤 선행 Step이 미완료인지 보고하고, 해당 Step부터 재실행
 
-이 검증은 .claude/hooks/step-dependency-gate.ps1이 PreToolUse 훅으로 자동 수행한다.
+이 게이트를 대신 수행하는 훅은 없다(번들되지 않음). 각 Step이 시작할 때 위 규칙을 직접 적용한다.
 
 ### 4. 결과 기록
 

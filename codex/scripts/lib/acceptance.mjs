@@ -560,6 +560,13 @@ function historicalReplayContract(contract, persistedEvidence) {
     // screenshot and report. Fresh completions still require the lock artifact.
     return { ...contract, acceptance: contract.acceptance.filter(item => item.id !== "browser-backend-lock") };
   }
+  if (contract.number === 14 && sanitizeEvidence(persistedEvidence).some(item =>
+    item.acceptance_id === "biome-version" && item.command === "npx biome --version")) {
+    // Step 14 receipts written before the scoped check ran the unscoped npx biome. Only they
+    // keep that exact command; fresh completions run npx --no-install @biomejs/biome.
+    return { ...contract, acceptance: contract.acceptance.map(item => item.id === "biome-version"
+      ? { ...item, command: "npx biome --version" } : item) };
+  }
   if (contract.number === 30 && !ids.has("design-exclusion-contract")) {
     // A Step 30 receipt written before the design contract proves only the earlier
     // design gates. Fresh completions still require the contract check.

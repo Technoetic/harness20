@@ -10,21 +10,13 @@ persistence: session
 > 모델 정책: **haiku** (조사·설치).
 > SPEC 자동 생성: step_archive/specs/SPEC-012.md (Stop hook).
 
-**Hook**: `.claude/hooks/lhci-validator.ps1`
-
 ## 검증
 
-Hook 실행 후 다음을 확인:
-- `step_archive/step012_lhci_test.md` 파일 생성 확인
-- `.claude/hooks/lhci-validator.log` 로그 확인
-- Hook exit code 확인 (0: 성공, 1: 실패)
+`npx --no-install lhci --version`로 확인한다. `npx`에는 `--no-install`을 붙여 설치되지 않은 패키지를 내려받지 않는다. 없으면 `npm i -D @lhci/cli`로 설치하고 다시 확인한다. 설치와 확인을 합쳐 최대 3회 시도하며 정상 권한 확인을 유지한다.
 
-**검증 실패 시:**
-1. 로그 파일 분석
-2. 에러 원인 파악 (npm 설치 실패, 의존성 문제 등)
-3. 필요한 조치 수행 (npm install -D @lhci/cli 등)
-4. Hook 재실행
-5. 검증 통과할 때까지 반복
+`step_archive/step012_lhci_test.md`에 명령, 종료 코드, 확인된 버전 또는 실패 사유를 기록한다. 패키지 이름·디렉터리 존재만으로 성공을 적지 않는다.
+
+이 도구는 필수다. 자동 검증 훅은 번들되지 않는다.
 
 서브에이전트는 항상 haiku를 사용한다.
 

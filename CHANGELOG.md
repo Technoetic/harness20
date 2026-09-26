@@ -10,6 +10,11 @@
 - Claude visual verifiers (steps 39, 40, 43) and step 49 block only on `Critical`/`Important` findings that cite a design spec, selected token, required acceptance or a functional/accessibility defect. Each such finding carries location, criterion, expected/observed and reproduction. Advisory opinions never fail a round. At step 43 a reference element the design did not adopt is advisory, and an excluded one is recorded as `제외 계약: <id>`. Constitution §11 reads the old 'do not miss any small awkwardness' / 'FAIL if anything is lacking' wording of in-progress runs as 'record every observation'. The evaluator's finding line and the `observation`/`next_check` guidance in docs/QA-REPORTS.md use the same fields.
 - Screenshot and error judgement never runs on haiku. A new constitution §7 row, steps 46–48 and 50 hand it to the main session or sonnet and up. `step-executor` stays on haiku, hands a visual step back with its existing '미완료' line and a capture file, and `/webapp` makes the judging caller responsible for the Jev checkpoint.
 - Claude step 50 reports console findings in six fixed fields. Codex step 50 now records the first application stack frame `file:line`. Codex steps 39, 40, 43 and 46–49 were reviewed without change.
+- Claude step bodies no longer tell the model to run the unbundled `.claude/hooks/*-validator.ps1`, `dependency-checker.ps1` or `step-dependency-gate.ps1`. Steps 8–15 check the CLI directly, with `npx --no-install` for npm tools (optional tools record `SKIP`), and chunk checks are manual.
+- The model is no longer asked to edit `progress.json`: failure patterns go to each step's verification report.
+- Step 1 takes the topic from the `session_prompt` that `/webapp` wrote into TOPIC.md. It keeps `created` and `session_prompt`, resolves the overwrite/keep contradiction and no longer claims that the loader creates `progress.json`.
+- Both hosts check Biome with `npx --no-install @biomejs/biome --version`, so the unrelated npm package `biome` is never fetched. The Codex step 14 acceptance command changes, and a Step 14 receipt that recorded `npx biome --version` still replays.
+- In-progress Claude runs keep their archived bodies, and a missing validator there stays fail-open.
 
 ## 2.10.0 — 2026-09-26
 

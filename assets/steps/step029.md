@@ -18,7 +18,7 @@ persistence: session
 ## Memory-of-Thought
 
 기획 전에 다음을 확인하라:
-- step_archive/progress.json의 failure_patterns — 이전에 실패한 패턴을 반복하지 않는다
+- 이전 단계 검증 보고서(`step_archive/outputs/step0*_검증*.md`)의 `## 실패 패턴` 절(있으면) — 이전에 실패한 패턴을 반복하지 않는다
 - 이전 기획 Step의 결과 파일 — 중복되거나 상충되는 내용이 없는지 확인한다
 - 성공한 기획 패턴이 있으면 재활용한다
 
@@ -75,7 +75,7 @@ step025_planning_chunk3.md (500줄 이하)
 **작성 규칙**:
 
 - 각 청크는 500줄 이하로 작성 (성능 최적화)
-- 저장 시 PostToolUse 훅(research-chunk-validator.ps1)이 각 청크 자동 검증 (BOM/CRLF/줄수/파일크기) — 일괄 재검증: `.claude/hooks/research-validator.ps1` 수동 실행
+- 저장 후 각 청크가 500줄 이하이고 UTF-8(BOM 없음)인지 직접 확인한다. 자동 검증 훅은 번들되지 않는다.
 - 청크 그대로 유지 (병합 안 함)
 
 서브에이전트는 항상 haiku를 사용한다.

@@ -38,7 +38,7 @@ Skill(skill="superpowers:brainstorming")
 
 step025 기획 결과를 기반으로 레이아웃 설계와 전체 설계를 superpowers:brainstorming에 진입하여 레이아웃을 포함한 전체 설계 문서를 작성한다.
 
-**설계 시작 전 반드시 `step_archive/TOPIC/TOPIC.md`를 Read한다.** 인터랙티브 요구(`interactive`), 타깃(`audience`), 대중 앱 사례(`real_world_apps`)가 레이아웃·인터랙션 설계에 반영되어야 한다. 단, brainstorming 스킬의 사용자 옵션 질문은 `NEW-WORK-규칙.md` 2번에 따라 금지하고, 결정을 즉시 내려 설계 문서에 사유와 함께 기록한다.
+**설계 시작 전 반드시 `step_archive/TOPIC/TOPIC.md`를 Read한다.** 인터랙티브 요구(`interactive`), 타깃(`audience`), 대중 앱 사례(`real_world_apps`)가 레이아웃·인터랙션 설계에 반영되어야 한다. 단, brainstorming 스킬의 사용자 옵션 질문은 헌법 §4에 따라 금지하고, 결정을 즉시 내려 설계 문서에 사유와 함께 기록한다.
 
 **최종 조사 입력:** `step_archive/outputs/step024_검증_r1.md`의 최종 판정과 보충 수집 manifest를 먼저 읽는다.
 원래 조사 청크와 manifest가 가리키는 `step_archive/supplemental/step024/<attempt-id>/round-N/`의
@@ -154,7 +154,7 @@ step030_전체설계_chunk2.md (500줄 이하)
 **작성 규칙**:
 
 - 각 청크는 500줄 이하로 작성 (성능 최적화)
-- 저장 시 PostToolUse 훅(research-chunk-validator.ps1)이 각 청크 자동 검증 (BOM/CRLF/줄수/파일크기) — 일괄 재검증: `.claude/hooks/research-validator.ps1` 수동 실행
+- 저장 후 각 청크가 500줄 이하이고 UTF-8(BOM 없음)인지 직접 확인한다. 자동 검증 훅은 번들되지 않는다.
 - 청크 그대로 유지 (병합 안 함)
 
 서브에이전트는 항상 haiku를 사용한다. (2026-06-10 정정: 헤더·CLAUDE.md 모델 매트릭스와 통일 — sonnet은 EVAL 게이트 평가자 전용)

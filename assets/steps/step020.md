@@ -18,7 +18,7 @@ persistence: session
 ## Memory-of-Thought
 
 기획 전에 다음을 확인하라:
-- step_archive/progress.json의 failure_patterns — 이전에 실패한 패턴을 반복하지 않는다
+- 이전 단계 검증 보고서(`step_archive/outputs/step0*_검증*.md`)의 `## 실패 패턴` 절(있으면) — 이전에 실패한 패턴을 반복하지 않는다
 - 이전 기획 Step의 결과 파일 — 중복되거나 상충되는 내용이 없는지 확인한다
 - 성공한 기획 패턴이 있으면 재활용한다
 
