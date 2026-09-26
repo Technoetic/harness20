@@ -438,7 +438,7 @@ harness50/
 │   └── debug-step/SKILL.md            ← c8 + 서브에이전트 병렬 디버깅
 │
 ├── agents/
-│   └── step-executor.md               ← 단일 step 실행 워커 (haiku 고정)
+│   └── step-executor.md               ← 단일 step 실행 워커 (haiku 고정, 스크린샷 판정 안 함)
 │
 ├── hooks/                             ← 14쌍 = 28 파일 (.ps1 + .sh)
 │   ├── hooks.json                     ← 6개 이벤트 바인딩

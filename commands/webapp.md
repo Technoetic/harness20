@@ -101,7 +101,7 @@ Score는 순서 있는 2–10개 기준의 가중 평점이다. Noul에 제공�
 재확인하지 않는다. 단계 도달이나 키 존재, workflow 시작 자체는 전송 승인이 아니다.
 승인 또는 서비스가 없으면 이유를 단계 보고서에 남기고 기존 독립 검증을 수행한다.
 
-호출 책임자를 해당 step-executor로 정하고 승인 범위와 선택 근거를 인계한다.
+호출 책임자를 그 단계를 실행하는 주체 하나로 정하고(보통 step-executor, 시각 판정을 돌려받은 단계는 판정하는 호출자) 승인 범위와 선택 근거를 인계한다.
 워커가 반환한 보고서는 `inspect`하고 현재 `prepare`의 `request_hash`, `policy_hash`,
 `input_hash`, `sources`를 대조한다. 재사용할 판정이 없을 때만 같은 JSON으로
 `run --workspace ROOT --input - --allow-network`를 실행한다. 변하지 않은 입력에는

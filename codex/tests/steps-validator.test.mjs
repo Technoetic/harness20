@@ -3451,7 +3451,7 @@ const EXPECTED_REVIEW_ROWS = [
     phase: "review",
     source: "assets/steps/step039.md",
     target: "codex/assets/steps/step039.md",
-    source_sha256: "3826f6f36f9f733407327335ea13d71f0e30f2ffa392ed18d5212440cd03dca9",
+    source_sha256: "e3533aa66be031d7e45ed284cbe55af650d61df7421708d9cd7710cc51c4dd94",
     inputs: [
       "step_archive/step030_레이아웃설계_chunk1.md",
       "step_archive/step030_전체설계_chunk1.md",
@@ -3491,7 +3491,7 @@ const EXPECTED_REVIEW_ROWS = [
     phase: "review",
     source: "assets/steps/step040.md",
     target: "codex/assets/steps/step040.md",
-    source_sha256: "b95e68b9b3d412184127288c10af0cb82d74ca66c745152498cf3d0a3ae0e0a3",
+    source_sha256: "aee1887200a1094b68f66f1dc30dcb1a39d85f13781b7a7838505b20b9f63be5",
     inputs: [
       "step_archive/step022_수집결과_chunk1.md",
       "step_archive/awwwards-step022-primary.txt",
@@ -3598,7 +3598,7 @@ const EXPECTED_REVIEW_ROWS = [
     phase: "review",
     source: "assets/steps/step043.md",
     target: "codex/assets/steps/step043.md",
-    source_sha256: "63b75eccf23a872712756d954e93549c255343ea067b2fcab5f886aebffaf544",
+    source_sha256: "7e5908dc646573b521b41123deb5ab5a58af6490617e2098ceea6a6b0af543e0",
     inputs: [
       "step_archive/step022_수집결과_chunk1.md",
       "step_archive/awwwards-step022-primary.txt",
@@ -3696,11 +3696,11 @@ test("review source hashes bind reviewed source steps 039 through 044", async ()
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(38, 44));
 
   assert.deepEqual(hashes, {
-    step039: "3826f6f36f9f733407327335ea13d71f0e30f2ffa392ed18d5212440cd03dca9",
-    step040: "b95e68b9b3d412184127288c10af0cb82d74ca66c745152498cf3d0a3ae0e0a3",
+    step039: "e3533aa66be031d7e45ed284cbe55af650d61df7421708d9cd7710cc51c4dd94",
+    step040: "aee1887200a1094b68f66f1dc30dcb1a39d85f13781b7a7838505b20b9f63be5",
     step041: "d3bd6bc9850aa09868a3925349fd826a898230a5200e1a384f14d058921b883c",
     step042: "de60366a82b20ca40f7d8fa0fb43df0194d723039155f0ee6714df1fdff83e16",
-    step043: "63b75eccf23a872712756d954e93549c255343ea067b2fcab5f886aebffaf544",
+    step043: "7e5908dc646573b521b41123deb5ab5a58af6490617e2098ceea6a6b0af543e0",
     step044: "bad68534ce5d04e52a1b4ff933f15fcb5dcaa6a03958f695810b044682489f35"
   });
 });
@@ -4312,7 +4312,7 @@ const EXPECTED_E2E_ROWS = [
     phase: "e2e",
     source: "assets/steps/step046.md",
     target: "codex/assets/steps/step046.md",
-    source_sha256: "c290f0b81e68da011996abaa3a6fb2dd753d5c7199b8f6acaab2b8b3f606d1d9",
+    source_sha256: "4ffe72bc6bf63a634bdfc0a9f6c502795a0cc5194eb7277816616941425df522",
     inputs: [
       "step_archive/step030_레이아웃설계_chunk1.md",
       "step_archive/step030_전체설계_chunk1.md",
@@ -4350,7 +4350,7 @@ const EXPECTED_E2E_ROWS = [
     phase: "e2e",
     source: "assets/steps/step047.md",
     target: "codex/assets/steps/step047.md",
-    source_sha256: "e35c1b210e06b1cb4742573941a789e166aa4a131a2cc012481b3747ffdc04be",
+    source_sha256: "cff31f0921592d45ab47bea454622d470b08779a8d1b123233238783a34b1927",
     inputs: [
       "step_archive/step030_레이아웃설계_chunk1.md",
       "step_archive/step038_smoke_test.md",
@@ -4390,7 +4390,7 @@ const EXPECTED_E2E_ROWS = [
     phase: "e2e",
     source: "assets/steps/step048.md",
     target: "codex/assets/steps/step048.md",
-    source_sha256: "b171cb98e9ca33de2e7ff5f58f721dd1590c5df213b8598268726125176982d0",
+    source_sha256: "b2248048644bac7fe00399f12a9102c6292fa1eb3884f82358838ffee7e88a91",
     inputs: [
       "step_archive/step030_레이아웃설계_chunk1.md",
       "step_archive/step038_smoke_test.md",
@@ -4433,7 +4433,7 @@ const EXPECTED_E2E_ROWS = [
     phase: "e2e",
     source: "assets/steps/step049.md",
     target: "codex/assets/steps/step049.md",
-    source_sha256: "db375fd7117e6ce4086a80562a3d2f8215c8f98f7e3111b9532b07ac37fae3b8",
+    source_sha256: "0d3b244f1ff00bc38315ece5a91d940cf53901c68082d978fa078c756fb27e4f",
     inputs: [
       "step_archive/step030_레이아웃설계_chunk1.md",
       "step_archive/step030_전체설계_chunk1.md",
@@ -4475,7 +4475,7 @@ const EXPECTED_E2E_ROWS = [
     phase: "e2e",
     source: "assets/steps/step050.md",
     target: "codex/assets/steps/step050.md",
-    source_sha256: "fe19984ab5614cc4c10db56a79a75ac3d5cd8af7a787849250e48767f794cd3d",
+    source_sha256: "d225b568d190d6baeaae41dd685f6106221aa312321cb38704f4a2e2f838c6c2",
     inputs: [
       "step_archive/step038_smoke_test.md",
       "dist/index.html",
@@ -4546,11 +4546,11 @@ test("e2e source hashes bind reviewed source steps 045 through 050", async () =>
   const hashes = await recordSourceHashes(repoRoot, index.steps.slice(44, 50));
   assert.deepEqual(hashes, {
     step045: "631828447c6154675d2f6b7a651717b9e211d1cc67ca62c829b65ecd20b34e9f",
-    step046: "c290f0b81e68da011996abaa3a6fb2dd753d5c7199b8f6acaab2b8b3f606d1d9",
-    step047: "e35c1b210e06b1cb4742573941a789e166aa4a131a2cc012481b3747ffdc04be",
-    step048: "b171cb98e9ca33de2e7ff5f58f721dd1590c5df213b8598268726125176982d0",
-    step049: "db375fd7117e6ce4086a80562a3d2f8215c8f98f7e3111b9532b07ac37fae3b8",
-    step050: "fe19984ab5614cc4c10db56a79a75ac3d5cd8af7a787849250e48767f794cd3d"
+    step046: "4ffe72bc6bf63a634bdfc0a9f6c502795a0cc5194eb7277816616941425df522",
+    step047: "cff31f0921592d45ab47bea454622d470b08779a8d1b123233238783a34b1927",
+    step048: "b2248048644bac7fe00399f12a9102c6292fa1eb3884f82358838ffee7e88a91",
+    step049: "0d3b244f1ff00bc38315ece5a91d940cf53901c68082d978fa078c756fb27e4f",
+    step050: "d225b568d190d6baeaae41dd685f6106221aa312321cb38704f4a2e2f838c6c2"
   });
 });
 
@@ -4569,7 +4569,7 @@ const EXPECTED_E2E_TARGET_SHA256 = Object.freeze({
   step047: "d2ed158f4fb15f52e21d76438776bbe0b1e5a0124a46eb4e7bd511c31398dfde",
   step048: "d858de0ea976dbce2a85c62ec71722964d2615528c2235fdf8e877b1d2a1558b",
   step049: "764cf2132e9197a95a84c9e65d549956e7dc6ef37ee1ea513e48d649987ece1b",
-  step050: "d267d4f2f588f42f04eebc51641319cebe52b7f090af0b629de0e85026d107bd"
+  step050: "7f7c186628672579fc4d6589fd6b9fe3e7e825142ffca429eba1f50184501177"
 });
 
 async function assertE2eTargetDigests(root) {

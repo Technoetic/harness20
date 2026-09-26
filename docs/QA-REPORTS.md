@@ -91,6 +91,13 @@ across the report. Evidence belongs in `step_archive/outputs/`,
 report directory itself and private paths cannot serve as evidence. Observations
 are limited to 1,024 characters; requirements, next checks and next actions to
 512. A failed or unverified outcome requires a nonempty `next_check`.
+For a visual, interaction or console finding, write the `observation` as the
+location, the violated criterion and the expected versus observed value. The
+location is a source `file:line`, or a route, viewport, selector and screenshot
+region. Write `next_check` as the exact way to reproduce it: the route without
+sensitive query values, the viewport and the ordered actions that reach the
+state. An aesthetic opinion that cites no criterion is advisory: keep it in the
+step report, not as a `fail` outcome.
 
 ```json
 {

@@ -7,6 +7,9 @@
 - Codex keeps the legacy list plus TOPIC exclusions. Its step 30 gains the required check `design-exclusion-contract`, and an older Step 30 receipt still replays.
 - Codex workspaces past step 30 reconstruct the contract in the current step report and never edit step 30 outputs.
 - Porting: Codex step 1 and step 23 were reviewed without change.
+- Claude visual verifiers (steps 39, 40, 43) and step 49 block only on `Critical`/`Important` findings that cite a design spec, selected token, required acceptance or a functional/accessibility defect. Each such finding carries location, criterion, expected/observed and reproduction. Advisory opinions never fail a round. At step 43 a reference element the design did not adopt is advisory, and an excluded one is recorded as `제외 계약: <id>`. Constitution §11 reads the old 'do not miss any small awkwardness' / 'FAIL if anything is lacking' wording of in-progress runs as 'record every observation'. The evaluator's finding line and the `observation`/`next_check` guidance in docs/QA-REPORTS.md use the same fields.
+- Screenshot and error judgement never runs on haiku. A new constitution §7 row, steps 46–48 and 50 hand it to the main session or sonnet and up. `step-executor` stays on haiku, hands a visual step back with its existing '미완료' line and a capture file, and `/webapp` makes the judging caller responsible for the Jev checkpoint.
+- Claude step 50 reports console findings in six fixed fields. Codex step 50 now records the first application stack frame `file:line`. Codex steps 39, 40, 43 and 46–49 were reviewed without change.
 
 ## 2.10.0 — 2026-09-26
 

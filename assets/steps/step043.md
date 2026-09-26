@@ -26,7 +26,7 @@ Step 37에서 구현된 CSS가 Awwwards 조사 결과를 충실히 반영했는�
 
 ## 설계 제외 계약 우선
 
-비교 기준에는 `step_archive/step030_레이아웃설계_chunk1.md`의 `harness50-design-contract` 블록(플러그인 `docs/DESIGN-CONTRACT.md`)도 들어간다. `exclude`에서 `adopted: false`인 항목에 해당하는 Awwwards 요소는 구현에 없어도 부족한 부분이 아니다 (목록 우선). 검증자는 그 차이를 FAIL 항목에 넣지 않고 `제외 계약: <id>`로 따로 적는다. 수정자는 피드백에 있더라도 그 스타일을 들여오지 않는다.
+비교 기준에는 `step_archive/step030_레이아웃설계_chunk1.md`의 `harness50-design-contract` 블록(플러그인 `docs/DESIGN-CONTRACT.md`)도 들어간다. `exclude`에서 `adopted: false`인 항목에 해당하는 Awwwards 요소는 구현에 없어도 부족한 부분이 아니다 (목록 우선). 검증자는 그 차이를 필수 finding이나 advisory로 넣지 않고 `제외 계약: <id>`로 따로 적는다. 수정자는 피드백에 있더라도 그 스타일을 들여오지 않는다.
 
 ## QA 완료 증거 (필수)
 
@@ -71,14 +71,24 @@ Step 37에서 구현된 CSS가 Awwwards 조사 결과를 충실히 반영했는�
    - `step_archive/outputs/step043_검증_r*.md` (Glob 검색)
    - 이전 라운드에서 FAIL로 지적한 항목이 수정되었는지 반드시 확인한다
 
-4. 원본과 구현을 비교하여 부족한 부분을 구체적으로 나열한다.
-   각 항목마다: 어떤 Awwwards 스크린샷의 어떤 요소가 구현에 빠졌는지 명시한다.
+4. 원본과 구현을 비교한다. 비교 기준은 step030 설계가 최종 manifest에서 채택한 조사 패턴이다.
+   설계가 채택했는데 구현에 빠졌거나 다르게 구현된 요소는 필수 finding이다.
+   참고 이미지에는 있지만 설계가 채택하지 않은 요소는 advisory다. 1번에서 `제외 계약: <id>`로 적은 요소는 advisory로도 적지 않는다.
+   기준 필드에는 채택 근거인 Awwwards 스크린샷 경로·영역과 step030 설계의 절을 함께 쓴다.
    이전 라운드에서 지적한 항목은: [수정됨] 또는 [미수정]으로 표시한다.
+   판정 규칙:
+   - 필수 finding(`Critical`/`Important`): 설계 명세·선택 토큰·필수 acceptance를 어긴 것, 또는 기능·접근성 결함(겹침·잘림·가림·조작 불가 포함)
+   - `advisory`: 어긴 기준을 인용할 수 없는 미관·선호 의견. advisory만 남으면 PASS이며 수정 대상이 아니다
+   - 필수 finding마다 네 필드를 모두 쓴다:
+     - 위치: 소스 `file:line`, 또는 route·viewport·selector·스크린샷 파일과 영역
+     - 기준: 어긴 명세·토큰·acceptance의 출처(파일과 절 또는 줄)
+     - 기대/관찰: 기대값과 관찰값(예: gap 24px 기대, 40px 관찰)
+     - 재현: 같은 화면을 다시 보는 route·viewport·선행 조작
 
 5. 결과를 `step_archive/outputs/step043_검증_rN.md`에 저장한다.
    - 실제 검사한 기존·보충 입력의 경로·SHA-256과 통합 조사 축별 관찰을 기록한다.
-   - 부족한 부분이 없으면: "PASS"로 시작
-   - 부족한 부분이 있으면: "FAIL"로 시작하고 구체적 피드백 나열
+   - 미해결 필수 finding이 없으면: "PASS"로 시작하고 advisory는 따로 적는다
+   - 하나라도 있으면: "FAIL"로 시작하고 필수 finding을 위 네 필드로 나열한다
 ```
 
 에이전트 B는 sonnet을 사용한다 (스크린샷 분석 필요).

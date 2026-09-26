@@ -178,6 +178,7 @@ Sub-lines: `@MX:SPEC`, `@MX:LEGACY`, `@MX:REASON`, `@MX:TEST`, `@MX:PRIORITY`
 - 서브에이전트는 매트릭스대로 haiku / sonnet 분기:
   - 도구 설치·조사·구현: **haiku**
   - 평가·시각 검증(단계 본문이 sonnet을 지정한 단계, 예: step039·040·043·049): **sonnet**
+  - 스크린샷·이미지를 읽고 판단하는 일(PASS/FAIL, finding 중요도, 스크린샷을 보고 쓰는 CSS — step037): **메인 세션 또는 sonnet 이상**. haiku는 촬영·브라우저 조작·증거 수집만 하고 경로·viewport·URL만 돌려준다. 단계 본문이 "서브에이전트는 항상 haiku"라고 해도 판정은 이 행을 따른다. `step-executor`(haiku 고정)는 판정하지 않는다
   - 품질 마일스톤 r1·r2·r3(완료 38·44·49단계)은 모델 판정이 아니라 Stop 훅(`trust5-validator` → `scripts/quality-gate.mjs --hook`)의 측정 증거 검사다.
 
 ## 8. .claude/ 보호 (전역 규칙 상속)
@@ -208,6 +209,12 @@ Phase 3: 구현 에이전트 병렬 실행 (프롬프트에 Phase 1 산출물 �
 - 다른 백엔드의 package나 browser binary를 설치하지 않는다. 예: Aside로 고정된 프로젝트에서 Playwright나 Chromium을 설치하지 않는다. 고정 백엔드를 사용할 수 없다는 오류가 나면 그 백엔드만 복구한다.
 - 잠금 파일이 없는 진행 중 프로젝트는 `step_archive/step003_playwright_test.md`의 selected 값으로 검증 체크아웃에서 `node scripts/verify-output.mjs --probe --backend <selected> --lock --workspace "<project-root>"`를 한 번 실행해 고정한다.
 - 백엔드 변경은 사용자가 요청할 때만 `--backend <name> --lock`으로 다시 고정한다. 상세: `docs/BROWSER-TOOLS.md` "Backend lock (Step 3)".
+
+## 11. 검증 판정과 finding 형식
+
+- 검증자는 필수 기준(설계 명세, 선택된 디자인 토큰, 필수 acceptance, 기능·접근성·보안)을 어긴 finding만 `Critical`/`Important`로 기록한다. 필수 검사 실패나 미해결 필수 finding이 있으면 `FAIL`이다. 인용할 기준이 없는 미관·선호 의견은 `advisory`이며, advisory만으로 `FAIL`이나 추가 라운드를 만들지 않는다. 선택된 디자인 토큰과 제외 목록은 30단계 설계 계약(`harness50-design-contract`)이고, 계약 `exclude`에서 `adopted: false`인 항목의 위반은 최소 `Important`다. 계약이 없는 이전 실행은 §5의 수치를 기준으로 쓴다.
+- 필수 finding마다 위치(소스 `file:line`, 또는 route·viewport·selector·스크린샷 파일과 영역), 어긴 기준의 출처, 기대값과 관찰값, 재현 방법(route·viewport·선행 조작)을 쓴다. 스크린샷 영역과 viewport는 언제나 쓸 수 있으므로 위치를 못 찾았다는 이유로 필수 finding을 `advisory`로 낮추지 않는다.
+- 이전 버전 단계 본문의 "사소한 위화감도 놓치지 않는다"와 "부족한 부분이 있으면 FAIL"은 관찰을 빠짐없이 적으라는 뜻으로 읽는다. 판정은 이 절을 따른다.
 
 ---
 
