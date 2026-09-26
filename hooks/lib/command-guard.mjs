@@ -19,7 +19,7 @@
 // Block rules match their command word at any position of a segment, so a wrapper (strace,
 // flock, ...) cannot hide it. Ask rules match only the command a segment runs (after VAR=value and
 // known wrappers), so prose such as "remove sudo usage" does not prompt. A line that is only a #
-// comment is skipped.
+// comment is skipped when the text has no quotes (a # line can belong to a quoted string).
 //
 // Linear time: every rule is one pass over the words of a segment or a regular expression without
 // nested quantifiers whose repeats are bounded. A rule reads at most LOOKAHEAD_WORDS words after its
@@ -52,7 +52,8 @@ export function segments(text) {
   for (const part of marked.split(SEP_QUOTES)) if (part.trim()) out.push(part.trim());
   return out;
 }
-const words = segment => segment.split(/\s+/).filter(Boolean);
+// Redirection is syntax even without spaces: cat<.env and reset --hard>/dev/null.
+const words = segment => segment.replace(/[<>]+&?/g, ' ').split(/\s+/).filter(Boolean);
 const baseName = word => word.replace(/^[\u0001{}]+/, '').replace(/^\\/, '').replace(/^.*[\\/]/, '').replace(/\.exe$/i, '').toLowerCase();
 const unquote = word => word.replace(/^["']+|["']+$/g, '');
 
@@ -85,19 +86,38 @@ export function commandOf(segment) {
 // entry, the working directory or a parent, or a bare wildcard. Deeper project paths pass.
 export function dangerousTarget(raw, { cwd = true } = {}) {
   if (raw.startsWith(SUBST)) return true;
-  const t = raw.replace(/\\/g, '/').replace(/\/{2,}/g, '/');
+  if (!/[\\/.~$%:*?\[{]/.test(raw)) return false;
+  // Collapse home spellings before splitting; a HOME parameter default can itself contain '/'.
+  const input = raw.replace(/\\/g, '/').replace(/\/{2,}/g, '/')
+    .replace(/^(?:~[^/]*|\$\{(?:HOME|USERPROFILE|PWD)(?::[^}]*)?\}|\$(?:HOME|USERPROFILE|PWD)(?=\/|$)|%USERPROFILE%)/i, '~');
+  const anchor = /^(?:~(?=\/|$)|[A-Za-z]:|\/[A-Za-z](?=\/|$)|\/)/.exec(input)?.[0] || '';
+  const parts = [];
+  for (const part of input.slice(anchor.length).split('/')) {
+    if (!part || part === '.') continue;
+    if (part === '..') {
+      if (parts.length && parts.at(-1) !== '..') parts.pop();
+      else if (anchor) return true;
+      else parts.push(part);
+    } else parts.push(part);
+  }
+  // Keep the first wildcard component, not just its parent: ~/proj/*/dist stays a deep path.
+  const wildcard = parts.findIndex(part => /[*?[{]/.test(part));
+  if (wildcard === 0 && anchor && anchor !== '~') return true;
+  if (wildcard !== -1) parts.length = wildcard + 1;
+  const t = anchor + (anchor && anchor !== '/' && parts.length ? '/' : '') + parts.join('/') || '.';
   if (/^(?:\/|[A-Za-z]:\/?|\/[A-Za-z]\/?)\*?$/.test(t)) return true;
   if (cwd && /^(?:\.{1,2}\/)*\.{1,2}\/?\*?$|^\*$|^\.\*$|^\.\/\.\*$/.test(t)) return true;
+  if (cwd && /^\.git$/i.test(t)) return true;
   if (/^(?:~|\$\{?(?:HOME|USERPROFILE|PWD)\}?|%USERPROFILE%)(?:\/[^/]*)?\/?$/i.test(t)) return true;
   const p = t.replace(/^(?:[A-Za-z]:|\/[A-Za-z](?=\/))/, '');
   if (/^\/(?:etc|usr|bin|sbin|boot|lib|lib32|lib64|sys|proc|dev|root|windows|progra(?:m files|m|~\d)|programdata|system|library|applications)(?:\/|$)/i.test(p)) return true;
   return /^\/(?:home|users|var|opt|srv|mnt|media)(?:\/[^/]*){0,2}\/?$/i.test(p);
 }
 
-const HARD_SECRET = /(?:^|[\\/])(?:\.ssh|\.aws|\.gnupg|\.azure)(?:[\\/]|$)|\.kube[\\/]config$|\.config[\\/]gcloud(?:[\\/]|$)|\.docker[\\/]config\.json$|(?:^|[\\/])(?:id_rsa|id_ed25519|id_ecdsa|id_dsa|\.netrc|\.git-credentials|\.pgpass|credentials(?:\.json)?|application_default_credentials\.json)$/i;
-const ENV_FILE = /(?:^|[\\/])\.env(?:\.[\w.-]+)?$/i;
+const HARD_SECRET = /(?:^|[\\/])(?:\.ssh|\.aws|\.gnupg|\.azure)(?:[\\/]|$)|\.config[\\/]gcloud(?:[\\/]|$)|(?:\.kube[\\/]config|\.docker[\\/]config\.json|(?:^|[\\/])(?:id_rsa|id_ed25519|id_ecdsa|id_dsa|\.netrc|\.git-credentials|\.pgpass|credentials(?:\.json)?|application_default_credentials\.json|\.npmrc|\.pypirc))(?:[*?{\[][^\\/]*)?$/i;
+const ENV_FILE = /(?:^|[\\/])[*?]*\.env(?:[.*?{\[][^\\/]*)?$/i;
 const ENV_TEMPLATE = /\.(?:example|sample|template|dist|defaults)$/i;
-export const secretPath = arg => HARD_SECRET.test(arg) || (ENV_FILE.test(arg) && !ENV_TEMPLATE.test(arg)) || /(?:^|[\\/])\.(?:npmrc|pypirc)$/i.test(arg);
+export const secretPath = arg => HARD_SECRET.test(arg) || (!ENV_TEMPLATE.test(arg) && ENV_FILE.test(arg));
 // Files a later git operation, shell start, login, service manager, scheduler or Claude session
 // runs or follows: git hooks and config, Claude settings, the installed plugin's hooks and
 // manifest, shell rc files, authorized_keys, systemd user units and autostart entries, sudoers and
@@ -120,6 +140,7 @@ const SHELLS = new Set(['sh', 'bash', 'zsh', 'dash', 'ksh', 'python', 'python3',
 const DOWNLOADERS = new Set(['curl', 'wget', 'fetch', 'iwr', 'irm', 'invoke-webrequest', 'invoke-restmethod']);
 const PIPE_SOURCES = new Set([...DOWNLOADERS, 'echo', 'printf', 'base64']);
 const RECURSIVE_RM = /^-[A-Za-z]*[rR][A-Za-z]*$|^--recursive$/;
+const CMD_SWITCH = /^\/(?:[A-Za-z?]{1,2}\/)*[A-Za-z?]{1,2}$/;
 // Every output redirection in a segment and its target (2>/dev/null, >>file, > file).
 const REDIRECT = />{1,2}\s*([^\s<>]+)/g;
 
@@ -139,7 +160,8 @@ function blockHits(segment, hits) {
     const targets = args.filter(a => !a.startsWith('-')).map(unquote);
     const has = re => args.some(a => re.test(a));
     if ((name === 'rm' || variable) && flags.some(f => RECURSIVE_RM.test(f)) && (args.includes('--no-preserve-root') || targets.some(dangerousTarget))) hits.push({ level: 'block', rule: 'recursive-delete-root' });
-    if (['rd', 'rmdir', 'del', 'erase'].includes(name) && has(/^\/s$/i) && targets.some(dangerousTarget)) hits.push({ level: 'block', rule: 'recursive-delete-root' });
+    if (['rd', 'rmdir', 'del', 'erase'].includes(name) && args.some(a => CMD_SWITCH.test(a) && /\/s(?:\/|$)/i.test(a)) &&
+        targets.filter(a => !CMD_SWITCH.test(a)).some(dangerousTarget)) hits.push({ level: 'block', rule: 'recursive-delete-root' });
     if (['remove-item', 'ri'].includes(name) && has(/^-r(?:ecurse)?$/i) && targets.some(dangerousTarget)) hits.push({ level: 'block', rule: 'recursive-delete-root' });
     if (name === 'find' && targets.length && dangerousTarget(targets[0], { cwd: false }) && (args.includes('-delete') || args.some((a, k) => /^-exec(?:dir)?$/.test(a) && baseName(args[k + 1] || '') === 'rm'))) hits.push({ level: 'block', rule: 'find-delete-root' });
     if (/^mkfs(?:\.|$)/.test(name) || ['format-volume', 'clear-disk', 'diskpart', 'wipefs'].includes(name)) hits.push({ level: 'block', rule: 'disk' });
@@ -170,7 +192,8 @@ function blockHits(segment, hits) {
     if (['ngrok', 'cloudflared'].includes(name) && args[0] === 'http' && /^(?:0\.0\.0\.0|\*)/.test(args[1] || '')) hits.push({ level: 'block', rule: 'public-tunnel' });
     if (name === 'echo' && args.some(a => /^["']?(?:AKIA|ghp_|sk-|xoxb-)/.test(a))) hits.push({ level: 'block', rule: 'secret-echo' });
     if (READERS.has(name) && targets.some(secretPath)) hits.push({ level: 'block', rule: 'credential-read' });
-    if (COPIERS.has(name) && targets.slice(0, -1).some(secretPath)) hits.push({ level: 'block', rule: 'credential-read' });
+    // A single brace token can expand to both the source and destination: cp .env{,.bak}.
+    if (COPIERS.has(name) && targets.some((target, k) => (k < targets.length - 1 || /\{[^}]*,/.test(target)) && secretPath(target))) hits.push({ level: 'block', rule: 'credential-read' });
     if (ARCHIVERS.has(name) && targets.some(secretPath)) hits.push({ level: 'block', rule: 'credential-read' });
     if (name === 'curl' && (has(/^(?:-T|--upload-file)$/) || has(/^-F\S*=@/) || args.some((a, k) => /^(?:--data-binary|-d|--data|-F|--form)$/.test(a) && /@/.test(args[k + 1] || '')))) hits.push({ level: 'block', rule: 'upload' });
   }
@@ -181,7 +204,8 @@ function askHits(segment, hits) {
   const { name, args, escalated } = commandOf(segment);
   const ask = rule => hits.push({ level: 'ask', rule });
   // Before the empty-name return: a bare 'sudo -i' or 'doas -s' runs no further command word.
-  if (escalated || name === 'su' || name === 'sudo' || name === 'doas') ask('privilege');
+  // A JS assignment to su is not a privilege shell; redirects and sudo still need their checks.
+  if (escalated || (name === 'su' && !args[0]?.startsWith('=')) || name === 'sudo' || name === 'doas') ask('privilege');
   if (!name) return;
   const targets = args.filter(a => !a.startsWith('-')).map(unquote);
   const has = re => args.some(a => re.test(a));
@@ -199,7 +223,8 @@ function askHits(segment, hits) {
   if (['shutdown', 'reboot', 'halt', 'poweroff', 'stop-computer', 'restart-computer'].includes(name) || (name === 'init' && /^[06]$/.test(args[0] || ''))) ask('machine-state');
   if ((name === 'iptables' && has(/^(?:-F|--flush)$/)) || (name === 'ufw' && args[0] === 'disable')) ask('firewall');
   if (name === 'crontab' && (has(/^-[er]$/) || targets.length)) ask('scheduler');
-  if (['export', 'set', 'setx'].includes(name) && args.some(a => /^PATH(?:=|$)/i.test(a))) ask('path-hijack');
+  if (name === 'export' && args.some(a => /^PATH=/.test(a))) ask('path-hijack');
+  if (['set', 'setx'].includes(name) && args.some(a => /^PATH(?:=|$)/i.test(a))) ask('path-hijack');
   if (/^PATH=/i.test(segment) && /\$\{?PATH\b/i.test(segment.split(/\s/)[0])) ask('path-hijack');
   if (/^\$env:PATH\s*\+?=/i.test(segment)) ask('path-hijack');
   if (name === 'ssh' && args.some(a => baseName(a) === 'rm')) ask('remote-delete');
@@ -214,7 +239,13 @@ function askHits(segment, hits) {
     }
   }
   const redirected = [...segment.matchAll(REDIRECT)].some(match => PERSISTENT_TARGET.test(unquote(match[1])));
-  if (redirected || (WRITE_VERBS.has(name) && targets.some(t => PERSISTENT_TARGET.test(t)))) ask('persistence-write');
+  const downloaderWrite = DOWNLOADERS.has(name) && args.some((arg, i) => {
+    const output = /^(?:--output|--output-document|-OutFile)(?:=(.*))?$/i.exec(arg);
+    const short = /^-[A-Za-z]*?[oO](.*)$/.exec(arg);
+    const target = output ? output[1] || args[i + 1] : short ? short[1] || args[i + 1] : null;
+    return target && PERSISTENT_TARGET.test(unquote(target));
+  });
+  if (redirected || downloaderWrite || (WRITE_VERBS.has(name) && targets.some(t => PERSISTENT_TARGET.test(t)))) ask('persistence-write');
 }
 
 // Line rules: pipelines, download-then-run, process substitution, interpreter code, reverse shells.
@@ -259,6 +290,8 @@ function lineHits(text, hits) {
       const lang = interp[0].toLowerCase();
       const deletes = /shutil\.rmtree|os\.(?:remove|unlink|rmdir)\b|rmSync|unlinkSync|rmdirSync|fs\.(?:rm|unlink|rmdir)\b|fs\.promises\.rm|\bunlink\b|rmtree|File::Path|FileUtils\.rm|File\.delete|Dir\.(?:rmdir|delete)/.test(code);
       if (deletes) hits.push({ level: ROOT_LITERAL.test(code) ? 'block' : 'ask', rule: 'interpreter-delete' });
+      const writes = /write(?:File|FileSync|Text|_text|_bytes)?\b|appendFile(?:Sync)?\b|copyFile(?:Sync)?\b|File\.open|open\([^\n]{0,200},\s*["'][wax+]/.test(code);
+      if (writes && code.split(/[\s"'(),;]+/).some(token => PERSISTENT_TARGET.test(token))) hits.push({ level: 'ask', rule: 'persistence-write' });
       if ((lang.startsWith('python') && /\bsocket\b/.test(code) && /dup2|\bpty\b|subprocess|\/bin\/(?:ba)?sh/.test(code)) ||
           (lang.startsWith('perl') && /\bsocket\b/i.test(code)) || (lang.startsWith('ruby') && /TCPSocket/.test(code)) || (lang.startsWith('php') && /fsockopen/.test(code))) hits.push({ level: 'block', rule: 'reverse-shell' });
     }
@@ -270,7 +303,10 @@ const RANK = { pass: 0, ask: 1, block: 2 };
 export function inspectCommand(command) {
   if (typeof command !== 'string' || !command.trim()) return { level: 'pass', rule: null };
   if (command.length > MAX_COMMAND_CHARS) return { level: 'ask', rule: 'oversized' };
-  const text = stripComments(command);
+  const uncommented = /["']/.test(command) ? command : stripComments(command);
+  // Shell logical lines preserve pipeline and download state across continuations. Both passes
+  // are linear: no rescanning or repeated concatenation of a growing logical line.
+  const text = uncommented.replace(/\\\r?\n/g, ' ').replace(/(\||&&)[ \t]*\r?\n/g, '$1 ');
   const hits = [];
   for (const segment of segments(text)) { blockHits(segment, hits); askHits(segment, hits); }
   lineHits(text, hits);
