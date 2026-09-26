@@ -2,8 +2,11 @@
 # Windows guard: skip on git-bash / MSYS / Cygwin (ps1 counterpart runs there)
 case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) exit 0 ;; esac
 # webapp-trigger.sh — UserPromptSubmit hook (macOS/Linux)
-# Mirrors webapp-trigger.ps1 — detects webapp tutorial trigger, bootstraps step_archive/,
-# writes TOPIC.md, resets progress.json, emits a system-reminder forcing step001 entry.
+# Mirrors webapp-trigger.ps1 — only an explicit first-line `/webapp <topic>` (or
+# `/harness50:webapp <topic>`) bootstraps step_archive/, writes TOPIC.md, initializes
+# progress.json and emits a system-reminder forcing step001 entry. Natural-language prompts do
+# nothing. Progress that records completed steps, or cannot be read, is never overwritten: the
+# one line from lib/harness-activity.mjs precheck-webapp is printed instead.
 
 set -u
 RAW="$(cat || true)"
@@ -41,23 +44,9 @@ else
 fi
 [ -z "$PROMPT" ] && exit 0
 
-# trigger patterns (POSIX ERE)
-PATTERNS=(
-  '튜토리얼.*(생성|만들어|제작)'
-  '인터랙티브.*필수.*초보자'
-  '@step_archive/archived/step001\.md'
-  '^/webapp[[:space:]]+'
-  'webapp[[:space:]]+생성'
-  '웹앱.*튜토리얼'
-  '인터렉티브.*필수'
-  '대시보드.*(만들어|만들|생성|제작|구현)'
-  '(웹앱|웹[[:space:]]*앱|웹[[:space:]]*페이지|web[[:space:]]*app).*(만들어|만들|생성|제작|구현)'
-)
-MATCHED=0
-for p in "${PATTERNS[@]}"; do
-  if printf '%s' "$PROMPT" | grep -Eq "$p"; then MATCHED=1; break; fi
-done
-[ "$MATCHED" = "0" ] && exit 0
+# trigger: the explicit command on the first line only, case-sensitive (EXPLICIT_WEBAPP in
+# lib/harness-activity.mjs). Natural-language requests never start a run.
+printf '%s\n' "$PROMPT" | head -n 1 | grep -Eq '^[[:blank:]]*/(harness50:)?webapp[[:blank:]]+[^[:space:]]' || exit 0
 log "TRIGGER matched"
 
 # Codex coexistence (mirrors webapp-trigger.ps1): an existing Codex workflow is resumed,
@@ -72,6 +61,16 @@ if [ -e "$STEP_ARCHIVE/.harness50-codex/state.json" ]; then
   [ -n "$CODEX_LINE" ] || CODEX_LINE="[HARNESS] WARNING: step_archive/.harness50-codex/state.json exists but is unreadable or incomplete - Claude hooks will not create progress.json or block Stop here. Inspect it with the harness50 plugin's codex/scripts/harness-state.mjs show and ask the user before repairing or resetting it."
   echo "[HARNESS] webapp trigger skipped: a Codex workflow owns this workspace, so step_archive/TOPIC/TOPIC.md and progress.json were left unchanged. Resume that workflow, or use a separate workspace for a different topic."
   printf '%s\n' "$CODEX_LINE"
+  exit 0
+fi
+
+# Never overwrite a run that recorded completed steps, or a progress.json that cannot be read
+# (mirrors webapp-trigger.ps1). 'issue' is the only answer that lets the bootstrap run.
+PRECHECK="$(node "$(dirname "${BASH_SOURCE[0]}")/lib/harness-activity.mjs" precheck-webapp "$PROJECT_ROOT" 2>/dev/null | head -n 1 || true)"
+if [ "$PRECHECK" != "issue" ]; then
+  [ -n "$PRECHECK" ] || PRECHECK="[HARNESS] webapp trigger skipped: node is unavailable, so existing progress could not be checked and nothing was changed."
+  log "precheck -> trigger skipped"
+  printf '%s\n' "$PRECHECK"
   exit 0
 fi
 
@@ -119,20 +118,23 @@ log "TOPIC.md written"
 
 # progress.json
 NOW="$(date '+%Y-%m-%dT%H:%M:%S')"
+# run_started_at (UTC ISO 8601) is the run boundary: step-progress-writer counts only transcript
+# entries from this moment on (mirrors webapp-trigger.ps1). node answered the precheck above, so it
+# gives the millisecond form; date -u (whole seconds, never later than now) is the fallback.
+STARTED="$(node -e 'process.stdout.write(new Date().toISOString())' 2>/dev/null || true)"
+case "$STARTED" in
+  [0-9][0-9][0-9][0-9]-*Z) ;;
+  *) STARTED="$(date -u '+%Y-%m-%dT%H:%M:%SZ')" ;;
+esac
 cat >"$PROGRESS_FILE" <<JSON
 {
+  "run_started_at": "$STARTED",
   "current_step": 1,
   "completed_steps": [],
   "skipped_steps": [],
   "failed_steps": [],
   "total_steps": 50,
   "metrics": { "total_duration_minutes": 0, "total_sessions": 0, "steps_per_session_avg": 0 },
-  "trust5_results": { "r1": null, "r2": null, "r3": null },
-  "eval_rounds": {
-    "r1": { "step": 49,  "result": null, "score": null },
-    "r2": { "step": 69,  "result": null, "score": null },
-    "r3": { "step": 104, "result": null, "score": null }
-  },
   "session_history": [],
   "last_updated": "$NOW"
 }
@@ -159,7 +161,7 @@ ABSOLUTE OVERRIDE:
 
 Do NOT ask the user any clarifying questions.
 Do NOT pause for confirmation.
-Do NOT end the turn until you literally cannot continue.
+Do NOT end the turn before step050 except by a named pause (harness-rules 2-1).
 </harness50-trigger>
 REMINDER
 exit 0

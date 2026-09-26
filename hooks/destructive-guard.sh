@@ -121,7 +121,9 @@ for p in "${PATTERNS[@]}"; do
     echo "BLOCKED: Destructive command detected" 1>&2
     echo "Pattern: $p" 1>&2
     echo "Command: $CMD" 1>&2
-    echo "Requires explicit user approval." 1>&2
+    echo "Harness50 checks the whole command text, including quoted strings and heredoc bodies, and this block cannot be approved from here." 1>&2
+    echo "If the match is only inside a commit message or PR/issue body, write that text to a file with the Write tool and pass the file: git commit -F <file>, gh pr create --body-file <file>." 1>&2
+    echo "Do not move commands into a script to get past this check. If the command itself must run, ask the user to run it." 1>&2
     exit 2
   fi
 done

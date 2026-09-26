@@ -1,9 +1,12 @@
 ﻿# webapp-trigger.ps1 — UserPromptSubmit hook
-# 사용자 prompt가 "웹앱 튜토리얼 생성" 트리거 패턴이면:
+# /webapp 명시 명령만 발급, 완료 기록이 있는 progress는 덮어쓰지 않음.
+# 첫 줄이 `/webapp <주제>`(또는 `/harness50:webapp <주제>`)인 prompt에서만:
 #   1) step_archive/ 부트스트랩 (없으면 생성, step001~050 복사)
 #   2) TOPIC/TOPIC.md 작성 (사용자 prompt 원문 보존)
 #   3) progress.json 초기화 (current_step=1)
 #   4) stdout으로 system-reminder 주입 → step001 즉시 진입 강제
+# 자연어 요청은 아무것도 하지 않는다. 완료 단계가 기록됐거나 읽을 수 없는 progress.json이
+# 있으면 lib/harness-activity.mjs precheck-webapp의 한 줄만 알리고 아무것도 바꾸지 않는다.
 
 param()
 
@@ -17,9 +20,12 @@ try {
 } catch {}
 
 $ErrorActionPreference = "Continue"
+# PowerShell 5.1 writes stdout in the console code page (cp949 on Korean Windows), so '완료' in
+# the output reached Claude garbled. Emit UTF-8 like trust5-validator.ps1.
+try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch {}
 
 $pluginRoot  = Split-Path $PSScriptRoot -Parent
-$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { (Get-Location).Path }
+$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { [System.IO.Directory]::GetCurrentDirectory() }
 $stepArchive = Join-Path $projectRoot "step_archive"
 $archivedDir = Join-Path $stepArchive "archived"
 $topicDir    = Join-Path $stepArchive "TOPIC"
@@ -30,7 +36,7 @@ $logFile     = Join-Path $PSScriptRoot "webapp-trigger.log"
 
 function Write-Log($msg) {
   $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-  try { Add-Content -Path $logFile -Value "[$ts] $msg" -Encoding UTF8 } catch {}
+  try { Add-Content -LiteralPath $logFile -Value "[$ts] $msg" -Encoding UTF8 } catch {}
 }
 
 # stdin JSON 수신
@@ -46,24 +52,9 @@ try { $j = $raw | ConvertFrom-Json } catch { exit 0 }
 $prompt = [string]$j.prompt
 if (-not $prompt) { exit 0 }
 
-# 트리거 패턴 — /webapp 명시 트리거 + 자연어(대시보드/웹앱/튜토리얼 생성 요청).
-# (H1 수정: README가 광고하는 "...대시보드를 만들어줘" 자연어 진입을 실제로 지원)
-$triggers = @(
-  '튜토리얼.*(생성|만들어|제작)',
-  '인터랙티브.*필수.*초보자',
-  '@step_archive/archived/step001\.md',
-  '^/webapp\s+',
-  'webapp\s+생성',
-  '웹앱.*튜토리얼',
-  '인터렉티브.*필수',
-  '대시보드.*(만들어|만들|생성|제작|구현)',
-  '(웹앱|웹\s*앱|웹\s*페이지|web\s*app).*(만들어|만들|생성|제작|구현)'
-)
-$matched = $false
-foreach ($p in $triggers) {
-  if ($prompt -match $p) { $matched = $true; break }
-}
-if (-not $matched) { exit 0 }
+# 트리거 — 첫 줄의 명시 명령 `/webapp <주제>` 또는 `/harness50:webapp <주제>`만 (대소문자 구분).
+# 자연어 요청은 자동 시작하지 않는다. lib/harness-activity.mjs의 EXPLICIT_WEBAPP와 같은 규칙.
+if (-not ($prompt -cmatch '^[ \t]*/(harness50:)?webapp[ \t]+\S')) { exit 0 }
 
 Write-Log "TRIGGER matched. prompt head: $($prompt.Substring(0,[Math]::Min(80,$prompt.Length)))"
 
@@ -85,29 +76,44 @@ if (Test-Path -LiteralPath $codexState) {
   exit 0
 }
 
+# Never overwrite a run that recorded completed steps, or a progress.json that cannot be read.
+# lib/harness-activity.mjs precheck-webapp answers 'issue' when a new topic may start; any other
+# line is printed as is. Without node nothing is checked, so nothing is changed either.
+$preLine = ""
+try {
+  $pre = @(& node (Join-Path $PSScriptRoot 'lib/harness-activity.mjs') precheck-webapp (Join-Path $projectRoot '.') 2>$null)
+  if ($pre.Count -gt 0) { $preLine = [string]$pre[0] }
+} catch {}
+if ($preLine -ne 'issue') {
+  if (-not $preLine) { $preLine = '[HARNESS] webapp trigger skipped: node is unavailable, so existing progress could not be checked and nothing was changed.' }
+  Write-Log "precheck -> trigger skipped"
+  Write-Output $preLine
+  exit 0
+}
+
 # 1) step_archive 부트스트랩
-if (-not (Test-Path $stepArchive)) { New-Item -ItemType Directory -Path $stepArchive -Force | Out-Null }
-if (-not (Test-Path $archivedDir)) { New-Item -ItemType Directory -Path $archivedDir -Force | Out-Null }
-if (-not (Test-Path $topicDir))    { New-Item -ItemType Directory -Path $topicDir -Force | Out-Null }
+if (-not (Test-Path -LiteralPath $stepArchive)) { New-Item -ItemType Directory -Path $stepArchive -Force | Out-Null }
+if (-not (Test-Path -LiteralPath $archivedDir)) { New-Item -ItemType Directory -Path $archivedDir -Force | Out-Null }
+if (-not (Test-Path -LiteralPath $topicDir))    { New-Item -ItemType Directory -Path $topicDir -Force | Out-Null }
 
 # step001~050 복사 (없는 것만)
-if (Test-Path $assetSteps) {
-  Get-ChildItem $assetSteps -Filter "step*.md" | ForEach-Object {
+if (Test-Path -LiteralPath $assetSteps) {
+  Get-ChildItem -LiteralPath $assetSteps -Filter "step*.md" | ForEach-Object {
     $dst = Join-Path $archivedDir $_.Name
-    if (-not (Test-Path $dst)) { Copy-Item $_.FullName $dst -Force }
+    if (-not (Test-Path -LiteralPath $dst)) { Copy-Item -LiteralPath $_.FullName -Destination $dst -Force }
   }
 }
 
 # H4 수정: html-bundler를 프로젝트로 복사해 step038에서 실행 가능하게 한다.
 # (플러그인 hooks/는 ${CLAUDE_PLUGIN_ROOT} 밖이라 step 본문의 상대경로로 도달 불가)
 $toolsDir = Join-Path $stepArchive "tools"
-if (-not (Test-Path $toolsDir)) { New-Item -ItemType Directory -Path $toolsDir -Force | Out-Null }
+if (-not (Test-Path -LiteralPath $toolsDir)) { New-Item -ItemType Directory -Path $toolsDir -Force | Out-Null }
 foreach ($b in @("html-bundler.ps1", "html-bundler.sh")) {
   $bSrc = Join-Path $PSScriptRoot $b
-  if (Test-Path $bSrc) { Copy-Item $bSrc (Join-Path $toolsDir $b) -Force }
+  if (Test-Path -LiteralPath $bSrc) { Copy-Item -LiteralPath $bSrc -Destination (Join-Path $toolsDir $b) -Force }
 }
 
-# 2) TOPIC.md 작성 (덮어쓰기 — 신규 요청은 신규 주제)
+# 2) TOPIC.md 작성 (덮어쓰기 — 완료 기록이 없을 때의 신규 요청은 신규 주제)
 $today = Get-Date -Format "yyyy-MM-dd"
 $topicBody = @"
 ---
@@ -127,7 +133,7 @@ step001이 진입 시 본 파일의 session_prompt를 읽어 topic/audience/inte
 
 - 자동 추출 항목이 모호하면 step001이 즉시 결정·기록 후 진행 (질문 금지)
 "@
-$topicBody | Out-File -FilePath $topicFile -Encoding UTF8 -Force
+$topicBody | Out-File -LiteralPath $topicFile -Encoding UTF8 -Force
 # BOM 제거
 $bytes = [System.IO.File]::ReadAllBytes($topicFile)
 if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
@@ -136,23 +142,21 @@ if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $by
 Write-Log "TOPIC.md written"
 
 # 3) progress.json 초기화
+# run_started_at (UTC ISO 8601) is the run boundary: step-progress-writer counts only transcript
+# entries from this moment on, so completion lines of an earlier topic in the same session never
+# come back. scripts/harness-pause.mjs reset writes the same field.
 $progress = @{
+  run_started_at = [DateTime]::UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", [System.Globalization.CultureInfo]::InvariantCulture)
   current_step = 1
   completed_steps = @()
   skipped_steps = @()
   failed_steps = @()
   total_steps = 50
   metrics = @{ total_duration_minutes = 0; total_sessions = 0; steps_per_session_avg = 0 }
-  trust5_results = @{ r1 = $null; r2 = $null; r3 = $null }
-  eval_rounds = @{
-    r1 = @{ step = 49; result = $null; score = $null }
-    r2 = @{ step = 69; result = $null; score = $null }
-    r3 = @{ step = 104; result = $null; score = $null }
-  }
   session_history = @()
   last_updated = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss")
 }
-$progress | ConvertTo-Json -Depth 6 | Out-File -FilePath $progressFile -Encoding UTF8 -Force
+$progress | ConvertTo-Json -Depth 6 | Out-File -LiteralPath $progressFile -Encoding UTF8 -Force
 $bytes = [System.IO.File]::ReadAllBytes($progressFile)
 if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
   [System.IO.File]::WriteAllBytes($progressFile, $bytes[3..($bytes.Length-1)])
@@ -178,6 +182,6 @@ Write-Output "    4. Continue without user confirmation through step050"
 Write-Output ""
 Write-Output "Do NOT ask the user any clarifying questions."
 Write-Output "Do NOT pause for confirmation."
-Write-Output "Do NOT end the turn until you literally cannot continue."
+Write-Output "Do NOT end the turn before step050 except by a named pause (harness-rules 2-1)."
 Write-Output "</harness50-trigger>"
 exit 0

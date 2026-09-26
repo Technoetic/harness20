@@ -13,7 +13,10 @@ try {
 
 
 $ErrorActionPreference = "Continue"
-$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { (Get-Location).Path }
+# PowerShell 5.1 writes stdout in the console code page (cp949 on Korean Windows), so '완료' in
+# the output reached Claude garbled. Emit UTF-8 like trust5-validator.ps1.
+try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch {}
+$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { [System.IO.Directory]::GetCurrentDirectory() }
 $stepArchive = Join-Path $projectRoot "step_archive"
 $progressFile = Join-Path $stepArchive "progress.json"
 
@@ -26,16 +29,15 @@ function Write-ProgressAtomic($obj) {
     try { $acquired = $mutex.WaitOne(5000) } catch {}
     if (-not $acquired) { $mutex.Dispose(); return }
     try {
-        New-Item -ItemType Directory -Path $stepArchive -Force | Out-Null
         $json = $obj | ConvertTo-Json -Depth 32
         if ([string]::IsNullOrWhiteSpace($json) -or $json -eq 'null') { return }
         $tempFile = "$progressFile.tmp.$PID"
-        $json | Out-File -FilePath $tempFile -Encoding UTF8 -Force
+        $json | Out-File -LiteralPath $tempFile -Encoding UTF8 -Force
         $bytes = [System.IO.File]::ReadAllBytes($tempFile)
         if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
             [System.IO.File]::WriteAllBytes($tempFile, $bytes[3..($bytes.Length - 1)])
         }
-        Move-Item -Path $tempFile -Destination $progressFile -Force
+        Move-Item -LiteralPath $tempFile -Destination $progressFile -Force
     } catch {
         Write-Host "WARNING: progress.json write failed: $_"
     } finally {
@@ -64,87 +66,61 @@ if (Test-Path -LiteralPath $codexState) {
     exit 0
 }
 
-Write-Host "=== Step Progress Loader ==="
+# The loader never creates progress.json or step_archive/: only an explicit /webapp <topic>
+# starts a run (webapp-trigger). Without a progress file there is nothing to resume.
+if (-not (Test-Path -LiteralPath $progressFile -PathType Leaf)) { exit 0 }
+try { $existingProgress = Get-Content -LiteralPath $progressFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop } catch { exit 0 }
+if ($null -eq $existingProgress) { exit 0 }
 
-if (-not (Test-Path $progressFile)) {
-    Write-Host "No progress file found. Starting fresh."
-    Write-Host "Next step: step001"
-
-    # F1 guard (2026-06-10): 직전 런의 stall 상태 파일이 남아 있으면 SoT 불일치 경고 후 리셋
-    $staleStates = @(Get-ChildItem -Path $stepArchive -Filter "step-auto-continue*.state" -ErrorAction SilentlyContinue)
-    if ($staleStates.Count -gt 0) {
-        Write-Host "WARNING: progress.json absent but stale auto-continue state found (previous run remnant). Resetting state files."
-        $staleStates | Remove-Item -ErrorAction SilentlyContinue
+# Named pause (harness-rules 2-1). Only scripts/harness-pause.mjs sets or clears it. While it is set
+# this hook writes nothing (no session count, no migration) and prints where the run stopped
+# instead of the resume instructions. Same judgement as scripts/lib/pause-state.mjs isPaused; the
+# code list, template and NAMED sentence match step-progress-loader.sh and step-obedience-guard.
+$pauseCodes = @('permission-denied', 'required-tool-failed', 'required-input-missing', 'user-request')
+$pausedTemplate = '[HARNESS] PAUSED at step{STEP}/{TOTAL} (reason={REASON}{SINCE}). Automatic continuation is off: do not run steps. Tell the user why (pause_note in step_archive/progress.json) and handle their message. Resume only when the user explicitly asks: /harness-resume.'
+$namedPause = 'Early stop only as a named pause (permission-denied | required-tool-failed | required-input-missing; harness-rules 2-1): save evidence under step_archive/, run node "<plugin-root>/scripts/harness-pause.mjs" pause --workspace "<project-root>" --reason <code> --evidence <step_archive/file> --note "<user action>", then end the turn with the pause report.'
+$hasPaused = @($existingProgress.PSObject.Properties.Name) -ccontains 'paused'
+$isPaused = ($hasPaused -and -not ($existingProgress.paused -is [bool] -and -not $existingProgress.paused)) -or ($existingProgress.status -is [string] -and $existingProgress.status -ceq 'paused')
+if ($isPaused) {
+    $pauseTotal = 0
+    try { $pauseTotal = [int]$existingProgress.total_steps } catch {}
+    $pauseDone = @($existingProgress.completed_steps)
+    $pauseFirst = 0
+    for ($i = 1; $i -le $pauseTotal; $i++) { if ($pauseDone -notcontains $i) { $pauseFirst = $i; break } }
+    if ($pauseFirst -gt 0) {
+        $pauseStep = $pauseFirst
+        $pausedStepValue = $existingProgress.paused_step
+        # max(paused_step, first unfinished): the Stop writer records the completions of the turn
+        # that paused after the pause itself (scripts/lib/pause-state.mjs pausedStep).
+        if (($pausedStepValue -is [int] -or $pausedStepValue -is [long]) -and $pausedStepValue -ge 1 -and $pausedStepValue -le $pauseTotal -and $pausedStepValue -gt $pauseFirst) { $pauseStep = [int]$pausedStepValue }
+        $pauseCode = 'unknown'
+        if ($existingProgress.pause_reason -is [string] -and $pauseCodes -ccontains $existingProgress.pause_reason) { $pauseCode = $existingProgress.pause_reason }
+        $pauseSince = ''
+        if ($existingProgress.paused_at -is [string] -and $existingProgress.paused_at -cmatch '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,3})?Z\z') { $pauseSince = ', since ' + $existingProgress.paused_at }
+        $pausedLine = $pausedTemplate.Replace('{STEP}', ('{0:D3}' -f $pauseStep)).Replace('{TOTAL}', [string]$pauseTotal).Replace('{REASON}', $pauseCode).Replace('{SINCE}', $pauseSince)
+        Write-Host "=== Paused at step$('{0:D3}' -f $pauseStep) ==="
+        Write-Host $pausedLine
+        exit 0
     }
-
-    # total_steps 동적 계산 (F5 fix: flat + archived/ 이중 스캔, 파일명 unique 기준 —
-    # 구버전 flat 전용 스캔은 archived/ 배치에서 0을 반환해 fallback 107 우연 일치에 의존했음)
-    $stepFiles = @(Get-ChildItem -Path $stepArchive -Filter "step???.md" -ErrorAction SilentlyContinue)
-    $archivedInit = Join-Path $stepArchive "archived"
-    if (Test-Path $archivedInit) {
-        $stepFiles += @(Get-ChildItem -Path $archivedInit -Filter "step???.md" -ErrorAction SilentlyContinue)
-    }
-    $detected = @($stepFiles | ForEach-Object { $_.Name } | Sort-Object -Unique).Count
-    $totalStepsDetected = if ($detected -gt 0) { $detected } else { 50 }
-    Write-Host "Detected total_steps from filesystem: $totalStepsDetected"
-
-    # 초기 progress.json 생성 (MoAI-ADK 벤치마킹 필드 포함)
-    $initial = @{
-        last_updated = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss')
-        current_step = 1
-        total_steps = $totalStepsDetected
-        completed_steps = @()
-        failed_steps = @()
-        skipped_steps = @()
-        session_history = @()
-        eval_rounds = @{
-            r1 = @{ step = 49;  result = $null; score = $null }
-            r2 = @{ step = 69;  result = $null; score = $null }
-            r3 = @{ step = 104; result = $null; score = $null }
-        }
-        trust5_results = @{
-            r1 = $null
-            r2 = $null
-            r3 = $null
-        }
-        moai_features = @{
-            spec_generated_count = 0
-            mx_tag_warnings = 0
-            lsp_autofixes = 0
-        }
-        metrics = @{
-            total_sessions = 0
-            total_duration_minutes = 0
-            steps_per_session_avg = 0
-        }
-    }
-
-    Write-ProgressAtomic $initial
-    exit 0
 }
 
+Write-Host "=== Step Progress Loader ==="
+
 # 기존 progress.json이 있어도 total_steps가 실제 파일 수와 다르면 경고
-try { $existingProgress = Get-Content $progressFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop } catch { exit 0 }
-if ($null -eq $existingProgress) { exit 0 }
 # stepNNN.md 개수: flat + archived/ 둘 다 스캔 후 파일명 기준 unique (재가동 시 archived/ 이동 대응)
-$stepFiles = @(Get-ChildItem -Path $stepArchive -Filter "step???.md" -ErrorAction SilentlyContinue)
+$stepFiles = @(Get-ChildItem -LiteralPath $stepArchive -Filter "step???.md" -ErrorAction SilentlyContinue)
 $archivedDir2 = Join-Path $stepArchive "archived"
-if (Test-Path $archivedDir2) {
-    $stepFiles += @(Get-ChildItem -Path $archivedDir2 -Filter "step???.md" -ErrorAction SilentlyContinue)
+if (Test-Path -LiteralPath $archivedDir2) {
+    $stepFiles += @(Get-ChildItem -LiteralPath $archivedDir2 -Filter "step???.md" -ErrorAction SilentlyContinue)
 }
 $actualTotal = @($stepFiles | ForEach-Object { $_.Name } | Sort-Object -Unique).Count
 $needsRewrite = $false
+# Report only: rewriting total_steps could turn an inactive run active (or the reverse).
 if ($actualTotal -gt 0 -and $actualTotal -ne [int]$existingProgress.total_steps) {
-    Write-Host "WARNING: total_steps mismatch (progress.json=$($existingProgress.total_steps), filesystem=$actualTotal). Auto-correcting."
-    $existingProgress.total_steps = $actualTotal
-    $needsRewrite = $true
+    Write-Host "WARNING: total_steps mismatch (progress.json=$($existingProgress.total_steps), filesystem=$actualTotal)."
 }
 
 # MoAI-ADK 벤치마킹: 누락 필드 자동 추가 (마이그레이션)
-if (-not $existingProgress.PSObject.Properties.Name.Contains('trust5_results')) {
-    $existingProgress | Add-Member -NotePropertyName 'trust5_results' -NotePropertyValue ([PSCustomObject]@{ r1=$null; r2=$null; r3=$null }) -Force
-    $needsRewrite = $true
-}
 if (-not $existingProgress.PSObject.Properties.Name.Contains('moai_features')) {
     $existingProgress | Add-Member -NotePropertyName 'moai_features' -NotePropertyValue ([PSCustomObject]@{ spec_generated_count=0; mx_tag_warnings=0; lsp_autofixes=0 }) -Force
     $needsRewrite = $true
@@ -206,9 +182,9 @@ if ($null -ne $nextStep) {
     $nextStepFmt = "step$('{0:D3}' -f $nextStep)"
     # F9 fix (2026-06-10): archived/ 우선, flat 폴백 이중 해석 (auto-continue와 동일 규약)
     $nextStepRel = $null
-    if (Test-Path (Join-Path $archivedDir "$nextStepFmt.md")) {
+    if (Test-Path -LiteralPath (Join-Path $archivedDir "$nextStepFmt.md")) {
         $nextStepRel = "step_archive/archived/$nextStepFmt.md"
-    } elseif (Test-Path (Join-Path $stepArchive "$nextStepFmt.md")) {
+    } elseif (Test-Path -LiteralPath (Join-Path $stepArchive "$nextStepFmt.md")) {
         $nextStepRel = "step_archive/$nextStepFmt.md"
     }
     if ($nextStepRel) {
@@ -218,6 +194,7 @@ if ($null -ne $nextStep) {
         Write-Host "Do not greet the user. Do not ask what to do."
         Write-Host "Read $nextStepFmt.md, execute it, then move to the next step."
         Write-Host "Each step file ends with 'Read step(N+1).md immediately upon completion'; obey that chain."
+        Write-Host $namedPause
     }
 }
 exit 0

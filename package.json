@@ -1,13 +1,13 @@
 {
   "name": "harness50-validation",
-  "version": "2.9.0",
+  "version": "2.10.0",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --test codex/tests/*.test.mjs",
+    "test": "node --test --test-concurrency=4 codex/tests/*.test.mjs",
     "test:browser": "npm --prefix browser-verifier test",
     "verify:output": "node scripts/verify-output.mjs"
   },

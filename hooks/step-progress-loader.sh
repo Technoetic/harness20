@@ -38,18 +38,44 @@ fi
 
 export PROGRESS_FILE ARCHIVED_DIR
 python3 - <<'PY'
-import json, os, datetime
+import json, os, datetime, re
 p_path=os.environ.get("PROGRESS_FILE")
 a_dir=os.environ.get("ARCHIVED_DIR")
+# Same bytes as step-progress-loader.ps1 and step-obedience-guard (scripts/lib/pause-state.mjs).
+CODES=('permission-denied','required-tool-failed','required-input-missing','user-request')
+PAUSED='[HARNESS] PAUSED at step{STEP}/{TOTAL} (reason={REASON}{SINCE}). Automatic continuation is off: do not run steps. Tell the user why (pause_note in step_archive/progress.json) and handle their message. Resume only when the user explicitly asks: /harness-resume.'
+NAMED='Early stop only as a named pause (permission-denied | required-tool-failed | required-input-missing; harness-rules 2-1): save evidence under step_archive/, run node "<plugin-root>/scripts/harness-pause.mjs" pause --workspace "<project-root>" --reason <code> --evidence <step_archive/file> --note "<user action>", then end the turn with the pause report.'
+def paused_line(p,total,first):
+    # Validated values only: a known code, a step inside 1..total, an ISO paused_at. pause_note and
+    # pause_evidence are never printed. The step is max(paused_step, first unfinished): the Stop
+    # writer records the completions of the turn that paused after the pause itself.
+    step=p.get('paused_step')
+    step=max(step,first) if isinstance(step,int) and not isinstance(step,bool) and 1<=step<=total else first
+    code=p.get('pause_reason') if p.get('pause_reason') in CODES else 'unknown'
+    at=p.get('paused_at')
+    since=', since '+at if isinstance(at,str) and re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,3})?Z',at) else ''
+    return step, PAUSED.replace('{STEP}',f'{step:03d}').replace('{TOTAL}',str(total)).replace('{REASON}',code).replace('{SINCE}',since)
 try:
     with open(p_path,encoding="utf-8") as f: p=json.load(f)
 except Exception: raise SystemExit(0)
 
+# Named pause (harness-rules 2-1). Only scripts/harness-pause.mjs sets or clears it. While it is set
+# nothing is written and only where the run stopped is printed (mirrors step-progress-loader.ps1).
+if isinstance(p,dict) and (('paused' in p and p['paused'] is not False) or p.get('status')=='paused'):
+    try:
+        total=int(p.get("total_steps",50))
+        completed=set(int(x) for x in (p.get("completed_steps") or []))
+    except Exception: raise SystemExit(0)
+    first=next((n for n in range(1,total+1) if n not in completed),0)
+    if first:
+        step,line=paused_line(p,total,first)
+        print(f"=== Paused at step{step:03d} ===")
+        print(line)
+        raise SystemExit(0)
+
 import glob
-actual=len({os.path.basename(x) for d in [a_dir,os.path.dirname(a_dir)] for x in glob.glob(os.path.join(d,"step???.md"))})
-if actual>0 and actual!=p.get("total_steps"):
-    p["total_steps"]=actual
-p.setdefault("trust5_results",{"r1":None,"r2":None,"r3":None})
+# Report only (mirrors the .ps1 loader): rewriting total_steps could flip the run's activity.
+actual=len({os.path.basename(x) for d in [a_dir,os.path.dirname(a_dir)] for x in glob.glob(os.path.join(glob.escape(d),"step???.md"))})
 p.setdefault("metrics",{"total_sessions":0,"total_duration_minutes":0,"steps_per_session_avg":0})
 p["metrics"]["total_sessions"]=int(p["metrics"].get("total_sessions",0))+1
 p["last_updated"]=datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
@@ -61,6 +87,8 @@ done=len(p.get("completed_steps") or [])
 cur=next((n for n in range(1,int(p.get("total_steps",50))+1) if n not in (p.get("completed_steps") or [])),int(p.get("total_steps",50)))
 total=int(p.get("total_steps",50))
 print("=== harness50: Step Progress Loader ===")
+if actual>0 and actual!=p.get("total_steps"):
+    print(f"WARNING: total_steps mismatch (progress.json={p.get('total_steps', '')}, filesystem={actual}).")
 print(f"Progress: {done}/{total} completed")
 print(f"Current step: step{cur:03d}")
 if done<total:
@@ -82,5 +110,6 @@ if done<total:
             print("Do not greet the user. Do not ask what to do. Do not handle unrelated requests first.")
             print(f"Read {next_fmt}.md NOW, then execute it, then move to the next step.")
             print("Each step file ends with 'Read step(N+1).md immediately upon completion'; obey that chain.")
+            print(NAMED)
 PY
 exit 0

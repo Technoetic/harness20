@@ -9,7 +9,7 @@ $ErrorActionPreference = "Continue"
 $logFile = Join-Path $PSScriptRoot "destructive-guard.log"
 function Write-GuardLog($msg) {
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    try { Add-Content -Path $logFile -Value "[$ts] $msg" -Encoding UTF8 } catch {}
+    try { Add-Content -LiteralPath $logFile -Value "[$ts] $msg" -Encoding UTF8 } catch {}
 }
 
 # stdin에서 이벤트 JSON 읽기 (UTF-8 명시)
@@ -132,7 +132,9 @@ foreach ($pattern in $destructivePatterns) {
         [Console]::Error.WriteLine("BLOCKED: Destructive command detected")
         [Console]::Error.WriteLine("Pattern: $pattern")
         [Console]::Error.WriteLine("Command: $command")
-        [Console]::Error.WriteLine("This command requires explicit user approval.")
+        [Console]::Error.WriteLine("Harness50 checks the whole command text, including quoted strings and heredoc bodies, and this block cannot be approved from here.")
+        [Console]::Error.WriteLine("If the match is only inside a commit message or PR/issue body, write that text to a file with the Write tool and pass the file: git commit -F <file>, gh pr create --body-file <file>.")
+        [Console]::Error.WriteLine("Do not move commands into a script to get past this check. If the command itself must run, ask the user to run it.")
         exit 2
     }
 }

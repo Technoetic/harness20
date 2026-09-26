@@ -586,6 +586,24 @@ function webappContractErrors(text) {
   forbidAffirmative(errors, skill.body, /\b(?:execute|invoke|run)\b.*\b(?:Stop )?hooks?\b.*\b(?:yourself|manually|directly)\b/i, "direct hook execution");
   forbidAffirmative(errors, skill.body, /\b(?:call|run|invoke)\b.*\bresume\b.*\b(?:reset|clear)\b.*\bfailure\b/i, "resume bypasses retry limit");
 
+  let completion = "";
+  try {
+    completion = section(skill.body, "Completion report");
+  } catch (error) {
+    errors.push(error.message);
+  }
+  allowManagerOperations(errors, completion, [], "completion report section");
+  requirePositive(errors, completion, [/only when the manager status is `completed`/i], "completion report is limited to completed");
+  const completionText = completion.replace(/\s+/g, " ");
+  if (!completionText.includes("`## 사용자 확인 필요`, `## 변경` and `## 발견`") ||
+      !completionText.includes("<final-summary>") ||
+      !completionText.includes("grants no completion authority")) {
+    errors.push("completion report must lead with the shared summary's three fixed headings and grant no completion authority");
+  }
+  if (!resources.includes("- Shared final summary: `../../../scripts/final-summary.mjs`")) {
+    errors.push("webapp resources must list the shared final summary");
+  }
+
   const handoff = section(skill.body, "Boundaries and handoff");
   allowManagerOperations(errors, handoff, [], "handoff section");
   requirePositive(
@@ -799,7 +817,7 @@ test("Codex manifest isolates Codex skills and hooks", async () => {
     "utf8"
   ));
   assert.equal(manifest.name, "harness50");
-  assert.match(manifest.version, /^2\.9\.0(?:\+codex\.[a-z0-9-]+)?$/);
+  assert.match(manifest.version, /^2\.10\.0(?:\+codex\.[a-z0-9-]+)?$/);
   assert.equal(manifest.skills, "./codex/skills/");
   assert.equal(manifest.hooks, "./codex/hooks/hooks.json");
   assert.notEqual(manifest.hooks, "./hooks/hooks.json");
@@ -837,6 +855,21 @@ test("skill identity and canonical resource guards reject drift", async () => {
 test("webapp skill defines continuous execution through one manager-selected work unit at a time", async () => {
   const text = await readSkill("webapp");
   assert.deepEqual(webappContractErrors(text), []);
+});
+
+test("webapp completion report is bound to completed and fixed headings", async () => {
+  const text = await readSkill("webapp");
+  assert.deepEqual(webappContractErrors(text), []);
+  const mutate = (from, to) => {
+    const changed = text.replace(from, to);
+    assert.notEqual(changed, text, String(from));
+    return webappContractErrors(changed);
+  };
+  assert.ok(mutate(/## Completion report\n[^]*?(?=\n## )/, "").includes("missing section: Completion report"));
+  assert.notDeepEqual(mutate("`## 변경` and `## 발견`", "`## 발견` and `## 변경`"), []);
+  assert.notDeepEqual(mutate("Use this report only when the manager status is `completed`.", "Use this report after every work unit."), []);
+  assert.notDeepEqual(mutate("The summary is a report and grants\nno completion authority.", "The summary is a report."), []);
+  assert.notDeepEqual(mutate("- Shared final summary: `../../../scripts/final-summary.mjs`\n", ""), []);
 });
 
 test("webapp topic routing protects proven Codex and Claude topic mismatches first", async () => {
@@ -1053,19 +1086,19 @@ test("package, Claude, Codex, and marketplace release versions are synchronized 
   const entry = marketplace.plugins.find(plugin => plugin.name === "harness50");
 
   assert.equal(claude.name, "harness50");
-  assert.equal(claude.version, "2.9.0");
+  assert.equal(claude.version, "2.10.0");
   assert.equal(packageJson.version, claude.version);
   assert.equal(packageLock.version, claude.version);
   assert.equal(packageLock.packages[""].version, claude.version);
   assert.equal(codex.name, "harness50");
   assert.equal(codex.version.split("+")[0], claude.version);
-  if (codex.version.includes("+")) assert.match(codex.version, /^2\.9\.0\+codex\.[a-z0-9-]+$/);
+  if (codex.version.includes("+")) assert.match(codex.version, /^2\.10\.0\+codex\.[a-z0-9-]+$/);
   assert.equal(codex.skills, "./codex/skills/");
   assert.equal(codex.hooks, "./codex/hooks/hooks.json");
   assert.equal(marketplace.name, "harness50");
-  assert.equal(marketplace.metadata.version, "2.9.0");
+  assert.equal(marketplace.metadata.version, "2.10.0");
   assert.equal(entry?.source, "./");
-  assert.equal(entry?.version, "2.9.0");
+  assert.equal(entry?.version, "2.10.0");
 
   const marketplaceRoot = new URL(".claude-plugin/marketplace.json", REPO_URL);
   const pluginSource = new URL(entry.source, REPO_URL);

@@ -29,19 +29,29 @@ case "$EXT" in
   *) exit 0 ;;
 esac
 
-case "$FP" in
-  */src/*) ;;
+# Only files whose path relative to the project root starts with src/ (a relative input is read
+# from the project root; mirrors lsp-autofix.ps1).
+REL="$(python3 -c 'import os,sys; print(os.path.relpath(os.path.join(sys.argv[1], sys.argv[2]), sys.argv[1]).replace(os.sep, "/"))' "$PROJECT_ROOT" "$FP" 2>/dev/null)" || exit 0
+case "$REL" in
+  src/*) ;;
   *) exit 0 ;;
 esac
+case "/$REL" in
+  */node_modules/*|*/.git/*|*/step_archive/*|*/.claude/*) exit 0 ;;
+esac
 case "$FP" in
-  */node_modules/*|*/.git/*|*/step_archive/*|*/.claude/*|*/plugins/harness50/*) exit 0 ;;
+  */plugins/harness50/*) exit 0 ;;
 esac
 
 
 cd "$PROJECT_ROOT" || exit 0
 
+# Only a project-local biome/stylelint runs, through `npx --no-install`: nothing is downloaded,
+# and a package that sits only in the npx cache is not used.
 if [ "$KIND" = "js" ]; then
-  if npx biome check --write "$FP" >/dev/null 2>&1; then
+  if [ ! -f "$PROJECT_ROOT/node_modules/@biomejs/biome/package.json" ]; then
+    log "biome skipped (no local @biomejs/biome): $FP"
+  elif npx --no-install @biomejs/biome check --write "$FP" >/dev/null 2>&1; then
     log "biome OK: $FP"
   else
     log "biome diag: $FP"
@@ -49,7 +59,9 @@ if [ "$KIND" = "js" ]; then
   fi
 fi
 if [ "$KIND" = "css" ]; then
-  if npx stylelint --fix "$FP" >/dev/null 2>&1; then
+  if [ ! -f "$PROJECT_ROOT/node_modules/stylelint/package.json" ]; then
+    log "stylelint skipped (no local stylelint): $FP"
+  elif npx --no-install stylelint --fix "$FP" >/dev/null 2>&1; then
     log "stylelint OK: $FP"
   else
     log "stylelint diag: $FP"

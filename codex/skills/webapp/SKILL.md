@@ -30,6 +30,7 @@ Resolve these installed resources relative to this SKILL.md, not from the curren
 - Jev input and authorization contract: `../../../docs/jev-checkpoints.md`
 - Direct Jev-first helper: `../../../scripts/jev-ask.mjs`
 - Direct input, native types and routing: `../../../docs/jev-first.md`
+- Shared final summary: `../../../scripts/final-summary.mjs`
 
 Use the state manager for every workflow mutation. Pass the current project directory as the workspace. Do not derive package paths from environment variables or user-supplied flags.
 `init`, `resume`, `complete`, and `fail` return the state directly. For wrapped results
@@ -51,7 +52,7 @@ For existing-work rows, the Mutation column summarizes the referenced resume pro
 Enter that procedure once, without an extra preliminary `resume` or `import-claude` call.
 
 An empty topic is not an initialization request. Never pause, reset, reinterpret, or replace existing work to make room for a new topic.
-A completed workflow is not active: report its existing result without initialization.
+A completed workflow is not active: report its existing result through Completion report without initialization.
 Quoted invocation examples in a request to improve this plugin are not a request to start a product workflow.
 
 ### Fresh initialization input
@@ -79,7 +80,7 @@ mutation. If `import-claude` or `reconcile` returns `completed`, report the exis
 result and distinguish `imported` from `codex_verified`; do not call `resume` or
 otherwise mutate it. This includes an import with all 50 steps and recovery of the final receipt.
 
-1. When a valid Codex state exists, use it first. If its status is `completed`, report the existing result and do not mutate it or call `resume`. Otherwise call `reconcile` only when diagnostics indicate receipt recovery is needed. Apply Legacy topic recovery below when applicable, then call `resume` and follow One-step execution for the returned current step.
+1. When a valid Codex state exists, use it first. If its status is `completed`, report the existing result through Completion report and do not mutate it or call `resume`. Otherwise call `reconcile` only when diagnostics indicate receipt recovery is needed. Apply Legacy topic recovery below when applicable, then call `resume` and follow One-step execution for the returned current step.
 2. Only if no Codex state exists and Claude progress exists, call `import-claude`, report `imported` historical completions separately from `codex_verified` completions, then call `resume` and follow One-step execution.
 3. If import fails, preserve the returned error. Report `import_error.code`, `source_preserved`, and its action; stop without another mutation and advise: "repair the Claude state or use a separate workspace".
 4. When neither exists, report that there is nothing to resume and suggest `$webapp <topic>`.
@@ -126,7 +127,8 @@ One-step execution below is one work unit inside this loop, not one whole turn.
   scope. Perform the repair before retrying the failed checks. Each new attempt
   goes through `begin` and the required QA flow again.
 - Stop on manager status `blocked`, `paused`, or `completed`. Report completion
-  only for `completed` with the required product evidence. Never call `resume` or
+  only for `completed` with the required product evidence. For `completed`, follow
+  Completion report. Never call `resume` or
   `reset` between work units to clear the failure count or evade the retry limit.
 - When permission or essential external input is required, stop dependent work
   and give the concrete blocker and next action. A missing marker, manager error,
@@ -156,6 +158,18 @@ One-step execution below is one work unit inside this loop, not one whole turn.
 8. Otherwise call `fail` with a sanitized reason and evidence. Report the failure; do not invent completion. If snapshot or report recording fails, still call manager `fail`, identify the unavailable QA handoff, and do not fabricate a QA report. Include the recorded report digest when available and the next check to run. Reaching a retry limit never advances the step.
 9. Return the actual manager response to Continuous execution. Execute only one
    step in this work unit; the loop selects the next work unit after this one is accepted.
+
+## Completion report
+
+Use this report only when the manager status is `completed`. Run
+`node "<final-summary>" --workspace "<project-root>"` with the shared final summary
+resolved from Resources. Lead the final response with its output unchanged: exactly
+three headings in this order, `## 사용자 확인 필요`, `## 변경` and `## 발견`. Add no
+other heading and never paraphrase an item. The helper only reads saved product
+evidence, TOPIC and step reports, and writes only `step_archive/outputs/final-summary.md`.
+A missing or malformed source appears as `확인 불가`. The summary is a report and grants
+no completion authority. If the helper itself cannot run, report the completed result
+and state that the summary is unavailable.
 
 ## Jev-first request routing
 

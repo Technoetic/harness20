@@ -108,11 +108,11 @@ Step 3이 `step_archive/outputs/browser-backend.json`에 고정한 브라우저 
 ### 3단계: 판정 처리
 - **PASS**: 필수 검사·증거 통과와 미해결 `Critical`/`Important` 부재를 확인한 뒤 기존 Step 완료 절차로 복귀
 - **FAIL**: 필수 finding을 구현 에이전트에 전달하여 수정 후 독립 재평가 (전체 최대 5라운드)
-- **INCOMPLETE**: 결과 보고서를 남기고 현재 Step에서 중단. 완료를 보고하거나 다음 Step으로 진행하지 않는다.
+- **INCOMPLETE**: 결과 보고서를 남기고 현재 Step에서 중단. 완료를 보고하거나 다음 Step으로 진행하지 않는다. 원인이 헌법 §2-1 사유이면 호출자(메인 세션)가 그 코드로 멈춤을 기록한다.
 - 참고 의견만 남은 경우 선택적 개선으로 기록한다. 필수 검사를 통과했다면 점수나 선호만으로 추가 라운드를 시작하지 않는다.
 
 ## 라운드 제한
 - 최초 평가를 1라운드로 세며 수정·재평가를 포함해 전체 최대 5라운드다. 수정 방식이나 평가자 변경으로 회차를 초기화하지 않는다.
 - 동일 필수 finding이 3라운드 연속 미해결·무진전이면 일찍 중단하고 `INCOMPLETE`로 기록한다. 해당 항목을 스킵해 통과시키지 않는다.
-- 5라운드 뒤에도 필수 실패 또는 미해결 `Critical`/`Important`가 있으면 `INCOMPLETE`다. 남은 finding과 다음 안전한 조치를 `step_archive/outputs/eval_rN.md`에 기록하고 현재 Step에서 멈춘다.
+- 5라운드 뒤에도 필수 실패 또는 미해결 `Critical`/`Important`가 있으면 `INCOMPLETE`다. 남은 finding과 다음 안전한 조치를 `step_archive/outputs/eval_rN.md`에 기록하고 현재 Step에서 멈춘다. 라운드 한도 소진은 필수 기준 완화라는 사용자 결정이 필요하므로 `required-input-missing`으로 멈춘다(헌법 §2-1). 평가자는 progress.json과 멈춤 CLI를 직접 다루지 않는다.
 - `progress.json`의 `failed_steps` 등 공유 상태를 직접 갱신하지 않는다. 보고서는 기존 Step의 결과 증거이며 자체적으로 완료·재개 권한을 부여하지 않는다.

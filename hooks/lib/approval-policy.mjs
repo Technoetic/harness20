@@ -2,18 +2,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isActive, physical, within } from './harness-activity.mjs';
 
 const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-function physical(candidate) {
-  try { return fs.realpathSync(candidate); } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
-    // A dangling link is not an ordinary missing destination.
-    if (fs.lstatSync(candidate, { throwIfNoEntry: false })?.isSymbolicLink()) throw error;
-    const parent = path.dirname(candidate);
-    if (parent === candidate) throw error;
-    return path.join(physical(parent), path.basename(candidate));
-  }
-}
 function canonical(value, root) {
   if (typeof value !== 'string' || !value.trim() || /[\x00-\x1f]/.test(value)) throw Error('invalid path');
   let decoded = decodeURIComponent(value).replaceAll('\\', '/').replace(/^\/\/\?\//, '');
@@ -27,10 +18,6 @@ function canonical(value, root) {
     if (component) candidate = physical(path.resolve(candidate, component));
   }
   return candidate;
-}
-function within(candidate, root) {
-  const relative = path.relative(root, candidate);
-  return relative === '' || (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative));
 }
 function singlyLinked(candidate) {
   const stat = fs.statSync(candidate, { throwIfNoEntry: false });
@@ -60,43 +47,57 @@ function spelled(candidate) {
   }
 }
 // Claude progress.json and everything under step_archive/.harness50-codex/ steer the Stop gates.
-// A Codex state.json there silences them, so edits to either never receive hook approval.
+// A Codex state.json there silences them, so edits to either never receive hook approval. The
+// same names in a subfolder are excluded too: a progress.json written there without a prompt would
+// start a run (loader instructions, approval, Stop continuation) once that folder is opened.
 function workflowState(candidate, root) {
   const relative = path.relative(spelled(root), spelled(candidate)).replaceAll('\\', '/').toLowerCase();
-  return /^step_archive(?::[^/]*)?\/(?:progress\.json(?::[^/]*)?$|\.harness50-codex(?::[^/]*)?(?:\/|$))/.test(relative);
+  return /(^|\/)step_archive(?::[^/]*)?\/(?:progress\.json(?::[^/]*)?$|\.harness50-codex(?::[^/]*)?(?:\/|$))/.test(relative);
 }
-// Any entry at the Codex state path, even a directory or link, means the Codex state manager owns
-// the workspace. The Claude step hooks stand down there, and so does auto-approval, even next to a
-// stale or imported progress.json.
-function codexWorkspace(root) {
-  return fs.lstatSync(path.join(root, 'step_archive', '.harness50-codex', 'state.json'), { throwIfNoEntry: false }) !== undefined;
+// Execution-linked files: a later git operation, install, editor, CI run, agent session or
+// user-approved command runs or follows them without anyone reading the edit. They keep the
+// normal permission prompt in auto mode. The guard mode below does not deny them, so ordinary
+// edits still go through once the user confirms.
+const EXECUTION_LINKED = [
+  /(^|\/)\.mcp\.json$/,
+  /(^|\/)(claude|claude\.local|agents|agents\.override)\.md$/,
+  /(^|\/)\.(husky|githooks|vscode|idea|devcontainer|cursor|circleci|buildkite|claude-plugin|codex-plugin)(\/|$)/,
+  /(^|\/)\.github\/(workflows|actions)(\/|$)/,
+  /(^|\/)(\.cursorrules|\.windsurfrules)$/,
+  /(^|\/)\.github\/copilot-instructions\.md$/,
+  /(^|\/)(\.pre-commit-config\.ya?ml|\.?lefthook(-local)?\.(ya?ml|json|toml)|\.lefthookrc|\.?simple-git-hooks\.(json|c?js)|\.lintstagedrc(\.[^/]*)?|lint-staged\.config\.[^/]+)$/,
+  /(^|\/)(\.gitlab-ci\.ya?ml|azure-pipelines\.ya?ml|jenkinsfile|\.travis\.ya?ml|bitbucket-pipelines\.ya?ml)$/,
+  /(^|\/)(package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|\.yarnrc(\.ya?ml)?|\.?pnpmfile\.c?js|bunfig\.toml|\.envrc|harness50\.quality\.json)$/,
+  /(^|\/)node_modules(\/|$)/,
+  /^step_archive\/tools(\/|$)/,
+  // Step bodies: the loader and the Stop hook tell the next session to read and run them, and only
+  // webapp-trigger copies them in, so the model never needs to write there.
+  /^step_archive\/archived(\/|$)/
+];
+// Project-relative, lower case, '/' separated, with any ':stream' suffix (NTFS alternate data
+// stream) dropped from each component before matching.
+function executionLinked(candidate, root) {
+  const relative = path.relative(spelled(root), spelled(candidate)).replaceAll('\\', '/').toLowerCase()
+    .split('/').map(part => part.replace(/:.*$/, '')).join('/');
+  return EXECUTION_LINKED.some(pattern => pattern.test(relative));
 }
-function active(root) {
-  if (codexWorkspace(root)) return false;
-  const file = path.join(root, 'step_archive/progress.json');
-  if (!within(physical(file), root) || !fs.statSync(file).isFile()) return false;
-  const state = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
-  if (!state || typeof state !== 'object' || Array.isArray(state)) return false;
-  if ('paused' in state && state.paused !== false) return false;
-  if ('status' in state && !['active', 'running', 'in_progress'].includes(state.status)) return false;
-  if ('total_steps' in state && state.total_steps !== 50) return false;
-  const done = state.completed_steps;
-  return Array.isArray(done) && done.length < 50 && done.every((step, index) => step === index + 1) &&
-    Number.isInteger(state.current_step) && state.current_step === done.length + 1;
-}
+// Active-state judgement lives in harness-activity.mjs (isActive). Any entry at the Codex state
+// path makes it false there, even next to a stale or imported progress.json.
 try {
   const event = JSON.parse(fs.readFileSync(0, 'utf8').replace(/^\uFEFF/, ''));
   const root = physical(path.resolve(process.env.CLAUDE_PROJECT_DIR || event.cwd || process.cwd()));
   const mode = process.argv[2];
   const edits = ['Write', 'Edit', 'MultiEdit', 'NotebookEdit'];
   if (mode === 'auto') {
-    if (!active(root)) process.exit(0);
-    // Shell commands and network fetches retain ordinary host permission checks.
+    if (!isActive(root)) process.exit(0);
+    // Shell commands and network fetches retain ordinary host permission checks. Bash and WebFetch
+    // are never eligible here, and the auto-approve matcher in hooks/hooks.json leaves them out
+    // too: widen both together or neither.
     if (event.tool_name === 'WebSearch') process.stdout.write('eligible');
     else if (edits.includes(event.tool_name)) {
       const candidate = canonical(event.tool_input?.file_path || event.tool_input?.notebook_path, root);
       if (within(candidate, root) && !sensitive(candidate) && singlyLinked(candidate) && candidate !== root &&
-          !workflowState(candidate, root)) process.stdout.write('eligible');
+          !workflowState(candidate, root) && !executionLinked(candidate, root)) process.stdout.write('eligible');
     }
   } else if (mode === 'guard' && edits.includes(event.tool_name)) {
     const candidate = canonical(event.tool_input?.file_path || event.tool_input?.notebook_path, root);

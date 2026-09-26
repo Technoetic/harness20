@@ -3,7 +3,7 @@
 case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) exit 0 ;; esac
 # html-bundler.sh — src/ 구조를 단일 dist/index.html로 번들링 (file:// 호환)
 #
-# 역할 (step037/038/081 계약):
+# 역할 (step037/038 계약):
 #   src/index.html 베이스 + src/**/*.css → <style> 인라인 + src/**/*.js → <script> 인라인(import/export 제거)
 #   로컬 <link href>, <script src> 참조 제거. 결과: dist/index.html 단일 파일.
 #
@@ -37,8 +37,13 @@ with open(index_src, encoding="utf-8") as f:
 html = re.sub(r'(?i)<link\b[^>]*\bhref\s*=\s*["\'](?!https?:|//)[^"\']*\.css[^>]*>', '', html)
 html = re.sub(r'(?i)<script\b[^>]*\bsrc\s*=\s*["\'](?!https?:|//)[^"\']*\.js[^>]*>\s*</script>', '', html)
 
+# src/ 아래 일반 파일만 모은다. 프로젝트 경로의 [ ]가 glob 문자 클래스로 읽히지 않게
+# escape하고, 이름만 .js/.css인 디렉터리(예: vendor.js/)는 건너뛴다 (ps1의 -LiteralPath -File과 동일).
+def src_files(pattern):
+    return [p for p in glob.glob(os.path.join(glob.escape(src), "**", pattern), recursive=True) if os.path.isfile(p)]
+
 # 2) CSS 수집 → <style>
-css_files = sorted(glob.glob(os.path.join(src, "**", "*.css"), recursive=True))
+css_files = sorted(src_files("*.css"))
 css_parts = []
 for p in css_files:
     rel = os.path.relpath(p, src)
@@ -61,8 +66,7 @@ def strip_module(js):
         out.append(ln)
     return "\n".join(out)
 
-js_files = sorted(glob.glob(os.path.join(src, "**", "*.js"), recursive=True) +
-                  glob.glob(os.path.join(src, "**", "*.mjs"), recursive=True))
+js_files = sorted(src_files("*.js") + src_files("*.mjs"))
 js_parts = []
 for p in js_files:
     rel = os.path.relpath(p, src)
@@ -70,15 +74,16 @@ for p in js_files:
         js_parts.append("// %s\n%s" % (rel, strip_module(f.read())))
 script_block = ("<script>\n" + "\n\n".join(js_parts) + "\n</script>\n") if js_parts else ""
 
-# 4) 주입
+# 4) 주입 (치환 문자열은 함수로 넘겨 그대로 넣는다: 코드 안의 \d·\n이나 Windows 상대 경로의 \가
+#    re 이스케이프로 해석되지 않게)
 if style_block:
     if re.search(r'(?i)</head>', html):
-        html = re.sub(r'(?i)</head>', style_block + '</head>', html, count=1)
+        html = re.sub(r'(?i)</head>', lambda m: style_block + '</head>', html, count=1)
     else:
         html = style_block + html
 if script_block:
     if re.search(r'(?i)</body>', html):
-        html = re.sub(r'(?i)</body>', script_block + '</body>', html, count=1)
+        html = re.sub(r'(?i)</body>', lambda m: script_block + '</body>', html, count=1)
     else:
         html = html + script_block
 

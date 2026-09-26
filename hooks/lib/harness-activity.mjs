@@ -1,0 +1,214 @@
+#!/usr/bin/env node
+// Read-only. The single activity judgement shared by run-hook, approval-policy, quality-gate and
+// webapp-trigger (읽기 전용, run-hook·approval-policy·quality-gate·webapp-trigger가 공유하는 단일 판정).
+//
+// A Claude workflow is active only when all of these hold:
+//   - no Codex state entry exists at step_archive/.harness50-codex/state.json (lstat, so even a
+//     dangling link counts as present);
+//   - step_archive/progress.json is a regular file inside the project root and at most 1 MiB;
+//   - paused is absent or false, and status is absent or one of ACTIVE_STATUSES;
+//   - total_steps is present and equals STEP_COUNT;
+//   - completed_steps holds distinct integers 1..STEP_COUNT;
+//   - current_step equals the first unfinished step;
+//   - that step's body exists (step_archive/archived/stepNNN.md, else step_archive/stepNNN.md).
+// A progress.json created by an older SessionStart loader has no step bodies next to it, so it
+// reads as stale and never turns hooks on.
+// A named pause (scripts/harness-pause.mjs, harness-rules 2-1) is judged on the same rules with
+// the pause flag removed: 'paused' only when that run would be active, else finished, stale,
+// stopped or invalid. Only the loader, the prompt guard and the progress writer start for a paused
+// run.
+//
+// It never writes and never imports codex/: installed copies and hook fixtures may ship hooks/
+// without it. The CLI prints one ASCII line and always exits 0.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+export const STEP_COUNT = 50;
+export const ACTIVE_STATUSES = Object.freeze(['active', 'running', 'in_progress']);
+export const MAX_PROGRESS_BYTES = 1024 * 1024;
+// First line only: '^' without the m flag anchors at the start of the prompt. Case-sensitive.
+export const EXPLICIT_WEBAPP = /^[ \t]*\/(?:harness50:)?webapp[ \t]+\S/;
+// Which run phases start each registered hook. 'always' runs everywhere the plugin is installed;
+// 'explicit-webapp' runs only for a '/webapp <topic>' prompt. In a paused run the loader and the
+// prompt guard start, to say where the run stopped, and the writer starts to record the completion
+// lines the model reported in the turn it paused (harness-rules 2-1 lets it finish steps first). The
+// writer never tells the model to continue, so the pause keeps its meaning. Stop continuation,
+// approval, quality, SPEC, MX and LSP stay off until /harness-resume.
+export const HOOK_GATES = Object.freeze({
+  'destructive-guard': 'always',
+  'permission-request-guard': 'always',
+  'webapp-trigger': 'explicit-webapp',
+  'step-progress-loader': Object.freeze(['active', 'codex', 'paused']),
+  'trust5-validator': Object.freeze(['active', 'finished']),
+  'step-obedience-guard': Object.freeze(['active', 'paused']),
+  'auto-approve': Object.freeze(['active']),
+  'mx-tag-validator': Object.freeze(['active']),
+  'lsp-autofix': Object.freeze(['active']),
+  'step-progress-writer': Object.freeze(['active', 'paused']),
+  'spec-generator': Object.freeze(['active']),
+  'step-auto-continue': Object.freeze(['active'])
+});
+const DEFAULT_GATE = Object.freeze(['active']);
+
+const CODEX_SKIP_LINE = '[HARNESS] webapp trigger skipped: a Codex workflow owns this workspace, so step_archive/TOPIC/TOPIC.md and progress.json were left unchanged. Resume that workflow, or use a separate workspace for a different topic.';
+export const PRECHECK_INVALID_LINE = '[HARNESS] webapp trigger skipped: step_archive/progress.json is unreadable or invalid, so step_archive/TOPIC/TOPIC.md and progress.json were left unchanged. Repair it or run /harness-reset first.';
+
+// Physical path of candidate; a missing tail is joined onto the physical form of its parent.
+export function physical(candidate) {
+  try { return fs.realpathSync(candidate); } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    // A dangling link is not an ordinary missing destination.
+    if (fs.lstatSync(candidate, { throwIfNoEntry: false })?.isSymbolicLink()) throw error;
+    const parent = path.dirname(candidate);
+    if (parent === candidate) throw error;
+    return path.join(physical(parent), path.basename(candidate));
+  }
+}
+export function within(candidate, root) {
+  const relative = path.relative(root, candidate);
+  return relative === '' || (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative));
+}
+export function projectRoot(event, env = process.env, cwd = process.cwd()) {
+  return physical(path.resolve(env.CLAUDE_PROJECT_DIR || event?.cwd || cwd));
+}
+// Any entry at the Codex state path, even a directory or link, means the Codex state manager owns
+// the workspace. Only "a parent is not a directory" means no entry; other errors fail closed.
+export function codexOwned(root) {
+  try {
+    return fs.lstatSync(path.join(root, 'step_archive', '.harness50-codex', 'state.json'), { throwIfNoEntry: false }) !== undefined;
+  } catch (error) {
+    return error?.code !== 'ENOTDIR';
+  }
+}
+
+// Pure structural judgement of a parsed progress.json value.
+export function classifyProgress(state) {
+  if (!state || typeof state !== 'object' || Array.isArray(state)) return { phase: 'invalid' };
+  if (('paused' in state && state.paused !== false) || state.status === 'paused') return { phase: 'paused' };
+  if ('status' in state && !ACTIVE_STATUSES.includes(state.status)) return { phase: 'stopped' };
+  if (state.total_steps !== STEP_COUNT) return { phase: 'invalid' };
+  const done = state.completed_steps;
+  if (!Array.isArray(done) || !done.every(step => Number.isInteger(step) && step >= 1 && step <= STEP_COUNT) ||
+      new Set(done).size !== done.length) return { phase: 'invalid' };
+  const finished = new Set(done);
+  let next = null;
+  for (let step = 1; step <= STEP_COUNT; step += 1) {
+    if (!finished.has(step)) { next = step; break; }
+  }
+  // The final writer keeps the cursor on the last step or moves it one past.
+  if (next === null) {
+    return [STEP_COUNT, STEP_COUNT + 1].includes(state.current_step) ? { phase: 'finished', completed: STEP_COUNT } : { phase: 'invalid' };
+  }
+  return state.current_step === next ? { phase: 'running', next, completed: done.length } : { phase: 'invalid' };
+}
+
+const stepName = step => `step${String(step).padStart(3, '0')}.md`;
+function regularFile(file) {
+  try { return fs.statSync(file, { throwIfNoEntry: false })?.isFile() === true; } catch { return false; }
+}
+function progressEntry(root) {
+  const file = path.join(root, 'step_archive', 'progress.json');
+  try {
+    return fs.lstatSync(file, { throwIfNoEntry: false }) === undefined ? { file, present: false } : { file, present: true };
+  } catch (error) {
+    if (error?.code === 'ENOTDIR' || error?.code === 'ENOENT') return { file, present: false };
+    throw error;
+  }
+}
+// Parsed progress.json that lies inside root, or throws.
+function readProgress(root, file) {
+  if (!within(physical(file), root)) throw new Error('progress.json leaves the project');
+  const stat = fs.statSync(file);
+  if (!stat.isFile() || stat.size > MAX_PROGRESS_BYTES) throw new Error('progress.json is not a small regular file');
+  return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, ''));
+}
+
+export function readRun(root) {
+  if (codexOwned(root)) return { phase: 'codex' };
+  let entry;
+  try { entry = progressEntry(root); } catch { return { phase: 'invalid' }; }
+  if (!entry.present) return { phase: 'absent' };
+  let state;
+  try { state = readProgress(physical(root), entry.file); } catch { return { phase: 'invalid' }; }
+  const run = classifyProgress(state);
+  if (run.phase === 'paused') return pausedRun(root, state);
+  if (run.phase !== 'running') return run;
+  const body = stepBody(root, run.next);
+  return body ? { ...run, phase: 'active', stepBody: body } : { ...run, phase: 'stale' };
+}
+function stepBody(root, step) {
+  const name = stepName(step);
+  if (regularFile(path.join(root, 'step_archive', 'archived', name))) return 'archived';
+  if (regularFile(path.join(root, 'step_archive', name))) return 'flat';
+  return null;
+}
+// classifyProgress reports 'paused' before any structural check, so judge the same state without
+// the pause: a run that would be active stays 'paused'; anything else keeps that other phase.
+function pausedRun(root, state) {
+  const unpaused = { ...state };
+  delete unpaused.paused;
+  if (unpaused.status === 'paused') delete unpaused.status;
+  const run = classifyProgress(unpaused);
+  if (run.phase !== 'running') return run;
+  return stepBody(root, run.next) ? { phase: 'paused', next: run.next, completed: run.completed } : { ...run, phase: 'stale' };
+}
+export const isActive = root => readRun(root).phase === 'active';
+
+// Whether run-hook.mjs should start the named hook for this raw event. Any failure means no.
+export function shouldRunHook(name, raw, env = process.env, cwd = process.cwd()) {
+  try {
+    const gate = Object.hasOwn(HOOK_GATES, name) ? HOOK_GATES[name] : DEFAULT_GATE;
+    if (gate === 'always') return true;
+    const text = typeof raw === 'string' ? raw : Buffer.isBuffer(raw) ? raw.toString('utf8') : '';
+    const event = JSON.parse(text.replace(/^﻿/, ''));
+    if (!event || typeof event !== 'object' || Array.isArray(event)) return false;
+    if (gate === 'explicit-webapp') return typeof event.prompt === 'string' && EXPLICIT_WEBAPP.test(event.prompt);
+    return gate.includes(readRun(projectRoot(event, env, cwd)).phase);
+  } catch {
+    return false;
+  }
+}
+
+// 'issue' lets '/webapp <topic>' bootstrap a new run. Anything else is the one line the trigger
+// prints instead: recorded progress and unreadable progress are never overwritten. A run without
+// completed steps is replaced whether or not it is paused, so '/harness-reset' (which leaves a
+// user-request pause) followed by '/webapp <topic>' starts the new topic.
+export function webappPrecheck(root) {
+  if (codexOwned(root)) return CODEX_SKIP_LINE;
+  let state;
+  try {
+    const entry = progressEntry(root);
+    if (!entry.present) return 'issue';
+    state = readProgress(physical(root), entry.file);
+  } catch {
+    return PRECHECK_INVALID_LINE;
+  }
+  if (!state || typeof state !== 'object' || Array.isArray(state)) return PRECHECK_INVALID_LINE;
+  if (!('completed_steps' in state)) return 'issue';
+  const done = state.completed_steps;
+  if (!Array.isArray(done)) return PRECHECK_INVALID_LINE;
+  if (done.length === 0) return 'issue';
+  return `[HARNESS] webapp trigger skipped: step_archive/progress.json already records ${done.length}/${STEP_COUNT} completed steps, so step_archive/TOPIC/TOPIC.md and progress.json were left unchanged. Continue that run (use /harness-resume if it is paused), or run /harness-reset first and then /webapp <topic> for a new topic.`;
+}
+
+function invokedDirectly() {
+  try {
+    return fs.realpathSync.native(process.argv[1] ?? '') === fs.realpathSync.native(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+// node harness-activity.mjs precheck-webapp <root> | phase <root>
+if (invokedDirectly()) {
+  const [command, target] = process.argv.slice(2);
+  let line = 'invalid';
+  if (command === 'precheck-webapp') {
+    try { line = webappPrecheck(physical(path.resolve(target))); } catch { line = PRECHECK_INVALID_LINE; }
+  } else if (command === 'phase') {
+    try { line = readRun(physical(path.resolve(target))).phase; } catch { line = 'invalid'; }
+  }
+  process.stdout.write(`${line}\n`);
+  process.exitCode = 0;
+}

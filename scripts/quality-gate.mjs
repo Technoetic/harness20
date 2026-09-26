@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { runQualityGate, inspectQualityReport } from './lib/quality.mjs';
 import { physicalWorkspace, readSafe, writeSafe } from './lib/quality-files.mjs';
 import { inspectBrowserOutput } from './lib/final-output.mjs';
@@ -35,16 +33,20 @@ async function main() {
   if (!workspaceRoot) throw new Error('--workspace requires a directory');
   let round;
   if (hook) {
-    // Codex coexistence: step_archive/.harness50-codex/state.json means the Codex state manager
-    // owns completion here, so a stale Claude progress.json next to it never drives this Stop gate.
-    if (existsSync(join(workspaceRoot, 'step_archive', '.harness50-codex', 'state.json'))) return;
+    // Shared judgement (hooks/lib/harness-activity.mjs), loaded only here: the non-hook modes
+    // must keep working without hooks/ next to scripts/.
+    const { codexOwned, classifyProgress } = await import('../hooks/lib/harness-activity.mjs');
+    let physicalRoot;
+    try { physicalRoot = await physicalWorkspace(workspaceRoot); } catch { return; }
+    // Codex coexistence: any entry at step_archive/.harness50-codex/state.json means the Codex state
+    // manager owns completion here, so a stale Claude progress.json next to it never drives this Stop gate.
+    if (codexOwned(physicalRoot)) return;
     let progress;
-    try { progress = JSON.parse((await readSafe(await physicalWorkspace(workspaceRoot), 'step_archive/progress.json')).toString('utf8').replace(/^\uFEFF/, '')); }
+    try { progress = JSON.parse((await readSafe(physicalRoot, 'step_archive/progress.json')).toString('utf8').replace(/^\uFEFF/, '')); }
     catch { return; }
-    if (!progress || typeof progress !== 'object' || Array.isArray(progress)) return;
-    if ('paused' in progress && progress.paused !== false) return;
-    if ('status' in progress && !['active', 'running', 'in_progress'].includes(progress.status)) return;
-    if ('total_steps' in progress && progress.total_steps !== 50) return;
+    // Paused, stopped or structurally invalid runs release the gate; the milestone rules follow.
+    const run = classifyProgress(progress);
+    if (!['running', 'finished'].includes(run.phase)) return;
     const done = progress.completed_steps;
     if (!Array.isArray(done) || done.length > 50 || done.some((n, i) => n !== i + 1) || done.length < 38) return;
     // The final writer retains step 50; accept the exhausted cursor 51 as well.

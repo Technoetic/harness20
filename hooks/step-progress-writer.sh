@@ -2,6 +2,9 @@
 # Windows guard: skip on git-bash / MSYS / Cygwin (ps1 counterpart runs there)
 case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) exit 0 ;; esac
 # step-progress-writer.sh — Stop hook (macOS/Linux)
+# Run boundary (mirrors step-progress-writer.ps1): when progress.json has run_started_at (written
+# by the /webapp bootstrap and by harness-pause.mjs reset), only transcript entries from that
+# moment on count. Without it (runs started by 2.9.0 and earlier) the whole transcript counts.
 set -u
 RAW="$(cat || true)"
 EVENT_CWD=""
@@ -17,7 +20,6 @@ LOG_FILE="$(dirname "${BASH_SOURCE[0]}")/step-progress-writer.log"
 LOCK_FILE="$STEP_ARCHIVE/.writer.lock"
 
 log() { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >>"$LOG_FILE" 2>/dev/null || true; }
-log "invoked"
 
 # Codex coexistence (mirrors step-progress-writer.ps1): the Codex state manager owns completion.
 # Leave progress.json untouched and never create the lock file.
@@ -28,18 +30,16 @@ fi
 [ -f "$PROGRESS_FILE" ] || exit 0
 command -v python3 >/dev/null 2>&1 || { log "python3 missing"; exit 0; }
 
-
-# advisory file lock (best effort)
-exec 9>"$LOCK_FILE" 2>/dev/null || true
-if command -v flock >/dev/null 2>&1; then
-  flock -w 5 9 || { log "flock timeout"; exit 0; }
-fi
-
 H50_WRITER_INSPECTOR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/quality-gate.mjs"
 if command -v cygpath >/dev/null 2>&1; then H50_WRITER_INSPECTOR="$(cygpath -m "$H50_WRITER_INSPECTOR")"; fi
 export RAW PROGRESS_FILE ARCHIVED_DIR H50_WRITER_INSPECTOR
-python3 - <<'PY'
-import json, os, re, datetime, tempfile, shutil, subprocess
+
+# writer_py probe: prints "idle" for a paused run with no new completion line, else "work"; reads
+# only. writer_py write: records the completions and rewrites progress.json.
+writer_py() {
+python3 - "$1" <<'PY'
+import json, os, re, sys, datetime, tempfile, shutil, subprocess
+mode=sys.argv[1] if len(sys.argv)>1 else "write"
 raw=os.environ.get("RAW","")
 p_path=os.environ["PROGRESS_FILE"]
 a_dir=os.environ["ARCHIVED_DIR"]
@@ -48,6 +48,49 @@ try:
     with open(p_path,encoding="utf-8") as f: progress=json.load(f)
 except Exception: raise SystemExit(0)
 
+# Named pause (harness-rules 2-1): hooks/lib/harness-activity.mjs starts this hook for a paused run
+# so that the completion lines of the turn that paused are recorded; the pause fields are kept as
+# they are. With no new line to record nothing changes (probe below): no lock file, no log line,
+# no rewrite. Same judgement as scripts/lib/pause-state.mjs isPaused.
+p=progress
+paused=isinstance(p,dict) and (('paused' in p and p['paused'] is not False) or p.get('status')=='paused')
+if mode=="probe" and not paused:
+    print("work")
+    raise SystemExit(0)
+
+# UTC instant of an ISO 8601 timestamp: date, 'T', time, any number of fraction digits (cut to
+# microseconds) and 'Z' or a +hh:mm/-hh:mm offset; anything else is None. Instants are compared as
+# times, never as text: '01:02:03Z' and '01:02:03.000Z' are equal (mirrors Get-UtcTicks in the .ps1).
+ISO=re.compile(r'([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]+))?(Z|[+-][0-9]{2}:[0-9]{2})')
+def utc_instant(value):
+    if not isinstance(value,str): return None
+    m=ISO.fullmatch(value)
+    if not m: return None
+    try:
+        fraction=((m.group(7) or "")+"000000")[:6]
+        instant=datetime.datetime(int(m.group(1)),int(m.group(2)),int(m.group(3)),int(m.group(4)),int(m.group(5)),int(m.group(6)),int(fraction),tzinfo=datetime.timezone.utc)
+        zone=m.group(8)
+        if zone!="Z":
+            # Offsets beyond +-14:00 are no instant (the .NET DateTimeOffset range).
+            if int(zone[4:6])>59 or int(zone[1:3])*60+int(zone[4:6])>14*60: return None
+            shift=datetime.timedelta(hours=int(zone[1:3]),minutes=int(zone[4:6]))
+            instant=instant-shift if zone[0]=="+" else instant+shift
+        return instant
+    except (ValueError,OverflowError):
+        return None
+
+# Run boundary. Entries before run_started_at belong to an earlier run of this workspace (the topic
+# before a /webapp bootstrap or /harness-reset in the same session). An entry without a parsable
+# timestamp still counts: Claude Code stamps every transcript entry, so only a foreign or damaged
+# line lacks one, and dropping it could lose a real completion (the step would run again, and in a
+# new session the record is gone), while counting it is what every writer did before the boundary
+# existed. A missing or unparsable run_started_at (runs started by 2.9.0 and earlier) sets no
+# boundary: the whole transcript counts.
+boundary=utc_instant(progress.get("run_started_at")) if isinstance(progress,dict) else None
+
+# last_assistant_message is the final message of the turn that is stopping, written after any
+# run_started_at recorded before or during that turn (webapp-trigger at UserPromptSubmit,
+# harness-pause.mjs reset inside the turn), so it has no time and always counts.
 response=""
 j=None
 try: j=json.loads(raw) if raw else None
@@ -65,6 +108,8 @@ if j:
                     try:
                         e=json.loads(ln)
                         if e.get("type")=="assistant":
+                            at=utc_instant(e.get("timestamp"))
+                            if boundary is not None and at is not None and at<boundary: continue
                             content=(e.get("message") or {}).get("content") or []
                             for b in content:
                                 if b.get("type")=="text" and b.get("text"):
@@ -101,6 +146,11 @@ for line in response.split("\n"):
 
 valid={n for n in found if (os.path.isfile(os.path.join(a_dir,f"step{n:03d}.md")) or os.path.isfile(os.path.join(os.path.dirname(a_dir),f"step{n:03d}.md")))}
 existing=set(int(x) for x in (progress.get("completed_steps") or []))
+
+if mode=="probe":
+    print("work" if valid - existing else "idle")
+    raise SystemExit(0)
+
 if total == 50:
     qa_inspector = os.path.join(os.path.dirname(os.environ["H50_WRITER_INSPECTOR"]), "qa-report.mjs")
     for step in sorted((valid - existing) & {39, 40, 43, 46, 47, 48}):
@@ -143,4 +193,17 @@ with open(tmp,"w",encoding="utf-8") as f:
     json.dump(progress,f,ensure_ascii=False,indent=2)
 os.replace(tmp,p_path)
 PY
+}
+
+# A paused run with nothing new to record: leave without a log line, a lock file or a write.
+[ "$(writer_py probe 2>/dev/null | tr -d '\r')" = "idle" ] && exit 0
+log "invoked"
+
+# advisory file lock (best effort)
+exec 9>"$LOCK_FILE" 2>/dev/null || true
+if command -v flock >/dev/null 2>&1; then
+  flock -w 5 9 || { log "flock timeout"; exit 0; }
+fi
+
+writer_py write
 exit 0

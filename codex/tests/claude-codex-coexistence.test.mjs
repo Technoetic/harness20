@@ -415,9 +415,9 @@ test('without state.json (fresh or after a Codex reset) the Claude step hooks be
     stop: f.run('step-auto-continue', { session_id: 'legacy' }),
     writer: completeStepOne(f),
     stopAfter: f.run('step-auto-continue', { session_id: 'legacy' }),
-    // Git Bash emulation only: Windows python ends lines with CRLF, which the untouched legacy
-    // printf in step-obedience-guard.sh rejects. Real POSIX hosts and PowerShell run it.
-    guard: bashOnWindows ? null : f.run('step-obedience-guard', { prompt: 'continue' }),
+    // step-obedience-guard.sh drops the CR a Windows python prints, so the Git Bash emulation
+    // checks it too.
+    guard: f.run('step-obedience-guard', { prompt: 'continue' }),
     progress: position(readProgress(f))
   });
   const [legacy, afterReset] = [observe(plain), observe(reset)];
@@ -428,7 +428,7 @@ test('without state.json (fresh or after a Codex reset) the Claude step hooks be
     assert.match(JSON.parse(observed.stop).reason, /step001/, name);
     assert.equal(JSON.parse(observed.stopAfter).decision, 'block', name);
     assert.match(JSON.parse(observed.stopAfter).reason, /step002/, name);
-    if (!bashOnWindows) assert.match(observed.guard, /step002/, name);
+    assert.match(observed.guard, /step002/, name);
     assert.deepEqual(observed.progress, { total_steps: 3, current_step: 2, completed_steps: [1], failed_steps: [] }, name);
   }
   // Hook output does not depend on whether a contended write landed, so both fixtures match exactly.
@@ -441,10 +441,8 @@ const STALE_LOADER_PROGRESS = {
   skipped_steps: [], session_history: [], metrics: { total_sessions: 1, total_duration_minutes: 0, steps_per_session_avg: 0 }
 };
 
-test('Codex state turns Claude auto-approval off, even next to a stale progress.json', t => {
-  // No brackets here: auto-approve.ps1 checks progress.json with a wildcard Test-Path, so a
-  // bracketed project would never reach the approval baseline this test needs.
-  const f = fixture(t, { name: 'Codex 작업 approvals' });
+testEachName('Codex state turns Claude auto-approval off, even next to a stale progress.json', (t, name) => {
+  const f = fixture(t, { name });
   mkdirSync(f.archive, { recursive: true });
   writeFileSync(f.progressFile, JSON.stringify(STALE_LOADER_PROGRESS));
   // One variant per run, like the rest of this file: PowerShell on Windows, bash on POSIX, and the
@@ -455,7 +453,11 @@ test('Codex state turns Claude auto-approval off, even next to a stale progress.
   const search = { tool_name: 'WebSearch', tool_input: { query: 'css' } };
   const allow = /"permissionDecision":"allow"/;
 
-  // Baseline: on its own the stale file still reads as an active Claude workflow.
+  // The loader-created file alone has no step body next to it: it is stale, never an active run.
+  assert.equal(approve(edit), '');
+  // With the step body a /webapp run has, the same progress.json reads as an active Claude workflow.
+  mkdirSync(join(f.archive, 'archived'), { recursive: true });
+  writeFileSync(join(f.archive, 'archived', 'step001.md'), '# Step 1\n');
   assert.match(approve(edit), allow);
   assert.equal(approve({ ...edit, tool_input: { ...edit.tool_input, file_path: CODEX_STATE_RELATIVE } }), '');
   const cases = {

@@ -13,6 +13,7 @@ import {
   validateIndex,
   validateStepBatch
 } from "../scripts/validate-steps.mjs";
+import { makeWorkspace } from "./helpers/workspace.mjs";
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 
@@ -33,7 +34,8 @@ function entry(number, overrides = {}) {
 }
 
 async function fixtureRoot() {
-  const root = await mkdtemp(join(tmpdir(), "harness50-steps-"));
+  // makeWorkspace() removes the folder when the test process exits.
+  const root = await makeWorkspace();
   await mkdir(join(root, "assets", "steps"), { recursive: true });
   return root;
 }

@@ -4,7 +4,7 @@
 
 ### 한 줄 요청 → 50 step 자율주행 → 인터랙티브 웹 튜토리얼 1편
 
-**"논문 트렌드 분석 대시보드 만들어"** 한 줄을 던지면 컨텍스트 한계 직전까지 멈추지 않는 결정론적 절차가 가동된다.<br/>
+**`/webapp 논문 트렌드 분석 대시보드`** 한 줄을 던지면 50단계 완료나 명명된 멈춤 전까지 멈추지 않는 결정론적 절차가 가동된다.<br/>
 모델을 똑똑하게 만드는 대신 **모델이 놓을 트랙을 좁힌다**.
 
 <br/>
@@ -15,7 +15,7 @@
 [![Hooks](https://img.shields.io/badge/Hooks-28_files-F59E0B?style=for-the-badge)](hooks/)
 [![Steps](https://img.shields.io/badge/Steps-50_files-10B981?style=for-the-badge)](assets/steps/)
 
-[![Security Tests](https://img.shields.io/badge/Security_Tests-45_cases_·_reproducible-22C55E?style=for-the-badge)](tests/security-regression.sh)
+[![Security Tests](https://img.shields.io/badge/Security_Tests-reproducible_·_FAIL%3D0-22C55E?style=for-the-badge)](tests/security-regression.sh)
 [![Patterns](https://img.shields.io/badge/Safety_Patterns-200+-EF4444?style=for-the-badge)](hooks/destructive-guard.ps1)
 [![Dual Shell](https://img.shields.io/badge/Dual_Shell-PS1_+_SH-7C3AED?style=for-the-badge&logo=powershell&logoColor=white)](hooks/)
 [![Style](https://img.shields.io/badge/style-no_questions-FF1493?style=for-the-badge)](skills/harness-rules/SKILL.md)
@@ -40,6 +40,8 @@
 | Codex | `$webapp <topic>` | `$harness50-status` | `$harness50-reset` |
 
 Codex does not provide a `/webapp` slash command. Codex에서 기존 작업을 이어가려면 `$webapp resume`, 자동 이어가기를 멈추려면 `$webapp pause`를 사용합니다.
+
+Claude Code에서 자동 이어가기를 멈추려면 `/harness-pause`, 멈춘 작업을 이어가려면 `/harness-resume`을 사용합니다. `/harness-reset`은 진행 기록을 새로 만들고 `/webapp <topic>`은 완료 기록이 있는 진행을 건드리지 않으므로 둘 다 재개 수단이 아닙니다.
 
 플러그인 이름이 표시되는 Codex에서는 `$harness50:webapp`, `$harness50:harness50-status`, `$harness50:harness50-reset`을 선택합니다. 짧은 이름과 같은 제어 요청으로 처리됩니다.
 
@@ -168,19 +170,19 @@ v2.4.0은 Claude·Codex의 제품 QA에 [실패·검증 인계 보고서](docs/Q
    step025.md  ───────►  4단계 카드 스토리보드 기획
    step030.md  ───────►  통합 설계 (디자인 토큰·SVG·ARIA)
    step037.md  ───────►  단일 HTML 인터랙티브 튜토리얼 구현
-   step038.md  ───────►  빌드 스모크 게이트 + TRUST 5 r1 (50점 만점)
+   step038.md  ───────►  빌드 스모크 게이트 + TRUST 5 r1
    step044.md  ───────►  클라이언트 사이드 라우팅 + TRUST 5 r2
    step045.md  ───────►  E2E 테스트 (프로젝트의 npm run e2e, 프리플라이트 흡수)
    step050.md  ───────►  콘솔 에러 0 + 최종 build 게이트 + TRUST 5 r3
                         ↓
    Stop hook  ────►  진행 미완료면  {"decision":"block"}  →  자동 재개
                         ↓
-            50 step 완주 후에야 사용자에게 컨트롤 반환
+            50 step 완주 또는 명명된 멈춤 전까지 컨트롤을 돌려주지 않음
 ```
 
 > [!IMPORTANT]
-> 진짜 종료 조건은 단 하나: **컨텍스트 한계 도달**. <br/>
-> "이만하면 충분"이라는 모델의 자기판단을 위반으로 정의한다.
+> 종료 조건은 둘뿐이다: **50단계 완료 기록** 또는 **명명된 멈춤**(권한 거부·필수 도구 3회 실패·필수 외부 입력 부재·사용자 요청). <br/>
+> "이만하면 충분"이라는 모델의 자기판단은 위반이다. 멈춤은 사유와 함께 progress.json에 기록되고 `/harness-resume`으로 풀린다.
 
 ---
 
@@ -196,7 +198,7 @@ v2.4.0은 Claude·Codex의 제품 QA에 [실패·검증 인계 보고서](docs/Q
 | `/webapp 논문 인용 네트워크` | force-directed 인용 관계망 + 시간축 애니메이션 + 검색·필터 + 영향력 노드 강조 |
 | `/webapp 저자 연구 활동 대시보드` | h-index·인용 추이 KPI + 공저자 네트워크 + 키워드 워드클라우드 + 연도별 라인 |
 | `/webapp Literature Review 대시보드` | 논문 분류 매트릭스 + 갭 분석 다이어그램 + 읽기 큐 카드 + 태그 클라우드 |
-| 자연어 `"... 대시보드 만들어줘"` | 위 넷과 동일. 트리거 패턴 7종 모두 지원 |
+| 자연어 요청 | 자동 시작하지 않음 — `/webapp <주제>`로 시작 |
 
 산출물 = **단일 HTML 파일** (Helvetica Neue / 8 배수 grid / accent 1색 / radius {0,4,8,12,16} / 터치 44pt / ARIA 필수).
 
@@ -287,7 +289,7 @@ flowchart TB
 활성 작업의 프로젝트 내부 파일 편집과 WebSearch만 제한적으로 자동 승인합니다. 셸 명령과 WebFetch는 호스트의 권한 정책을 따르며, 알려진 위험 명령과 민감 경로는 계속 차단합니다.
 
 > [!IMPORTANT]
-> **auto-approve는 유효한 진행 상태에서만 발화합니다.** 완료 단계가 연속되고 현재 단계가 일치해야 합니다. 파일이 없거나 JSON이 손상됐거나 일시정지·완료 상태라면 정상 권한 흐름을 따릅니다. 경로는 `..`, 버전이 포함된 플러그인 캐시, 디렉터리 링크를 포함해 검사합니다.
+> **auto-approve는 유효한 진행 상태에서만 발화합니다.** 완료 단계는 1~50 사이의 중복 없는 정수이고, 현재 단계는 첫 번째 빈 단계이며, `total_steps`는 50이고, 그 단계의 본문 파일(`step_archive/archived/stepNNN.md` 또는 `step_archive/stepNNN.md`)이 있어야 합니다. 파일이 없거나 JSON이 손상됐거나 일시정지·중지·완료 상태라면 정상 권한 흐름을 따릅니다. `.mcp.json`·`CLAUDE.md`·`.husky/`·`package.json`처럼 실행과 연결되는 파일은 진행 중에도 자동 승인에서 빠집니다. 경로는 `..`, 버전이 포함된 플러그인 캐시, 디렉터리 링크를 포함해 검사합니다.
 >
 > 아래 감사 기록은 이전 버전의 이력입니다. 현재 회귀 검사는 [`tests/security-regression.sh`](tests/security-regression.sh)와 [`codex/tests/claude-security.test.mjs`](codex/tests/claude-security.test.mjs)에서 위험 명령 차단, 일반 셸 명령의 권한 위임, 비활성 상태와 경로 우회를 확인합니다. 경로 검사는 파일시스템 샌드박스를 대신하지 않습니다.
 
@@ -346,7 +348,7 @@ flowchart LR
 | 9 | 0 | **개발 감사 사이클 종료** |
 | 재현 | — | **커밋된 `tests/security-regression.sh` — 45 케이스 (차단 18 + 승인 8 + 게이트) 통과. 신규 커버: 변수 인다이렉션·인터프리터 삭제·git hooksPath·2단계 다운로드·자격증명 유출** |
 
-위 회차별 셀 수는 개발 과정의 감사 기록이며, 저장소에서 재현 가능한 검증은 `tests/security-regression.sh`(45 케이스)다. 감사 로그 원본은 커밋되어 있지 않다 — 재현 가능한 증거는 이 테스트 스위트로 대체한다.
+위 회차별 셀 수는 개발 과정의 감사 기록이며, 저장소에서 재현 가능한 검증은 `tests/security-regression.sh`(`PASS=N FAIL=0` 출력)다. 감사 로그 원본은 커밋되어 있지 않다 — 재현 가능한 증거는 이 테스트 스위트로 대체한다.
 
 </details>
 
@@ -398,8 +400,8 @@ graph TB
 |:---:|:---|:---|
 | 1 | **하네스 엔지니어링** | 모델을 똑똑하게 만들기 전에 트랙·가드·게이트·기록을 깔아라 |
 | 2 | **절차의 원자화** | 한 step은 한 책임. 끝나면 다음 step 즉시 호출 |
-| 3 | **질문 금지** | "진행할까요?"는 위반. 모호하면 결정 + 산출물에 1줄 사유 기록 |
-| 4 | **자연 종료 금지** | "이만하면 충분"은 위반. 컨텍스트 한계 직전까지 계속 |
+| 3 | **질문 금지** | "진행할까요?"는 위반. 모호하면 결정 + 산출물에 1줄 사유 기록. 예외는 명명된 멈춤 보고와 50단계 요약의 사용자 확인 필요 절뿐 |
+| 4 | **자연 종료 금지** | "이만하면 충분"은 위반. 50단계 완료나 명명된 멈춤 전에는 계속 |
 | 5 | **AI Slop 방지** | 8 배수 grid · 폰트 4 · accent 1 · radius 5 · 44 pt 터치 |
 | 6 | **MoAI-ADK 정직성** | @MX 4종 태그 · EARS-라이트 SPEC · TRUST 5 게이트 |
 
@@ -419,10 +421,12 @@ harness50/
 │   ├── plugin.json                    ← v1.0.0 · MIT
 │   └── marketplace.json               ← /plugin marketplace add 진입점
 ├── tests/
-│   └── security-regression.sh         ← 45 케이스 안전 회귀 (재현 가능)
-├── commands/                          ← 3개 슬래시 커맨드
+│   └── security-regression.sh         ← 안전 회귀 (재현 가능, PASS=N FAIL=0 출력)
+├── commands/                          ← 5개 슬래시 커맨드
 │   ├── webapp.md                      ← /webapp <주제>  자율주행 진입
 │   ├── harness-status.md              ← /harness-status 1줄 진행 보고
+│   ├── harness-pause.md               ← /harness-pause  명명된 멈춤 기록 (진행 보존)
+│   ├── harness-resume.md              ← /harness-resume 멈춤 해제 후 이어서 실행
 │   └── harness-reset.md               ← /harness-reset  progress.json 리셋
 │
 ├── skills/                            ← 4개 스킬
@@ -448,7 +452,7 @@ harness50/
 │   ├── mx-tag-validator.{ps1,sh}      ← @MX 4종 태그 검증
 │   ├── lsp-autofix.{ps1,sh}           ← Biome / Stylelint 자동수정
 │   ├── spec-generator.{ps1,sh}        ← SPEC-NNN.md 자동 생성
-│   ├── trust5-validator.{ps1,sh}      ← r1·r2·r3 50점 만점 평가
+│   ├── trust5-validator.{ps1,sh}      ← r1·r2·r3 측정 증거 검사(Verdict)
 │   └── validate-tools.{ps1,sh}        ← 도구 검증 wrapper
 │
 └── assets/steps/                      ← 50개 결정론적 절차
@@ -469,7 +473,7 @@ harness50/
 
 </div>
 
-이 한 줄이 **컨텍스트 한계 직전까지 멈추지 않는 자율 실행**의 핵심이다.
+이 한 줄이 **50단계 완료나 명명된 멈춤 전까지 멈추지 않는 자율 실행**의 핵심이다.
 
 <div align="center">
 <img src="docs/screenshots/stop-hook-magic.svg" width="90%" alt="Stop hook이 progress.json을 읽고 block JSON을 반환해 다음 step을 자동 재개하는 메커니즘 시각화"/>
@@ -507,7 +511,7 @@ sequenceDiagram
     end
 ```
 
-질문 패턴(`"진행할까요?"`, `"다음 턴에서 재개"` 등 50+개) 감지 시 `[VIOLATION DETECTED]` reason과 함께 강제 재실행. 모델이 빠져나갈 길은 progress.json이 50이 되는 그 시점뿐이다.
+Stop 훅은 문구가 아니라 progress.json 상태로 판정한다. 50단계가 기록되지 않았고 명명된 멈춤도 없으면 `[HARNESS] N/50 done.`으로 시작하는 reason으로 첫 미완료 단계를 다시 지시하고, 진전 없는 재지시는 3회에서 멈춘다. Windows 훅은 질문 문구(39개 패턴)를 감지하면 재지시 문구만 바꾼다. 모델이 빠져나갈 길은 50단계 완료와 명명된 멈춤(`scripts/harness-pause.mjs`) 둘뿐이다.
 
 ---
 
@@ -604,16 +608,10 @@ step045 E2E는 프로젝트의 `npm run e2e`를 실행한다 — 러너(Playwrig
 /webapp 논문 트렌드 분석 대시보드
 ```
 
-또는 자연어:
+자연어 요청만으로는 시작하지 않습니다. 요구사항을 한 번에 못박고 싶을 때는 첫 줄에 `/webapp <주제>`를 두고 다음 줄부터 요구사항을 적습니다:
 
 ```text
-논문 분야별 트렌드를 보여주는 대시보드를 만들어줘
-```
-
-또는 요구사항을 한 번에 못박고 싶을 때 — 트리거 매칭 신뢰도가 가장 높습니다:
-
-```text
-주제: 논문 트렌드 분석 대시보드
+/webapp 논문 트렌드 분석 대시보드
 
 연구자가 한눈에 분야별 흐름을 짚을 수 있는
 인터랙티브 대시보드를 한 편 만들어줘.
@@ -631,34 +629,67 @@ step045 E2E는 프로젝트의 `npm run e2e`를 실행한다 — 러너(Playwrig
 → harness50: 37/50 완료 | current=step038 | r1=- r2=- r3=-
 ```
 
+### 완료 보고
+
+50단계를 마치면 `Step 050/50 완료` 줄 바로 다음에 세 제목의 요약이 붙습니다. 저장된 증거(최종 HTML, 품질·브라우저·회귀 보고서, Jev, TOPIC, `결정/사유` 표지)만 읽는 보고이며 완료 게이트가 아닙니다. 같은 내용이 `step_archive/outputs/final-summary.md`에도 저장됩니다. 상세: [docs/FINAL-SUMMARY.md](docs/FINAL-SUMMARY.md)
+
+```text
+Step 050/50 완료
+## 사용자 확인 필요
+
+- 배포 검증 대기(pending) `step_archive/step045_e2e테스트결과.md:3`
+
+## 변경
+
+- 최종 HTML `dist/index.html` · … bytes · SHA-256 `…`
+
+## 발견
+
+- 최종 게이트 quality=PASS · browser=PASS · regression=PASS `quality-gate.mjs --inspect-final`
+```
+
 ### 처음부터 다시
 
 ```text
 /harness-reset
-→ harness50 리셋 완료 — step001부터 재시작 가능
+→ harness50 리셋 완료 — 새 주제는 /webapp <주제>, 현재 주제를 1단계부터 다시 하려면 /harness-resume
+
+/webapp 새 주제
+→ step001부터 새 주제로 실행
 ```
 
-`/harness-reset`은 `step_archive/archived/`, `specs/`, `outputs/`는 보존. progress.json만 초기화.
+`/harness-reset`은 `scripts/harness-pause.mjs reset`으로 progress.json만 1단계의 새 실행으로 바꾸고 `step_archive/archived/`, `specs/`, `outputs/`, `TOPIC/TOPIC.md`는 보존합니다. 새 실행은 `user-request` 멈춤으로 대기하므로 리셋한 턴의 Stop이 옛 주제로 1단계를 시작하지 않습니다. 이어서 `/webapp <주제>`는 새 주제로 시작하고, `/harness-resume`은 현재 주제를 1단계부터 진행합니다. 리셋과 `/webapp` 부트스트랩은 `run_started_at`(UTC)을 새 실행 경계로 적고, 진행 기록 훅은 그 이전 대화의 `Step NNN/50 완료` 줄을 세지 않습니다(`run_started_at`이 없는 2.9.0 이하의 실행은 전체를 셉니다).
+
+### 멈춤과 재개
+
+```text
+/harness-pause 회의로 잠시 중단
+→ harness50 멈춤 — step038에서 자동 진행 중지. 재개: /harness-resume
+
+/harness-status
+→ harness50: 37/50 완료 | current=step038 | r1=- r2=- r3=- | 멈춤: user-request @step038 — 회의로 잠시 중단
+
+/harness-resume
+→ step038부터 이어서 실행
+```
+
+멈춤은 `step_archive/progress.json`의 `paused`·`pause_*` 필드로 기록되고 진행 기록은 그대로 남습니다. 모델은 권한 거부·필수 도구 3회 실패·필수 외부 입력 부재일 때만 같은 CLI(`scripts/harness-pause.mjs`, 헌법 §2-1)로 멈춥니다. 멈추기 전 같은 턴에 보고한 `Step NNN/50 완료` 줄은 그 턴의 Stop에서 기록되므로, 멈춘 위치와 재개 지점은 첫 미완료 step입니다. 멈춘 동안 Stop 훅은 실행을 다시 지시하지 않고 자동 승인과 품질 게이트도 쉬며, 세션 시작과 프롬프트마다 `[HARNESS] PAUSED at stepNNN/50` 한 줄로 멈춘 위치만 알립니다. `/harness-reset`과 `/webapp <topic>`은 재개 수단이 아닙니다.
 
 ---
 
 <div align="center">
 
-## 🧪 평가 게이트 — TRUST 5 (50점 만점)
+## 🧪 품질 마일스톤 — 측정 증거 (r1·r2·r3)
 
 </div>
 
-| 축 | 측정 | 만점 | 임계 |
-|:---|:---|:---:|:---:|
-| **Tested** 테스트성 | `coverage/` 디렉토리 + vitest 결과 | 10 | 7 |
-| **Readable** 가독성 | Biome check 0 errors | 10 | 7 |
-| **Unified** 일관성 | `src/` 구조 + 디자인 토큰 단일화 | 10 | 7 |
-| **Secured** 보안성 | semgrep `--config=auto` findings 0 | 10 | 7 |
-| **Trackable** 추적성 | `@MX` 4종 태그 커버리지 | 10 | 7 |
-| **총점** | | **50** | **40** PASS |
+| 마일스톤 | 발화(연속 완료 수) | 검사 | 결과 파일 |
+|:---|:---:|:---|:---|
+| **r1** | 38 | test·lint·typecheck·security 네 명령 exit 0 + 측정 커버리지 ≥ 85% | `step_archive/outputs/trust5_r1.md` |
+| **r2** | 44 | test·lint·typecheck·security 네 명령 exit 0 + 측정 커버리지 ≥ 85% | `step_archive/outputs/trust5_r2.md` |
+| **r3** | 49 이후(최종 Step 050) | r1·r2와 같은 검사 + 현재 HTML의 schema-v3 브라우저 라우팅 증거 + Step 50 회귀 행렬 6종 | `step_archive/outputs/trust5_r3.md` |
 
-평가 라운드: r1 = step038 / r2 = step044 / r3 = step050 도달 시 자동 발화.<br/>
-40점 이상 PASS · 40점 미만 WARN (fail-open, 자율주행은 계속).
+PASS/FAIL/INCOMPLETE 판정이며 점수는 없다. PASS가 아니면 한 번 복구를 요구하고, Step 050 완료는 최종 PASS 전까지 기록되지 않는다. 상세: [docs/QUALITY.md](docs/QUALITY.md)
 
 ---
 
@@ -670,14 +701,26 @@ step045 E2E는 프로젝트의 `npm run e2e`를 실행한다 — 러너(Playwrig
 
 | 이벤트 | 실행 hook | 역할 |
 |:---|:---|:---|
-| **UserPromptSubmit** | webapp-trigger → step-obedience-guard | 트리거 패턴 감지 시 부트스트랩. 그 외엔 다음 step 강제 |
-| **SessionStart** | step-progress-loader | progress.json 로드 + 다음 step 지시 주입 |
-| **PreToolUse** | destructive-guard + auto-approve | 위험 차단 + 화이트리스트 자동 승인 (병렬, exit 2 우선) |
+| **UserPromptSubmit** | webapp-trigger → step-obedience-guard | `/webapp <주제>`일 때만 부트스트랩(완료 기록이 있는 progress는 건너뜀). 활성 실행에서는 다음 step 알림, 멈춘 실행에서는 멈춘 위치 1줄(`/webapp <주제>`에는 webapp-trigger만 답함) |
+| **SessionStart** | step-progress-loader | 진행 중인 실행에서만 progress.json 로드 + 다음 step 지시 주입(새로 만들지 않음). 멈춘 실행에서는 멈춘 위치만 알림 |
+| **PreToolUse** | destructive-guard + auto-approve | 위험 차단(Bash) + 편집·WebSearch 자동 승인 (병렬, exit 2 우선) |
 | **PermissionRequest** | permission-request-guard | `updatedInput` 변조 방어용 최후 검증 (deny+exit 2) |
 | **PostToolUse** | mx-tag-validator + lsp-autofix | @MX 태그 검증 + Biome/Stylelint 자동수정 |
 | **Stop** | step-progress-writer → spec-generator → trust5-validator → step-auto-continue | progress 갱신 → SPEC 생성 → r1/r2/r3 평가 → 미완료면 block JSON |
 
 `step_archive/.harness50-codex/state.json`이 있는 Codex 작업 공간에서는 step 훅(loader·writer·auto-continue·obedience-guard·webapp-trigger·spec-generator·trust5-validator)이 progress.json과 TOPIC.md를 만들거나 바꾸지 않고 Stop도 막지 않으며, Claude 편집을 자동 승인하지도 않습니다. SessionStart는 `hooks/lib/codex-workflow.mjs`가 읽은 Codex 진행 단계를 한 줄로만 알립니다([마이그레이션과 리셋](#migration-and-reset--마이그레이션과-리셋)).
+
+**활성 조건.** Claude Code 훅은 `hooks/lib/harness-activity.mjs` 한 곳의 판정을 따릅니다. 다음을 모두 만족할 때만 진행 중인 실행입니다: `step_archive/.harness50-codex/state.json` 항목이 없음, `step_archive/progress.json`이 프로젝트 안의 1MB 이하 일반 파일, `paused`가 없거나 false, `status`가 없거나 active·running·in_progress, `total_steps`가 50, 완료 단계가 1~50의 중복 없는 정수, 현재 단계가 첫 번째 빈 단계, 그 단계의 본문 파일이 있음. `hooks/run-hook.mjs`가 셸을 띄우기 전에 이 판정을 한 번 하므로, 무관한 폴더에서는 훅이 파일을 만들거나 승인·block·지시 주입을 하지 않습니다.
+
+- destructive-guard와 permission-request-guard는 설치 범위 전체(모든 폴더)에서 실행됩니다.
+- webapp-trigger는 첫 줄이 `/webapp <주제>`(또는 `/harness50:webapp <주제>`)일 때만 실행됩니다.
+- step-progress-loader는 진행 중인 실행, 멈춘 실행(멈춘 위치 한 줄), Codex 작업 공간(한 줄 안내)에서 실행됩니다.
+- step-obedience-guard는 진행 중인 실행과 멈춘 실행(멈춘 위치 한 줄)에서 실행됩니다.
+- step-progress-writer는 진행 중인 실행과 멈춘 실행에서 실행됩니다. 멈춘 실행에서는 멈춘 턴에 보고된 완료 줄만 기록하고, 기록할 줄이 없으면 아무것도 쓰지 않습니다.
+- trust5-validator는 진행 중일 때와 50단계를 모두 마친 뒤에 실행됩니다.
+- 나머지 훅(auto-approve·mx-tag-validator·lsp-autofix·spec-generator·step-auto-continue)은 진행 중인 실행에서만 실행됩니다.
+- 진행 중에도 실행과 연결되는 파일은 자동 승인에서 빠집니다. 예: `.mcp.json`, `CLAUDE.md`, `AGENTS.md`, `.husky/`, `.github/workflows/`, `package.json`, lockfile, `harness50.quality.json`, `node_modules/`, `step_archive/tools/`, `step_archive/archived/`(단계 본문). 하위 폴더의 `step_archive/progress.json`과 `step_archive/.harness50-codex/`도 자동 승인되지 않습니다.
+- lsp-autofix는 프로젝트 `node_modules`에 biome·stylelint가 있을 때만 `npx --no-install`로 실행합니다.
 
 ---
 
@@ -698,6 +741,9 @@ step045 E2E는 프로젝트의 `npm run e2e`를 실행한다 — 러너(Playwrig
 | 4 | **블랙리스트 방식의 본질적 불완전성** | 셸 동치표현은 무한(변수·인터프리터·인코딩·2단계) — 알려진 우회만 차단 | `tests/security-regression`으로 회귀 고정. 근본 대응은 화이트리스트 역전(로드맵) |
 | 5 | **진행 추적이 transcript 정규식 스캔 의존** (H8) | 완료 문구 변형 시 미기록→재개, 예시 인용 시 오집계 위험 | 코드펜스·인용 가드로 오탐 완화. 상태전이가 LLM 산문에 걸리는 구조적 약점은 잔존 |
 | 6 | **step 본문이 참조하는 검증기 다수 미번들** (H5) | tokei/c8/biome/semgrep 등 `*-validator.ps1` 24종 부재 | 부재 시 해당 단계 fail-open(건너뜀). 목록·정책은 [`docs/RETIRED-VALIDATORS.md`](docs/RETIRED-VALIDATORS.md) |
+| 7 | 가드 2종은 활성 여부와 무관하게 설치 범위 전체에서 동작하고, 명령 문자열 전체(따옴표 안 메시지·heredoc 본문 포함)를 정규식으로 검사 | 커밋 메시지나 PR 본문의 위험 문구도 승인할 수 없게 차단 | Write로 파일에 쓴 뒤 `git commit -F <파일>`·`gh pr create --body-file <파일>`. 문맥을 인식하는 검사는 후속 |
+| 8 | 훅은 hooks.json 제한 시간 전에 스스로 멈추고 결정을 내리지 않음(POSIX는 직계 자식만 종료) | 부하가 크면 자동 승인 대신 권한 창 | — |
+| 9 | 일부 가드 정규식이 병적으로 긴 편집 내용에서 느림 | 예산을 넘기면 결정 없이 종료 | 선형 패턴·시간 제한은 후속 |
 
 2.2부터 Bash와 WebFetch는 정상 권한 확인을 거칩니다. 위험 패턴 검사는 추가 방어이며,
 호스트 권한 정책이나 파일시스템 샌드박스를 대체하지 않습니다.
@@ -713,7 +759,7 @@ bash tests/security-regression.sh
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/security-regression.ps1
 ```
 
-두 스위트 모두 45 케이스(위험 18 차단 + 정상 8 승인 + 게이트)를 검사한다. Windows에서는 `.sh` 훅이 OS 가드로 no-op되므로 `.ps1` 스위트가 검증 SoT다.
+두 스위트 모두 위험 명령 차단·정상 명령 승인·게이트 사례를 검사하고 `결과: PASS=N FAIL=0`을 출력한다. Windows에서는 `.sh` 훅이 OS 가드로 no-op되므로 `.ps1` 스위트가 검증 SoT다.
 
 ---
 

@@ -1,6 +1,10 @@
 ﻿# step-progress-writer.ps1 - Step 완료 상태 자동 기록 (Stop 훅)
 # 전략: 매 턴 끝에 transcript 전체를 스캔해 모든 "Step NNN 완료" 패턴을 추출.
 # 멱등 동작: 이미 completed_steps에 있으면 스킵. 누락된 과거 완료도 자동 복구.
+# Run boundary: when progress.json has run_started_at (written by the /webapp bootstrap and by
+# harness-pause.mjs reset), only transcript entries from that moment on count, so a new topic in
+# the same session never gets the completions of the old one. Without it (runs started by 2.9.0
+# and earlier) the whole transcript counts as before. Mirrors step-progress-writer.sh.
 param()
 
 $harnessRaw = ""
@@ -17,10 +21,9 @@ $ErrorActionPreference = "Continue"
 $logFile = Join-Path $PSScriptRoot "step-progress-writer.log"
 function Write-WriterLog($msg) {
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    try { Add-Content -Path $logFile -Value "[$ts] $msg" -Encoding UTF8 } catch {}
+    try { Add-Content -LiteralPath $logFile -Value "[$ts] $msg" -Encoding UTF8 } catch {}
 }
-Write-WriterLog "=== invoked ==="
-$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { (Get-Location).Path }
+$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { [System.IO.Directory]::GetCurrentDirectory() }
 $stepArchive = Join-Path $projectRoot "step_archive"
 $progressFile = Join-Path $stepArchive "progress.json"
 
@@ -42,7 +45,142 @@ if (Test-Path -LiteralPath (Join-Path (Join-Path $stepArchive ".harness50-codex"
     exit 0
 }
 
-if (-not (Test-Path $progressFile)) { exit 0 }
+if (-not (Test-Path -LiteralPath $progressFile)) { exit 0 }
+
+# UTC ticks of an ISO 8601 instant: date, 'T', time, any number of fraction digits (cut to
+# microseconds like step-progress-writer.sh) and 'Z' or a +hh:mm/-hh:mm offset. Anything else is
+# $null. Instants are compared as times, never as text: '01:02:03Z' and '01:02:03.000Z' are equal.
+function Get-UtcTicks($value) {
+    if ($value -isnot [string]) { return $null }
+    $m = [regex]::Match($value, '^([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2})(?:\.([0-9]+))?(Z|[+-][0-9]{2}:[0-9]{2})\z')
+    if (-not $m.Success) { return $null }
+    $fraction = ($m.Groups[2].Value + '000000').Substring(0, 6)
+    $offset = if ($m.Groups[3].Value -ceq 'Z') { '+00:00' } else { $m.Groups[3].Value }
+    try {
+        return [DateTimeOffset]::ParseExact("$($m.Groups[1].Value).$fraction$offset", "yyyy-MM-dd'T'HH:mm:ss.ffffffzzz", [System.Globalization.CultureInfo]::InvariantCulture).UtcTicks
+    } catch { return $null }
+}
+
+# 1) 누적 응답 수집 (last_assistant_message + 전체 transcript 스캔). Each text keeps the UTC ticks
+#    of its transcript entry. last_assistant_message is the final message of the turn that is
+#    stopping, written after any run_started_at recorded before or during that turn (webapp-trigger
+#    at UserPromptSubmit, harness-pause.mjs reset inside the turn), so it has no time and counts.
+$responseParts = New-Object System.Collections.Generic.List[object]
+if ($inputJson -and $inputJson.last_assistant_message) {
+    $responseParts.Add([pscustomobject]@{ Ticks = $null; Text = [string]$inputJson.last_assistant_message })
+}
+
+if ($inputJson -and $inputJson.transcript_path -and (Test-Path -LiteralPath $inputJson.transcript_path)) {
+    try {
+        # transcript 전체를 스캔 (JSONL). 파일이 클 수 있으나 Step당 KB 단위라 수용 가능
+        $allLines = Get-Content -LiteralPath $inputJson.transcript_path -Encoding UTF8
+        foreach ($line in $allLines) {
+            if (-not $line) { continue }
+            try {
+                $entry = $line | ConvertFrom-Json
+                if ($entry.type -eq 'assistant' -and $entry.message.content) {
+                    $entryTicks = Get-UtcTicks $entry.timestamp
+                    foreach ($block in $entry.message.content) {
+                        if ($block.type -eq 'text' -and $block.text) {
+                            $responseParts.Add([pscustomobject]@{ Ticks = $entryTicks; Text = [string]$block.text })
+                        }
+                    }
+                }
+            } catch {}
+        }
+    } catch {}
+}
+
+# 2)+3) Completion lines of this run whose step body exists, judged against one progress state.
+function Get-ReportedSteps($state) {
+    # Run boundary. Entries before run_started_at belong to an earlier run of this workspace (the
+    # topic before a /webapp bootstrap or /harness-reset in the same session). An entry without a
+    # parsable timestamp still counts: Claude Code stamps every transcript entry, so only a foreign
+    # or damaged line lacks one, and dropping it could lose a real completion (the step would run
+    # again, and in a new session the record is gone), while counting it is what every writer did
+    # before the boundary existed. A missing or unparsable run_started_at (runs started by 2.9.0
+    # and earlier) sets no boundary: the whole transcript counts.
+    $boundary = Get-UtcTicks $state.run_started_at
+    $response = ""
+    foreach ($part in $responseParts) {
+        if ($null -ne $boundary -and $null -ne $part.Ticks -and $part.Ticks -lt $boundary) { continue }
+        $response += "`n" + $part.Text
+    }
+
+    # 2) Step 완료 패턴 매칭 - 엄격한 명시 완료 보고만 허용
+    #    total_steps 범위를 벗어난 숫자는 무시 (본문 언급 오탐 방지)
+    #    F4 fix (2026-06-10): 줄 단위 스캔 + 인용 가드 — 백틱/인용부호(>)/예시(예:) 줄은 제외하고
+    #    줄 머리에 anchoring하여, 모델이 문서 예시 문자열("✅ Step 023/107 완료" 등)을 본문에
+    #    인용했을 때의 위양성 완료 처리를 차단한다.
+    $total = [int]$state.total_steps
+    $foundSteps = New-Object System.Collections.Generic.HashSet[int]
+
+    # 패턴 A: "Step NNN/MMM 완료" - 슬래시 + 총수 필수 (가장 엄격)
+    $patternA = '^\s*[✅→\-\*\s]*Step\s+(\d{1,3})\s*/\s*(\d{1,3})\s*완료'
+    # 패턴 B: "Step NNN 완료" (총수 없는 약식 보고)
+    $patternB = '^\s*[✅→\-\*\s]*Step\s+(\d{1,3})\s+완료'
+
+    $inFence = $false
+    foreach ($respLine in ($response -split "`n")) {
+        if ($null -eq $respLine) { continue }
+        # H3 수정: 코드펜스(```/~~~) 블록 추적 — 펜스 안의 "Step NNN/107 완료" 예시는
+        # 완료 신호로 인정하지 않는다 (백틱이 같은 줄에 없어도 차단).
+        if ($respLine -match '^\s*(```|~~~)') { $inFence = -not $inFence; continue }
+        if ($inFence) { continue }
+        if (-not $respLine) { continue }
+        # 인용/예시 컨텍스트 가드: 코드 인용(백틱), 마크다운 인용(>), 예시 표기 줄은 스킵
+        if ($respLine -match '`' -or $respLine -match '^\s*>' -or $respLine -match '예\s*[:)]' -or $respLine -match '예시') { continue }
+        $mA = [regex]::Match($respLine, $patternA, 'IgnoreCase')
+        if ($mA.Success) {
+            $stepNum = [int]$mA.Groups[1].Value
+            $declaredTotal = [int]$mA.Groups[2].Value
+            if ($stepNum -ge 1 -and $stepNum -le $total -and $declaredTotal -eq $total) {
+                [void]$foundSteps.Add($stepNum)
+            }
+            continue
+        }
+        $mB = [regex]::Match($respLine, $patternB, 'IgnoreCase')
+        if ($mB.Success) {
+            $stepNum = [int]$mB.Groups[1].Value
+            if ($stepNum -ge 1 -and $stepNum -le $total) {
+                [void]$foundSteps.Add($stepNum)
+            }
+        }
+    }
+
+    # 3) 실존 Step 파일 검증: stepNNN.md 파일이 실제 존재해야 완료로 인정
+    #    (대화 본문 오탐, 테스트 주입 문자열 차단)
+    #    경로 견고화: step_archive/stepNNN.md 또는 step_archive/archived/stepNNN.md 둘 중 하나면 인정
+    #    (하네스 재가동 시 step 파일이 archived/ 로 이동된 케이스 대응 — 다른 세션 재발 방지)
+    $archivedDirW = Join-Path $stepArchive "archived"
+    $reported = New-Object System.Collections.Generic.HashSet[int]
+    foreach ($s in $foundSteps) {
+        $stepFileFlat = Join-Path $stepArchive ("step{0:D3}.md" -f $s)
+        $stepFileArch = Join-Path $archivedDirW ("step{0:D3}.md" -f $s)
+        if ((Test-Path -LiteralPath $stepFileFlat) -or (Test-Path -LiteralPath $stepFileArch)) {
+            [void]$reported.Add($s)
+        }
+    }
+    # The comma keeps the set whole instead of unrolling it into the pipeline.
+    return ,$reported
+}
+
+# Named pause (harness-rules 2-1): hooks/lib/harness-activity.mjs starts this hook for a paused run
+# so that the completion lines of the turn that paused are recorded; the pause fields are kept as
+# they are. With no new line to record it changes nothing: no progress.json rewrite, no .bak, no
+# log line. Same judgement as scripts/lib/pause-state.mjs isPaused.
+$peek = $null
+try { $peek = Get-Content -LiteralPath $progressFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop } catch {}
+$hasPaused = @($peek.PSObject.Properties.Name) -ccontains 'paused'
+$isPaused = ($hasPaused -and -not ($peek.paused -is [bool] -and -not $peek.paused)) -or ($peek.status -is [string] -and $peek.status -ceq 'paused')
+if ($null -ne $peek -and $isPaused) {
+    $recorded = New-Object System.Collections.Generic.HashSet[int]
+    foreach ($s in @($peek.completed_steps)) { try { [void]$recorded.Add([int]$s) } catch {} }
+    $pending = @((Get-ReportedSteps $peek) | Where-Object { -not $recorded.Contains([int]$_) })
+    if ($pending.Count -eq 0) { exit 0 }
+}
+
+Write-WriterLog "=== invoked ==="
 
 # B-P2-1/6/7 fix: Mutex 락으로 progress.json 동시 쓰기 방지
 $mutex = New-Object System.Threading.Mutex($false, "Global\step-progress-writer-mutex")
@@ -57,7 +195,7 @@ if (-not $mutexAcquired) {
 $progress = $null
 for ($i = 0; $i -lt 3; $i++) {
     try {
-        $rawProgress = Get-Content $progressFile -Raw -Encoding UTF8
+        $rawProgress = Get-Content -LiteralPath $progressFile -Raw -Encoding UTF8
         if ($rawProgress -and $rawProgress.Trim().Length -gt 0) {
             $progress = $rawProgress | ConvertFrom-Json
             if ($null -ne $progress) { break }
@@ -75,86 +213,9 @@ if ($null -eq $progress) {
     exit 0
 }
 
-# 1) 누적 응답 수집 (last_assistant_message + 전체 transcript 스캔)
-$response = ""
-if ($inputJson -and $inputJson.last_assistant_message) {
-    $response += "`n" + $inputJson.last_assistant_message
-}
-
-if ($inputJson -and $inputJson.transcript_path -and (Test-Path $inputJson.transcript_path)) {
-    try {
-        # transcript 전체를 스캔 (JSONL). 파일이 클 수 있으나 Step당 KB 단위라 수용 가능
-        $allLines = Get-Content $inputJson.transcript_path -Encoding UTF8
-        foreach ($line in $allLines) {
-            if (-not $line) { continue }
-            try {
-                $entry = $line | ConvertFrom-Json
-                if ($entry.type -eq 'assistant' -and $entry.message.content) {
-                    foreach ($block in $entry.message.content) {
-                        if ($block.type -eq 'text' -and $block.text) {
-                            $response += "`n" + $block.text
-                        }
-                    }
-                }
-            } catch {}
-        }
-    } catch {}
-}
-
-# 2) Step 완료 패턴 매칭 - 엄격한 명시 완료 보고만 허용
-#    total_steps 범위를 벗어난 숫자는 무시 (본문 언급 오탐 방지)
-#    F4 fix (2026-06-10): 줄 단위 스캔 + 인용 가드 — 백틱/인용부호(>)/예시(예:) 줄은 제외하고
-#    줄 머리에 anchoring하여, 모델이 문서 예시 문자열("✅ Step 023/107 완료" 등)을 본문에
-#    인용했을 때의 위양성 완료 처리를 차단한다.
+# 2)+3) 이번 실행의 완료 보고 중 본문이 있는 Step (잠금 후 읽은 progress 기준)
 $totalSteps = [int]$progress.total_steps
-$foundSteps = New-Object System.Collections.Generic.HashSet[int]
-
-# 패턴 A: "Step NNN/MMM 완료" - 슬래시 + 총수 필수 (가장 엄격)
-$patternA = '^\s*[✅→\-\*\s]*Step\s+(\d{1,3})\s*/\s*(\d{1,3})\s*완료'
-# 패턴 B: "Step NNN 완료" (총수 없는 약식 보고)
-$patternB = '^\s*[✅→\-\*\s]*Step\s+(\d{1,3})\s+완료'
-
-$inFence = $false
-foreach ($respLine in ($response -split "`n")) {
-    if ($null -eq $respLine) { continue }
-    # H3 수정: 코드펜스(```/~~~) 블록 추적 — 펜스 안의 "Step NNN/107 완료" 예시는
-    # 완료 신호로 인정하지 않는다 (백틱이 같은 줄에 없어도 차단).
-    if ($respLine -match '^\s*(```|~~~)') { $inFence = -not $inFence; continue }
-    if ($inFence) { continue }
-    if (-not $respLine) { continue }
-    # 인용/예시 컨텍스트 가드: 코드 인용(백틱), 마크다운 인용(>), 예시 표기 줄은 스킵
-    if ($respLine -match '`' -or $respLine -match '^\s*>' -or $respLine -match '예\s*[:)]' -or $respLine -match '예시') { continue }
-    $mA = [regex]::Match($respLine, $patternA, 'IgnoreCase')
-    if ($mA.Success) {
-        $stepNum = [int]$mA.Groups[1].Value
-        $declaredTotal = [int]$mA.Groups[2].Value
-        if ($stepNum -ge 1 -and $stepNum -le $totalSteps -and $declaredTotal -eq $totalSteps) {
-            [void]$foundSteps.Add($stepNum)
-        }
-        continue
-    }
-    $mB = [regex]::Match($respLine, $patternB, 'IgnoreCase')
-    if ($mB.Success) {
-        $stepNum = [int]$mB.Groups[1].Value
-        if ($stepNum -ge 1 -and $stepNum -le $totalSteps) {
-            [void]$foundSteps.Add($stepNum)
-        }
-    }
-}
-
-# 3) 실존 Step 파일 검증: stepNNN.md 파일이 실제 존재해야 완료로 인정
-#    (대화 본문 오탐, 테스트 주입 문자열 차단)
-#    경로 견고화: step_archive/stepNNN.md 또는 step_archive/archived/stepNNN.md 둘 중 하나면 인정
-#    (하네스 재가동 시 step 파일이 archived/ 로 이동된 케이스 대응 — 다른 세션 재발 방지)
-$archivedDirW = Join-Path $stepArchive "archived"
-$validSteps = New-Object System.Collections.Generic.HashSet[int]
-foreach ($s in $foundSteps) {
-    $stepFileFlat = Join-Path $stepArchive ("step{0:D3}.md" -f $s)
-    $stepFileArch = Join-Path $archivedDirW ("step{0:D3}.md" -f $s)
-    if ((Test-Path $stepFileFlat) -or (Test-Path $stepFileArch)) {
-        [void]$validSteps.Add($s)
-    }
-}
+$validSteps = Get-ReportedSteps $progress
 
 # 4) 기존 completed_steps와 병합
 $existing = New-Object System.Collections.Generic.HashSet[int]
@@ -243,37 +304,21 @@ if ($sessions.Count -gt 0) {
 # MoAI-ADK 벤치마킹: 보조 산출물 카운트 반영
 try {
     $specDir = Join-Path $stepArchive "specs"
-    $outDir  = Join-Path $stepArchive "outputs"
-    if (Test-Path $specDir) {
-        $specCount = (Get-ChildItem -Path $specDir -Filter "SPEC-*.md" -ErrorAction SilentlyContinue).Count
+    if (Test-Path -LiteralPath $specDir) {
+        $specCount = (Get-ChildItem -LiteralPath $specDir -Filter "SPEC-*.md" -ErrorAction SilentlyContinue).Count
         if (-not $progress.PSObject.Properties.Name.Contains('moai_features')) {
             $progress | Add-Member -NotePropertyName 'moai_features' -NotePropertyValue ([PSCustomObject]@{ spec_generated_count=0; mx_tag_warnings=0; lsp_autofixes=0 }) -Force
         }
         $progress.moai_features.spec_generated_count = $specCount
     }
-    # trust5_results 필드는 outputs/ 유무와 무관하게 보장
-    if (-not $progress.PSObject.Properties.Name.Contains('trust5_results')) {
-        $progress | Add-Member -NotePropertyName 'trust5_results' -NotePropertyValue ([PSCustomObject]@{ r1=$null; r2=$null; r3=$null }) -Force
-    }
-    if (Test-Path $outDir) {
-        foreach ($r in @('r1','r2','r3')) {
-            $rf = Join-Path $outDir "trust5_$r.md"
-            if (Test-Path $rf) {
-                $rc = Get-Content $rf -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
-                if ($rc -match '\*\*총점\*\*\s*\|\s*\*\*(\d+)/50\*\*') {
-                    $progress.trust5_results.$r = [int]$Matches[1]
-                }
-            }
-        }
-    }
     # @MX 경고 / LSP 자동수정 카운트 (로그 행 수 기반 근사)
     $mxLog = Join-Path $PSScriptRoot "mx-tag-validator.log"
-    if (Test-Path $mxLog) {
-        $progress.moai_features.mx_tag_warnings = (Select-String -Path $mxLog -Pattern '@MX-WARN' -ErrorAction SilentlyContinue).Count
+    if (Test-Path -LiteralPath $mxLog) {
+        $progress.moai_features.mx_tag_warnings = (Select-String -LiteralPath $mxLog -Pattern '@MX-WARN' -ErrorAction SilentlyContinue).Count
     }
     $lspLog = Join-Path $PSScriptRoot "lsp-autofix.log"
-    if (Test-Path $lspLog) {
-        $progress.moai_features.lsp_autofixes = (Select-String -Path $lspLog -Pattern 'OK:' -ErrorAction SilentlyContinue).Count
+    if (Test-Path -LiteralPath $lspLog) {
+        $progress.moai_features.lsp_autofixes = (Select-String -LiteralPath $lspLog -Pattern 'OK:' -ErrorAction SilentlyContinue).Count
     }
 } catch {
     Write-WriterLog "moai_features update FAILED: $_"
@@ -288,7 +333,7 @@ try {
         Write-WriterLog "ERROR: ConvertTo-Json produced null/empty — refusing to write"
     } else {
         $tempFile = "$progressFile.tmp.$PID"
-        $jsonOutput | Out-File -FilePath $tempFile -Encoding UTF8 -Force
+        $jsonOutput | Out-File -LiteralPath $tempFile -Encoding UTF8 -Force
         # PS 5.1 Out-File은 BOM을 추가하므로 BOM 제거
         $bytes = [System.IO.File]::ReadAllBytes($tempFile)
         if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
@@ -296,10 +341,10 @@ try {
             [System.IO.File]::WriteAllBytes($tempFile, $bytes)
         }
         # 원자적 rename (Windows: Move-Item -Force는 같은 볼륨에서 원자적)
-        Move-Item -Path $tempFile -Destination $progressFile -Force
+        Move-Item -LiteralPath $tempFile -Destination $progressFile -Force
         Write-WriterLog "Progress saved atomically"
         # F1 fix (2026-06-10): 롤링 백업 — 완주 이력이 리셋/삭제로 소실되는 사고 대비
-        try { Copy-Item -Path $progressFile -Destination "$progressFile.bak" -Force } catch {}
+        try { Copy-Item -LiteralPath $progressFile -Destination "$progressFile.bak" -Force } catch {}
     }
 } catch {
     Write-WriterLog "atomic write FAILED: $_"
