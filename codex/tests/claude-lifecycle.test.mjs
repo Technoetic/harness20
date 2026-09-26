@@ -6,6 +6,8 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
+import { hookShellTimeout } from './helpers/claude-hooks.mjs';
+
 const repo = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const windows = process.platform === 'win32';
 const bashOnWindows = windows && process.env.H50_TEST_BASH === '1';
@@ -28,7 +30,7 @@ function fixture(t, projectName) {
   const run = (name, event = {}, envRoot = '', cwd = other) => {
     const path = join(plugin, 'hooks', `${name}.${ext}`);
     const args = bashOnWindows ? ['-c', 'uname(){ echo Linux; }; python3(){ python "$@"; }; export -f uname python3; bash "$1"', 'fixture', path.replaceAll('\\', '/')] : windows ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path] : [path];
-    const result = spawnSync(shell, args, { cwd, input: JSON.stringify(event), encoding: 'utf8', timeout: 60000,
+    const result = spawnSync(shell, args, { cwd, input: JSON.stringify(event), encoding: 'utf8', timeout: hookShellTimeout(ext),
       env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8', CLAUDE_PROJECT_DIR: envRoot } });
     assert.equal(result.status, 0, result.stderr || String(result.error));
     assert.equal(result.stderr.trim(), '', result.stderr);

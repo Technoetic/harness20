@@ -70,10 +70,17 @@ async function fakeAsideDirectory() {
   return directory;
 }
 
+// options.timeout overrides the 60 s default. timedOut reports a child killed at that limit, which
+// the exit code alone would show only as -1.
 function run(file, args, options) {
   return new Promise((resolve) => {
     execFile(file, args, { windowsHide: true, timeout: 60000, ...options }, (error, stdout, stderr) => {
-      resolve({ code: error ? (typeof error.code === "number" ? error.code : -1) : 0, stdout: String(stdout ?? ""), stderr: String(stderr ?? "") });
+      resolve({
+        code: error ? (typeof error.code === "number" ? error.code : -1) : 0,
+        stdout: String(stdout ?? ""),
+        stderr: String(stderr ?? ""),
+        timedOut: Boolean(error?.killed)
+      });
     });
   });
 }
@@ -392,13 +399,15 @@ async function hookFixture(lock) {
   return { plugin, project, elsewhere };
 }
 
+// A cold powershell.exe on a fresh CI runner can take more than 60 s to start, so the Windows
+// variant gets 180 s. POSIX bash keeps the 60 s default.
 async function runHook(fixture, tool) {
   const nodeDirectory = dirname(process.execPath);
   if (process.platform === "win32") {
     const system32 = join(process.env.SystemRoot ?? "C:\\Windows", "System32");
     return run(join(system32, "WindowsPowerShell", "v1.0", "powershell.exe"),
       ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", join(fixture.plugin, "hooks", "validate-tools.ps1"), "-Tool", tool],
-      { cwd: fixture.elsewhere, env: { ...envWithPath(nodeDirectory, system32), CLAUDE_PROJECT_DIR: fixture.project } });
+      { cwd: fixture.elsewhere, timeout: 180000, env: { ...envWithPath(nodeDirectory, system32), CLAUDE_PROJECT_DIR: fixture.project } });
   }
   return run("bash", [join(fixture.plugin, "hooks", "validate-tools.sh"), tool],
     { cwd: fixture.elsewhere, env: { ...envWithPath(nodeDirectory, "/usr/bin", "/bin"), CLAUDE_PROJECT_DIR: fixture.project } });
@@ -408,6 +417,7 @@ const lines = (output) => output.replace(/\r\n/g, "\n").trim().split("\n").map((
 
 test("validate-tools playwright hints follow the Step 3 lock", async (t) => {
   const baseline = await runHook(await hookFixture(null), "playwright");
+  assert.equal(baseline.timedOut, false, "validate-tools did not finish within the spawn limit");
   if (baseline.code === 0) {
     t.skip("playwright resolves in this environment; the missing-tool hints cannot be exercised");
     return;
@@ -417,21 +427,25 @@ test("validate-tools playwright hints follow the Step 3 lock", async (t) => {
   assert.deepEqual(lines(baseline.stdout), [HOOK_LINES.playwrightDefault]);
 
   const lockedAside = await runHook(await hookFixture(validLock("aside")), "playwright");
+  assert.equal(lockedAside.timedOut, false, "validate-tools did not finish within the spawn limit");
   assert.equal(lockedAside.code, 1, lockedAside.stderr);
   assert.equal(lockedAside.stderr, "");
   assert.deepEqual(lines(lockedAside.stdout), [HOOK_LINES.playwrightLockedAside]);
 
   const lockedPlaywright = await runHook(await hookFixture(validLock("playwright")), "playwright");
+  assert.equal(lockedPlaywright.timedOut, false, "validate-tools did not finish within the spawn limit");
   assert.equal(lockedPlaywright.code, 1, lockedPlaywright.stderr);
   assert.equal(lockedPlaywright.stderr, "");
   assert.deepEqual(lines(lockedPlaywright.stdout), [HOOK_LINES.playwrightLockedPlaywright]);
 
   const invalid = await runHook(await hookFixture({ ...validLock("aside"), schema_version: 2 }), "playwright");
+  assert.equal(invalid.timedOut, false, "validate-tools did not finish within the spawn limit");
   assert.deepEqual(lines(invalid.stdout), [HOOK_LINES.playwrightDefault]);
 });
 
 test("validate-tools aside hints follow the Step 3 lock", async (t) => {
   const baseline = await runHook(await hookFixture(null), "aside");
+  assert.equal(baseline.timedOut, false, "validate-tools did not finish within the spawn limit");
   if (baseline.code === 0) {
     t.skip("aside resolves in this environment; the missing-tool hints cannot be exercised");
     return;
@@ -440,10 +454,12 @@ test("validate-tools aside hints follow the Step 3 lock", async (t) => {
   assert.doesNotMatch(baseline.stdout, /locked/);
 
   const lockedPlaywright = await runHook(await hookFixture(validLock("playwright")), "aside");
+  assert.equal(lockedPlaywright.timedOut, false, "validate-tools did not finish within the spawn limit");
   assert.equal(lockedPlaywright.code, baseline.code);
   assert.equal(lines(lockedPlaywright.stdout).at(-1), HOOK_LINES.asideLockedPlaywright);
 
   const lockedAside = await runHook(await hookFixture(validLock("aside")), "aside");
+  assert.equal(lockedAside.timedOut, false, "validate-tools did not finish within the spawn limit");
   assert.equal(lockedAside.code, baseline.code);
   assert.equal(lines(lockedAside.stdout).at(-1), HOOK_LINES.asideLockedAside);
 });

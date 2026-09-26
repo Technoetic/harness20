@@ -8,6 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { availableParallelism } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { spawn } from 'node:child_process';
 
@@ -101,10 +102,13 @@ function dispatch(plugin, name, event, { cwd, env }) {
     child.stdin.end(JSON.stringify(event));
   });
 }
+// At most one dispatcher per spare CPU (at least two): a 4 vCPU runner starts three at a time,
+// because test files running in parallel share the same PowerShell start-up cost.
 async function inPool(tasks, limit = 6) {
+  const cap = Math.min(limit, Math.max(2, availableParallelism() - 1));
   const results = new Array(tasks.length);
   let next = 0;
-  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, async () => {
+  await Promise.all(Array.from({ length: Math.min(cap, tasks.length) }, async () => {
     while (next < tasks.length) {
       const index = next++;
       results[index] = await tasks[index]();

@@ -49,6 +49,15 @@ function hookEnv(env) {
 
 const input = event => typeof event === 'string' ? event : JSON.stringify(event);
 
+// Spawn limit for one hook script run. Windows PowerShell 5.1 can take more than 60 s to start
+// on a fresh CI runner (tag run 36205595180: the first powershell.exe of several files went past
+// 60 s), so .ps1 gets 180 s. Git Bash emulation forks dozens of processes per hook call and gets
+// 300 s. No retry: a retry would hide a real hang and double the time spent.
+export function hookShellTimeout(variant = nativeVariant) {
+  if (!windows) return 60000;
+  return variant === 'ps1' ? 180000 : 300000;
+}
+
 // Runs hooks/<name>.<variant> directly. On Windows the .sh variant runs in Git Bash with uname
 // reporting Linux and python standing in for python3. stripCR drops the CR that Windows python
 // prints, for hooks that compare parsed values exactly.
@@ -68,8 +77,7 @@ export function runClaudeHook(plugin, name, event = {}, { variant = nativeVarian
     command = 'bash';
     args = [script];
   }
-  // Git Bash emulation forks dozens of processes per hook call, so it gets a much larger budget.
-  const timeout = timeoutMs ?? (windows && variant !== 'ps1' ? 300000 : 60000);
+  const timeout = timeoutMs ?? hookShellTimeout(variant);
   const result = spawnSync(command, args, { cwd, input: input(event), encoding: 'utf8', timeout, env: hookEnv(env) });
   if (result.error) throw result.error;
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };

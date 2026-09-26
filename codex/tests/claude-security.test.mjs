@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { PROJECT_NAMES, installPlugin, runClaudeHook, tempRoot } from './helpers/claude-hooks.mjs';
+import { PROJECT_NAMES, hookShellTimeout, installPlugin, runClaudeHook, tempRoot } from './helpers/claude-hooks.mjs';
 
 const repo = fileURLToPath(new URL('../../', import.meta.url));
 const windows = process.platform === 'win32';
@@ -31,7 +31,7 @@ function runRaw(root, hook, event, env = {}, cwd = root) {
   const shell = bashOnWindows ? 'C:/Program Files/Git/bin/bash.exe' : windows ? 'powershell.exe' : 'bash';
   const args = bashOnWindows ? ['-c', 'uname(){ echo Linux; }; python3(){ python "$@" | tr -d "\\r"; }; export -f uname python3; bash "$1"', 'fixture', script.replaceAll('\\', '/')] : windows ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script] : [script];
   const result = spawnSync(shell, args, {
-    cwd, input: JSON.stringify(event), encoding: 'utf8', timeout: 15000,
+    cwd, input: JSON.stringify(event), encoding: 'utf8', timeout: hookShellTimeout(windows && !bashOnWindows ? 'ps1' : 'sh'),
     env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8', CLAUDE_PROJECT_DIR: root, ...env },
   });
   assert.equal(result.error, undefined);
@@ -216,7 +216,7 @@ test('missing Node runtime cannot grant approval', t => {
   const script = path.join(repo, 'hooks', windows ? 'auto-approve.ps1' : 'auto-approve.sh');
   const executable = windows ? path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe') : '/bin/bash';
   const result = spawnSync(executable, windows ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script] : [script], {
-    cwd: root, input: JSON.stringify(write('src/app.js')), encoding: 'utf8', timeout: 15000,
+    cwd: root, input: JSON.stringify(write('src/app.js')), encoding: 'utf8', timeout: hookShellTimeout(windows ? 'ps1' : 'sh'),
     env: { ...process.env, PATH: root, CLAUDE_PROJECT_DIR: root },
   });
   assert.equal(result.error, undefined);

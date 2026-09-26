@@ -8,7 +8,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-import { gitBash, installPlugin, nativeVariant, runClaudeHook, tempRoot, windows } from './helpers/claude-hooks.mjs';
+import { gitBash, hookShellTimeout, installPlugin, nativeVariant, runClaudeHook, tempRoot, windows } from './helpers/claude-hooks.mjs';
 
 // Git Bash emulation on Windows (H50_TEST_BASH=1): mx-tag-validator.sh pastes the progress path
 // into python source, where C:\Users would read as an escape, so the .sh variant gets forward
@@ -58,7 +58,7 @@ function runBundler(plugin, project) {
     args = [script, project];
   }
   const result = spawnSync(command, args, {
-    cwd: plugin, encoding: 'utf8', timeout: windows && nativeVariant === 'sh' ? 300000 : 60000,
+    cwd: plugin, encoding: 'utf8', timeout: hookShellTimeout(nativeVariant),
     env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8', CLAUDE_PROJECT_DIR: '' }
   });
   if (result.error) throw result.error;

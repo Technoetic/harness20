@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Codex lock: on Windows, a lock-publication rename blocked by EPERM, EACCES or EBUSY is now retried within the lock wait instead of failing at random under contention. A later `lstat` raced with the owner's release, so a busy lock could surface as a plain EPERM. A blocked publication that lasts the whole wait ends as `LOCK_TIMEOUT` with `details.last_error`. POSIX behaviour is unchanged.
+- CI and tests: the Windows job limit is 30 min (POSIX stays at 20). CI and `npm test` pass `--test-timeout=600000`, so a hang fails one test instead of cancelling the job. A Windows PowerShell 5.1 warm-up step logs three start times and the Defender state before the tests. PowerShell hook spawns in the tests get 180 s and report a timeout explicitly. lock-store actors are killed after a 5 s grace period. The POSIX regression copy and the simulation test now also hash the .sh hooks and `tests/security-regression.sh`.
+
 ## 2.10.0 — 2026-09-26
 
 - Behaviour changes on upgrade (details in the bullets below): a run starts only from `/webapp <topic>`, because the natural-language triggers are gone; opening Claude Code no longer creates `step_archive/progress.json`; the step hooks act only for an active run, which needs `total_steps` 50, `current_step` equal to the first unfinished step and that step's body file, so an in-progress run of the older 107-step layout, one whose `total_steps` an older loader rewrote, or one without its step bodies stays inactive until `/harness-reset` and `/webapp <topic>` start it again; edits to execution-linked files always keep the normal permission prompt; and `lsp-autofix` fixes nothing without a project-local biome or stylelint.
