@@ -48,8 +48,15 @@ test('dispatcher runs only native shell and preserves stdin, output, and exit co
   fs.writeFileSync(path.join(root, windows ? 'destructive-guard.ps1' : 'destructive-guard.sh'), windows
     ? "$ErrorActionPreference = 'Stop'\n$raw = [Console]::In.ReadToEnd()\n[Console]::Out.Write($raw)\n[Console]::Error.Write('fixture stderr')\nexit 2\n"
     : "#!/usr/bin/env bash\ncat\nprintf 'fixture stderr' >&2\nexit 2\n");
-  const event = '{"stop_hook_active":true}';
-  const result = spawnSync(process.execPath, [path.join(root, 'run-hook.mjs'), 'destructive-guard'], { input: event, encoding: 'utf8', timeout: 10000 });
+  // The guards start only in a Harness50 workspace, so the event names a project with an active run.
+  const project = path.join(root, 'active');
+  fs.mkdirSync(path.join(project, 'step_archive', 'archived'), { recursive: true });
+  fs.writeFileSync(path.join(project, 'step_archive', 'progress.json'), JSON.stringify({ current_step: 1, total_steps: 50, completed_steps: [] }));
+  fs.writeFileSync(path.join(project, 'step_archive', 'archived', 'step001.md'), '# Step 1\n');
+  const event = JSON.stringify({ stop_hook_active: true, cwd: project });
+  const result = spawnSync(process.execPath, [path.join(root, 'run-hook.mjs'), 'destructive-guard'], {
+    input: event, encoding: 'utf8', timeout: 10000, env: { ...process.env, CLAUDE_PROJECT_DIR: '' }
+  });
   assert.equal(result.status, 2, result.stderr);
   assert.equal(result.stdout, event);
   assert.equal(result.stderr, 'fixture stderr');
@@ -111,19 +118,23 @@ async function gatedDispatcher({ withLib = true } = {}) {
     assert.equal(result.stderr, '', name);
     return fs.existsSync(sentinel) ? fs.readFileSync(sentinel, 'utf8') : null;
   };
-  return { empty, active, call };
+  return { empty, active, hooks, call };
 }
-test('dispatcher starts activity-gated hooks only in a project with an active run', async () => {
+test('dispatcher starts activity-gated hooks and the two guards only in a project with a run', async () => {
   const f = await gatedDispatcher();
-  for (const name of ACTIVITY_GATED) {
-    assert.equal(f.call(name, JSON.stringify({ cwd: f.empty, prompt: 'hello' })), null, `${name} in an empty project`);
+  for (const name of [...GUARDS, ...ACTIVITY_GATED]) {
+    assert.equal(f.call(name, JSON.stringify({ cwd: f.empty, prompt: 'hello', tool_name: 'Bash' })), null, `${name} in an empty project`);
     const event = JSON.stringify({ cwd: f.active, session_id: 's', note: 'bytes pass through' });
     assert.equal(f.call(name, event), event, `${name} in an active project`);
   }
-  for (const name of GUARDS) {
-    const event = JSON.stringify({ cwd: f.empty, tool_name: 'Bash' });
-    assert.equal(f.call(name, event), event, `${name} in an empty project`);
-  }
+});
+test('dispatcher hands the hook the node it runs on', async () => {
+  const f = await gatedDispatcher();
+  const windows = process.platform === 'win32';
+  fs.writeFileSync(path.join(f.hooks, windows ? 'destructive-guard.ps1' : 'destructive-guard.sh'), windows
+    ? "$null = [Console]::In.ReadToEnd()\n[System.IO.File]::WriteAllText((Join-Path $PSScriptRoot 'destructive-guard.ran'), $env:HARNESS50_NODE)\n"
+    : 'cat >/dev/null\nprintf \'%s\' "$HARNESS50_NODE" > "$(dirname "$0")/destructive-guard.ran"\n');
+  assert.equal(f.call('destructive-guard', JSON.stringify({ cwd: f.active, tool_name: 'Bash' })), process.execPath);
 });
 test('dispatcher starts webapp-trigger only for an explicit /webapp command', async () => {
   const f = await gatedDispatcher();

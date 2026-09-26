@@ -18,12 +18,18 @@ function hasWindowsAbsoluteSyntax(value) {
   );
 }
 
-function lockTimeout(lockPath, waitMs) {
+function lockTimeout(lockPath, waitMs, lastError = null) {
   return new HarnessError("LOCK_TIMEOUT", "timed out waiting for the workflow lock", {
     lock_path: lockPath,
-    wait_ms: waitMs
+    wait_ms: waitMs,
+    ...(lastError ? { last_error: lastError } : {})
   });
 }
+
+// Windows reports a rename onto an occupied or still-closing lock directory as EPERM, EACCES
+// or EBUSY. A later lstat races with the owner's release, so it cannot classify contention:
+// every such error is treated as a busy lock and retried until the wait ends.
+const WINDOWS_PUBLISH_ERRORS = new Set(["EACCES", "EBUSY", "EPERM"]);
 
 function validOptions(waitMs, staleMs, beforeReclaim, afterReclaimTransition, beforeRelease) {
   if (!Number.isFinite(waitMs) || waitMs < 0) {
@@ -202,7 +208,7 @@ async function reclaimIfSafe(lockPath, { staleMs, now, beforeReclaim, afterRecla
   }
 }
 
-async function createLock(lockPath, now, beforePublish) {
+async function createLock(lockPath, { now, beforePublish, publishRename, platform }) {
   const acquiredAt = now();
   if (!(acquiredAt instanceof Date) || Number.isNaN(acquiredAt.getTime())) {
     throw new HarnessError("LOCK_OPTIONS_INVALID", "now must return a valid Date");
@@ -238,8 +244,11 @@ async function createLock(lockPath, now, beforePublish) {
       if (error?.code !== "ENOENT") throw error;
     }
     try {
-      await rename(stagingPath, lockPath);
+      await publishRename(stagingPath, lockPath);
     } catch (error) {
+      if (platform === "win32" && WINDOWS_PUBLISH_ERRORS.has(error?.code)) {
+        throw Object.assign(new Error("lock publication was blocked"), { code: "EEXIST", publishError: error.code });
+      }
       if (["EEXIST", "ENOTEMPTY", "EPERM", "EACCES"].includes(error?.code) && await lstat(lockPath).catch(() => null)) {
         throw Object.assign(new Error("lock already exists"), { code: "EEXIST" });
       }
@@ -263,15 +272,19 @@ async function acquireLock(lockPath, options) {
   const deadline = Date.now() + waitMs;
 
   while (true) {
+    let publishError = null;
     try {
-      return await createLock(lockPath, now, options.beforePublish);
+      return await createLock(lockPath, options);
     } catch (error) {
       if (error?.code !== "EEXIST") throw error;
+      publishError = error.publishError ?? null;
     }
 
-    if (await reclaimIfSafe(lockPath, { staleMs, now, beforeReclaim, afterReclaimTransition })) continue;
+    // An absent lock is retried at once, except after a blocked publication: that retry waits
+    // and counts against the deadline, so a lasting EPERM cannot spin.
+    if (await reclaimIfSafe(lockPath, { staleMs, now, beforeReclaim, afterReclaimTransition }) && !publishError) continue;
     const remaining = deadline - Date.now();
-    if (remaining <= 0) throw lockTimeout(lockPath, waitMs);
+    if (remaining <= 0) throw lockTimeout(lockPath, waitMs, publishError);
     await new Promise(resolve => setTimeout(resolve, Math.min(RETRY_INTERVAL_MS, remaining)));
   }
 }
@@ -364,7 +377,9 @@ export async function withRunLock(lockPath, fn, {
   beforeReclaim = async () => {},
   afterReclaimTransition = async () => {},
   beforePublish = async () => {},
-  beforeRelease = async () => {}
+  beforeRelease = async () => {},
+  publishRename = rename,
+  platform = process.platform
 } = {}) {
   if (typeof fn !== "function") {
     throw new HarnessError("LOCK_CALLBACK_INVALID", "lock callback must be a function");
@@ -372,7 +387,12 @@ export async function withRunLock(lockPath, fn, {
   if (typeof beforePublish !== "function") {
     throw new HarnessError("LOCK_OPTIONS_INVALID", "beforePublish must be a function");
   }
-  const options = { waitMs, staleMs, now, beforeReclaim, afterReclaimTransition, beforeRelease, beforePublish };
+  if (typeof publishRename !== "function" || typeof platform !== "string") {
+    throw new HarnessError("LOCK_OPTIONS_INVALID", "publishRename must be a function and platform a string");
+  }
+  const options = {
+    waitMs, staleMs, now, beforeReclaim, afterReclaimTransition, beforeRelease, beforePublish, publishRename, platform
+  };
   const owner = await acquireLock(lockPath, options);
   try {
     return await lockContext.run(owner, fn);

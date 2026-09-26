@@ -39,8 +39,8 @@ if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
   const chunks = [];
   for await (const chunk of process.stdin) chunks.push(chunk);
   const raw = Buffer.concat(chunks);
-  // hooks/lib/harness-activity.mjs decides whether the project has an active run for this hook.
-  // Without that module only the two guards start; every other hook fails closed.
+  // hooks/lib/harness-activity.mjs decides whether the project's run phase starts this hook.
+  // Without that module only the two guards start (fail toward guarding); every other hook fails closed.
   let run;
   try {
     const { shouldRunHook } = await import('./lib/harness-activity.mjs');
@@ -55,7 +55,12 @@ if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
   } else {
     child = spawn(windows ? 'powershell.exe' : 'bash', windows
       ? ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script]
-      : [script], { stdio: ['pipe', 'inherit', 'inherit'], shell: false, windowsHide: true });
+      : [script], {
+      stdio: ['pipe', 'inherit', 'inherit'], shell: false, windowsHide: true,
+      // destructive-guard, permission-request-guard and auto-approve run their hooks/lib modules
+      // with this node first, so a node missing from PATH cannot switch them off.
+      env: { ...process.env, HARNESS50_NODE: process.execPath }
+    });
     child.once('error', error => {
       clearTimeout(watchdog);
       console.error(`Harness50: could not start registered hook (${error.code || 'spawn error'})`);

@@ -51,7 +51,7 @@ function delayForTest(milliseconds) {
   return new Promise(resolve => setTimeout(resolve, milliseconds));
 }
 
-function nextMessage(child, predicate, timeoutMs = 3000) {
+function nextMessage(child, predicate, timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
     const onMessage = message => {
       if (!predicate(message)) return;
@@ -87,7 +87,15 @@ async function stopLockActor(actor) {
   if (actor.child.connected) {
     actor.child.send({ type: "release" });
   }
-  await actor.exited;
+  // An actor that never reaches its release point would otherwise keep the test waiting forever.
+  const grace = setTimeout(() => {
+    if (actor.child.exitCode === null && actor.child.signalCode === null) actor.child.kill();
+  }, 5000);
+  try {
+    await actor.exited;
+  } finally {
+    clearTimeout(grace);
+  }
 }
 
 async function runConcurrentMutators({ root, count }) {
@@ -353,6 +361,91 @@ test("a killed initializer's private staging directory cannot block the next own
   } finally {
     if (actor.exitCode === null && actor.signalCode === null) actor.kill("SIGKILL");
   }
+});
+
+function publicationError(code) {
+  return Object.assign(new Error(`simulated ${code}`), { code });
+}
+
+test("a Windows lock publication blocked by EPERM, EACCES or EBUSY is retried within the wait", async () => {
+  for (const code of ["EPERM", "EACCES", "EBUSY"]) {
+    const { lockPath } = pathsFor(await makeWorkspace());
+    let calls = 0;
+    let entered = 0;
+    const result = await withRunLock(lockPath, () => {
+      entered += 1;
+      assert.equal(existsSync(lockPath), true, code);
+      return `owner after ${code}`;
+    }, {
+      platform: "win32",
+      publishRename: async (source, destination) => {
+        calls += 1;
+        if (calls <= 2) throw publicationError(code);
+        await rename(source, destination);
+      }
+    });
+    assert.equal(result, `owner after ${code}`, code);
+    assert.equal(entered, 1, code);
+    assert.equal(calls, 3, code);
+    assert.equal(existsSync(lockPath), false, code);
+    assert.deepEqual(
+      (await readdir(dirname(lockPath))).filter(name => name.startsWith("run.lock.initializing-")),
+      [],
+      code
+    );
+  }
+});
+
+test("a lasting Windows publication EPERM ends as LOCK_TIMEOUT with last_error and never spins", async () => {
+  const { lockPath } = pathsFor(await makeWorkspace());
+  let calls = 0;
+  let entered = 0;
+  const started = Date.now();
+  await assert.rejects(withRunLock(lockPath, () => {
+    entered += 1;
+  }, {
+    waitMs: 200,
+    platform: "win32",
+    publishRename: async () => {
+      calls += 1;
+      throw publicationError("EPERM");
+    }
+  }), error => {
+    assert.equal(error.code, "LOCK_TIMEOUT");
+    assert.equal(error.details.last_error, "EPERM");
+    return true;
+  });
+  const elapsed = Date.now() - started;
+  assert.ok(elapsed >= 200 && elapsed < 5000, `elapsed ${elapsed} ms`);
+  assert.ok(calls >= 2 && calls <= 20, `publication attempts: ${calls}`);
+  assert.equal(entered, 0);
+  assert.deepEqual(await readdir(dirname(lockPath)), []);
+});
+
+test("non-Windows publication EPERM with no lock still surfaces", async () => {
+  const { lockPath } = pathsFor(await makeWorkspace());
+  let calls = 0;
+  await assert.rejects(withRunLock(lockPath, () => assert.fail("entered"), {
+    platform: "linux",
+    publishRename: async () => {
+      calls += 1;
+      throw publicationError("EPERM");
+    }
+  }), error => error.code === "EPERM");
+  assert.equal(calls, 1);
+  assert.deepEqual(await readdir(dirname(lockPath)), []);
+});
+
+test("invalid publishRename is rejected before acquiring", async () => {
+  const { lockPath } = pathsFor(await makeWorkspace());
+  for (const options of [{ publishRename: "rename" }, { publishRename: null }, { platform: 32 }]) {
+    await assert.rejects(
+      withRunLock(lockPath, () => assert.fail("entered"), options),
+      error => error.code === "LOCK_OPTIONS_INVALID",
+      JSON.stringify(options)
+    );
+  }
+  assert.equal(existsSync(dirname(lockPath)), false);
 });
 
 test("a paused orphan reclaimer preserves a fresh successor generation", async () => {

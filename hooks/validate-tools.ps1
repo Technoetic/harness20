@@ -5,7 +5,10 @@
 param([Parameter(Mandatory=$true)][string]$Tool)
 $ErrorActionPreference = "Continue"
 
-$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { Get-Location }
+# Windows PowerShell 5.1 started with -File in a folder whose name has [ ] sets its location to
+# $PSHOME, so Get-Location is not the caller's folder there. Every other hook uses the process
+# directory too.
+$projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { [System.IO.Directory]::GetCurrentDirectory() }
 $stepArchive = Join-Path $projectRoot "step_archive"
 $outDir = Join-Path $stepArchive "research-scripts"
 if (-not (Test-Path -LiteralPath $outDir)) { New-Item -ItemType Directory -Path $outDir -Force | Out-Null }
@@ -66,30 +69,32 @@ switch ($Tool.ToLower()) {
     Pop-Location
     if ($found) { Write-Host "axe-core: OK ($label)"; exit 0 } else { Write-Host "axe-core: FAIL $out"; exit 1 }
   }
+  # A version check never installs: --no-install reports a missing tool instead of downloading it,
+  # and plain `npx biome` resolves to the unrelated biome package. Same policy as lsp-autofix.
   'biome' {
     Push-Location -LiteralPath $projectRoot
-    $out = (& cmd /c "npx biome --version 2>&1") -join "`n"
+    $out = (& cmd /c "npx --no-install @biomejs/biome --version 2>&1") -join "`n"
     Pop-Location
     Write-Host "biome: $out"
     if ($LASTEXITCODE -eq 0) { exit 0 } else { exit 1 }
   }
   'stylelint' {
     Push-Location -LiteralPath $projectRoot
-    $out = (& cmd /c "npx stylelint --version 2>&1") -join "`n"
+    $out = (& cmd /c "npx --no-install stylelint --version 2>&1") -join "`n"
     Pop-Location
     Write-Host "stylelint: $out"
     if ($LASTEXITCODE -eq 0) { exit 0 } else { exit 1 }
   }
   'c8' {
     Push-Location -LiteralPath $projectRoot
-    $out = (& cmd /c "npx c8 --version 2>&1") -join "`n"
+    $out = (& cmd /c "npx --no-install c8 --version 2>&1") -join "`n"
     Pop-Location
     Write-Host "c8: $out"
     if ($LASTEXITCODE -eq 0) { exit 0 } else { exit 1 }
   }
   'jscpd' {
     Push-Location -LiteralPath $projectRoot
-    $out = (& cmd /c "npx jscpd --version 2>&1") -join "`n"
+    $out = (& cmd /c "npx --no-install jscpd --version 2>&1") -join "`n"
     Pop-Location
     Write-Host "jscpd: $out"
     if ($LASTEXITCODE -eq 0) { exit 0 } else { exit 1 }

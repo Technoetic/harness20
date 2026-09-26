@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { PROJECT_NAMES, installPlugin, runClaudeHook, tempRoot } from './helpers/claude-hooks.mjs';
+import { PROJECT_NAMES, hookShellTimeout, installPlugin, runClaudeHook, tempRoot } from './helpers/claude-hooks.mjs';
 
 const repo = fileURLToPath(new URL('../../', import.meta.url));
 const windows = process.platform === 'win32';
@@ -31,7 +31,7 @@ function runRaw(root, hook, event, env = {}, cwd = root) {
   const shell = bashOnWindows ? 'C:/Program Files/Git/bin/bash.exe' : windows ? 'powershell.exe' : 'bash';
   const args = bashOnWindows ? ['-c', 'uname(){ echo Linux; }; python3(){ python "$@" | tr -d "\\r"; }; export -f uname python3; bash "$1"', 'fixture', script.replaceAll('\\', '/')] : windows ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script] : [script];
   const result = spawnSync(shell, args, {
-    cwd, input: JSON.stringify(event), encoding: 'utf8', timeout: 15000,
+    cwd, input: JSON.stringify(event), encoding: 'utf8', timeout: hookShellTimeout(windows && !bashOnWindows ? 'ps1' : 'sh'),
     env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8', CLAUDE_PROJECT_DIR: root, ...env },
   });
   assert.equal(result.error, undefined);
@@ -205,23 +205,81 @@ test('step bodies and a subfolder run state never receive hook approval; step re
     assert.match(run(root, 'auto-approve', write(target)).output, /"allow"/, target);
   }
 });
+// The approval policy the auto-approve relay asks, run directly with node (no PowerShell start):
+// 'eligible' or '' in auto mode, 'protected' or '' in guard mode.
+function policy(root, file_path, mode = 'auto') {
+  const result = spawnSync(process.execPath, [path.join(repo, 'hooks', 'lib', 'approval-policy.mjs'), mode], {
+    input: JSON.stringify(write(file_path)), encoding: 'utf8', timeout: 30000,
+    env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+  });
+  assert.equal(result.error, undefined);
+  assert.equal(result.stderr, '', result.stderr);
+  return result.stdout;
+}
+// Windows opens one file under several spellings. Auto-approval judges the path the file system
+// opens as well as the typed one, so no alias reaches a protected file. On POSIX ':' is an
+// ordinary character; the same judgement there only keeps the prompt, so the stream cases run on
+// every OS.
+test('stream, 8.3, trailing-dot and home-level aliases never receive hook approval', t => {
+  const root = fixture(t);
+  for (const dir of ['.claude/commands', '.git/hooks', '.codex']) fs.mkdirSync(path.join(root, dir), { recursive: true });
+  for (const file of ['.claude/settings.json', '.git/config', '.npmrc', '.env', '.codex/config.toml']) fs.writeFileSync(path.join(root, file), '');
+  assert.equal(policy(root, 'src/app.js'), 'eligible');
+  const streams = ['.claude::$INDEX_ALLOCATION/settings.json', '.claude::$INDEX_ALLOCATION/settings.local.json',
+    '.claude:$I30:$INDEX_ALLOCATION/settings.json', '.git::$INDEX_ALLOCATION/config', '.git::$INDEX_ALLOCATION/hooks/pre-commit',
+    '.git::$INDEX_ALLOCATION/hooks/new-hook', '.git ::$INDEX_ALLOCATION/config', '.codex::$INDEX_ALLOCATION/config.toml',
+    '.npmrc::$DATA', '.env:secret', '.env::$DATA', path.join(root, '.git::$INDEX_ALLOCATION', 'hooks', 'pre-commit')];
+  // 8.3 short names, where the volume creates them.
+  const shortNames = Object.entries({ '.git': ['/config', '/hooks/pre-commit', '/hooks/new-hook'], '.claude': ['/settings.json', '/commands/evil.md'],
+    '.codex': ['/config.toml'], '.npmrc': [''], '.env': [''], step_archive: ['/archived/step002.md'] })
+    .flatMap(([name, tails]) => { const alias = shortName(path.join(root, name)); return alias ? tails.map(tail => alias + tail) : []; });
+  // PR #1 C-3: a project rooted at the home folder (login units, PATH entries, the pip index).
+  const homeLevel = ['.config/systemd/user/x.service', '.config/autostart/x.desktop', '.local/bin/git', '.bin/node', 'pip.conf'];
+  for (const target of [...streams, ...shortNames, ...homeLevel]) assert.equal(policy(root, target), '', target);
+  // No over-blocking: streams of ordinary paths and names that only contain git or env.
+  for (const target of ['src/lib::$INDEX_ALLOCATION/x.js', 'src/app.js::$DATA', 'docs/git-notes.md', 'src/env.js']) {
+    assert.equal(policy(root, target), 'eligible', target);
+  }
+  // The guard mode keeps the typed path and its meaning.
+  assert.equal(policy(root, '.git/config', 'guard'), 'protected');
+  // Once through the shipping hook.
+  assert.equal(run(root, 'auto-approve', write('.claude::$INDEX_ALLOCATION/settings.json')).output, '');
+});
+// Flat step bodies are the fallback location of the step bodies (harness-activity stepBody), and
+// archived/ and tools/ under a subfolder step_archive are the same material. Step 1 writes
+// TOPIC.md itself, so it stays eligible.
+test('flat step bodies and subfolder archived/tools stay out of approval; TOPIC.md and step results stay in', t => {
+  const root = fixture(t);
+  for (const target of ['step_archive/step002.md', 'STEP_ARCHIVE/STEP050.MD', 'step_archive/step002.md.', 'step_archive/step002.md::$DATA',
+    'sub/step_archive/archived/step001.md', 'a/STEP_ARCHIVE/Archived/x.md', 'sub/step_archive/tools/html-bundler.ps1']) {
+    assert.equal(policy(root, target), '', target);
+  }
+  for (const target of ['step_archive/TOPIC/TOPIC.md', 'step_archive/step002_result.md', 'step_archive/step0021.md', 'sub/step_archive_x/archived/a.md', 'docs/archived/x.md']) {
+    assert.equal(policy(root, target), 'eligible', target);
+  }
+});
 test('the guard mode leaves execution-linked edits to the normal prompt instead of denying them', t => {
   const root = fixture(t);
   const guard = run(root, 'permission-request-guard', { hook_event_name: 'PermissionRequest', ...write('package.json') });
   assert.equal(guard.status, 0);
   assert.equal(guard.output, '');
 });
+// Without node (no HARNESS50_NODE from run-hook.mjs and none on PATH) the relays make no decision:
+// auto-approve grants nothing, and destructive-guard lets the host decide (documented fail-open).
 test('missing Node runtime cannot grant approval', t => {
   const root = fixture(t);
-  const script = path.join(repo, 'hooks', windows ? 'auto-approve.ps1' : 'auto-approve.sh');
   const executable = windows ? path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe') : '/bin/bash';
-  const result = spawnSync(executable, windows ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script] : [script], {
-    cwd: root, input: JSON.stringify(write('src/app.js')), encoding: 'utf8', timeout: 15000,
-    env: { ...process.env, PATH: root, CLAUDE_PROJECT_DIR: root },
-  });
-  assert.equal(result.error, undefined);
-  assert.equal(result.status, 0);
-  assert.equal(result.stdout.trim(), '');
+  const withoutNode = (hook, event) => {
+    const script = path.join(repo, 'hooks', `${hook}.${windows ? 'ps1' : 'sh'}`);
+    const result = spawnSync(executable, windows ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script] : [script], {
+      cwd: root, input: JSON.stringify(event), encoding: 'utf8', timeout: hookShellTimeout(windows ? 'ps1' : 'sh'),
+      env: { ...process.env, PATH: root, CLAUDE_PROJECT_DIR: root, HARNESS50_NODE: '' },
+    });
+    assert.equal(result.error, undefined);
+    return { status: result.status, stdout: result.stdout.trim() };
+  };
+  assert.deepEqual(withoutNode('auto-approve', write('src/app.js')), { status: 0, stdout: '' });
+  assert.deepEqual(withoutNode('destructive-guard', { tool_name: 'Bash', tool_input: { command: 'rm -rf /' } }), { status: 0, stdout: '' });
 });
 
 // The guards read the whole command text, quoted strings and heredoc bodies included. A block
@@ -268,4 +326,36 @@ test('permission-request-guard explains the file route for Bash denies only', t 
   assert.equal(edit.status, 2);
   assert.match(edit.stdout, /"deny"/);
   assert.equal(edit.stderr, '');
+});
+
+// One catalog decides both guards, so permission-request-guard denies only what destructive-guard
+// blocks: a command it passes or asks about is never refused at the permission prompt.
+test('permission-request-guard never refuses what destructive-guard leaves to the user', t => {
+  const { run } = installedGuard(t);
+  const bash = (command, hook_event_name) => ({ hook_event_name, tool_name: 'Bash', tool_input: { command } });
+  const guards = command => [run('destructive-guard', bash(command, 'PreToolUse')), run('permission-request-guard', bash(command, 'PermissionRequest'))];
+  for (const command of ['git commit -m "remove sudo usage"', 'rm -rf ./dist', 'rm -rf /tmp/h50-x', 'git branch -d feature']) {
+    const [pre, permission] = guards(command);
+    assert.deepEqual({ status: pre.status, stdout: pre.stdout }, { status: 0, stdout: '' }, command);
+    assert.deepEqual({ status: permission.status, stdout: permission.stdout }, { status: 0, stdout: '' }, command);
+  }
+  for (const command of ['sudo apt install jq', 'pip install semgrep', 'git config core.hooksPath .githooks', 'echo x > .claude/settings.json']) {
+    const [pre, permission] = guards(command);
+    assert.equal(pre.status, 0, command);
+    assert.match(pre.stdout, /"permissionDecision":"ask"/, command);
+    assert.deepEqual({ status: permission.status, stdout: permission.stdout }, { status: 0, stdout: '' }, command);
+  }
+});
+// Writing text that names a command is not running it: the permission guard never denies an edit
+// for its content. Auto-approval keeps the prompt for such text instead (approval-policy auto mode).
+test('edit content never makes permission-request-guard deny', t => {
+  const installed = installedGuard(t);
+  const edit = new_string => ({ tool_name: 'Edit', tool_input: { file_path: 'README.md', old_string: 'x', new_string } });
+  const permission = installed.run('permission-request-guard', { hook_event_name: 'PermissionRequest', ...edit('sudo apt install jq') });
+  assert.deepEqual({ status: permission.status, stdout: permission.stdout }, { status: 0, stdout: '' });
+  // In an active run the same edit keeps the prompt, and harmless text is still approved.
+  const root = fixture(t);
+  assert.equal(run(root, 'auto-approve', edit('sudo apt install jq')).output, '');
+  assert.equal(run(root, 'auto-approve', { tool_name: 'MultiEdit', tool_input: { file_path: 'README.md', edits: [{ old_string: 'a', new_string: 'b' }, { old_string: 'c', new_string: 'rm -rf /' }] } }).output, '');
+  assert.match(run(root, 'auto-approve', edit('const a = 1')).output, /"permissionDecision":"allow"/);
 });

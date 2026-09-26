@@ -20,6 +20,7 @@ import {
 } from '../../hooks/lib/codex-workflow.mjs';
 import { pathsFor } from '../scripts/lib/paths.mjs';
 import { createInitialState, validateState } from '../scripts/lib/schema.mjs';
+import { hookShellTimeout } from './helpers/claude-hooks.mjs';
 
 const repo = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const probeScript = join(repo, 'hooks', 'lib', 'codex-workflow.mjs');
@@ -103,9 +104,9 @@ function invoke(plugin, variant, name, event, cwd, { stripCR = false } = {}) {
     cwd,
     input: JSON.stringify(event),
     encoding: 'utf8',
-    // Git Bash emulation forks dozens of processes per hook call; auto-approve.sh on its allow
-    // path can take 40 s or more on Windows, so that path gets a much larger budget.
-    timeout: windows && variant !== 'ps1' ? 300000 : 60000,
+    // Shared spawn limit: a cold powershell.exe can pass 60 s on a fresh CI runner, and Git Bash
+    // emulation (auto-approve.sh on its allow path can take 40 s or more) gets the largest budget.
+    timeout: hookShellTimeout(variant),
     env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8', CLAUDE_PROJECT_DIR: '' }
   });
   assert.equal(result.status, 0, result.stderr || String(result.error));

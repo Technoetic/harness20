@@ -16,6 +16,10 @@
 
 param()
 
+# PowerShell 5.1 writes stdout in the console code page (cp949 on Korean Windows), so the '—' and
+# the Hangul in the warning reached Claude garbled. Emit UTF-8 like the other hooks.
+try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch {}
+
 $harnessRaw = ""
 $harnessEvent = $null
 try {
@@ -94,10 +98,11 @@ try { $content = Get-Content -LiteralPath $filePath -Raw -Encoding UTF8 } catch 
     exit 0
 }
 
-$hasNote   = $content -match '@MX:NOTE'
-$hasWarn   = $content -match '@MX:WARN'
-$hasAnchor = $content -match '@MX:ANCHOR'
-$hasTodo   = $content -match '@MX:TODO'
+# Case-sensitive like the grep in mx-tag-validator.sh: the tags are upper case (MoAI standard).
+$hasNote   = $content -cmatch '@MX:NOTE'
+$hasWarn   = $content -cmatch '@MX:WARN'
+$hasAnchor = $content -cmatch '@MX:ANCHOR'
+$hasTodo   = $content -cmatch '@MX:TODO'
 
 # 2026-06-10 수정 (posttool:F4/F5):
 #   (1) @MX:REASON 의무 검사가 태그 존재 조기 exit 뒤에 있어 영원히 도달 불가했음 → 선행 배치
@@ -106,7 +111,7 @@ $hasTodo   = $content -match '@MX:TODO'
 $warnings = @()
 
 # @MX:WARN/@MX:ANCHOR 사용 시 @MX:REASON 동반 의무
-if (($hasWarn -or $hasAnchor) -and -not ($content -match '@MX:REASON')) {
+if (($hasWarn -or $hasAnchor) -and -not ($content -cmatch '@MX:REASON')) {
     $warnings += "[@MX-WARN] $filePath has WARN/ANCHOR but missing @MX:REASON sub-line — add // @MX:REASON: <근거>"
 }
 

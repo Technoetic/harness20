@@ -4,8 +4,9 @@ command -v python3 >/dev/null 2>&1 || exit 0
 export RAW_STDIN="$(cat || true)"
 python3 - <<'PY_STOP'
 import json, os, re
-# The only early stop (harness-rules 2-1). Same bytes as $namedPause in step-auto-continue.ps1.
-NAMED='Early stop only as a named pause (permission-denied | required-tool-failed | required-input-missing; harness-rules 2-1): save evidence under step_archive/, run node "<plugin-root>/scripts/harness-pause.mjs" pause --workspace "<project-root>" --reason <code> --evidence <step_archive/file> --note "<user action>", then end the turn with the pause report.'
+# The only early stop (harness-rules 2-1). Same string as $namedPause in step-auto-continue.ps1
+# (Python triple quotes keep the inner single quotes).
+NAMED='''Early stop only as a named pause (permission-denied | required-tool-failed | required-input-missing; harness-rules 2-1): save evidence under step_archive/, run node "<plugin-root>/scripts/harness-pause.mjs" pause --workspace "<project-root>" --reason <code> --evidence <step_archive/file> --note '<user action, no quotes>', then end the turn with the pause report.'''
 try:
     event=json.loads(os.environ.get('RAW_STDIN') or '{}')
     root=os.environ.get('CLAUDE_PROJECT_DIR') or event.get('cwd') or os.getcwd()

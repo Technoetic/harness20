@@ -6,6 +6,8 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
+import { hookShellTimeout } from './helpers/claude-hooks.mjs';
+
 const repo = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const windows = process.platform === 'win32';
 const bashOnWindows = windows && process.env.H50_TEST_BASH === '1';
@@ -28,7 +30,7 @@ function fixture(t, projectName) {
   const run = (name, event = {}, envRoot = '', cwd = other) => {
     const path = join(plugin, 'hooks', `${name}.${ext}`);
     const args = bashOnWindows ? ['-c', 'uname(){ echo Linux; }; python3(){ python "$@"; }; export -f uname python3; bash "$1"', 'fixture', path.replaceAll('\\', '/')] : windows ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path] : [path];
-    const result = spawnSync(shell, args, { cwd, input: JSON.stringify(event), encoding: 'utf8', timeout: 60000,
+    const result = spawnSync(shell, args, { cwd, input: JSON.stringify(event), encoding: 'utf8', timeout: hookShellTimeout(ext),
       env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8', CLAUDE_PROJECT_DIR: envRoot } });
     assert.equal(result.status, 0, result.stderr || String(result.error));
     assert.equal(result.stderr.trim(), '', result.stderr);
@@ -58,6 +60,49 @@ testEachProject('writer preserves first unfinished step; loader and Stop agree',
   assert.match(JSON.parse(f.run('step-auto-continue', { cwd: f.project })).reason, /step001/);
   f.run('spec-generator', { cwd: f.project });
   assert.ok(existsSync(join(f.project, 'step_archive', 'specs', 'SPEC-001.md')));
+});
+// A hand edit can move current_step off the first unfinished step (harness-activity 'drift'). The
+// writer puts it back even with nothing new to record, keeps a pause, and leaves an aligned paused
+// run byte for byte. The PowerShell writer skips its write while another test file holds the
+// machine-wide Global\step-progress-writer-mutex, so each check reruns it (bounded).
+testEachProject('writer puts a drifted cursor back on the first unfinished step and keeps a pause', (t, name) => {
+  const f = fixture(t, name);
+  const file = join(f.project, 'step_archive', 'progress.json');
+  const read = () => JSON.parse(readFileSync(file, 'utf8'));
+  const stop = message => ({ cwd: f.project, last_assistant_message: message });
+  const writeUntil = (event, done) => {
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      f.run('step-progress-writer', event);
+      if (done(read())) break;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500 * attempt);
+    }
+    return read();
+  };
+  // (a) Nothing new to record: only the cursor moves back.
+  f.state([2], 3);
+  let p = writeUntil(stop(''), progress => progress.current_step === 1);
+  assert.deepEqual(p.completed_steps, [2]); assert.equal(p.current_step, 1);
+  // (b) A completion line is recorded, and the cursor follows the first unfinished step.
+  f.state([2], 3);
+  p = writeUntil(stop('Step 001/3 완료'), progress => progress.completed_steps.includes(1));
+  assert.deepEqual(p.completed_steps, [1, 2]); assert.equal(p.current_step, 3);
+  // (c) A paused run: the cursor moves back and the pause fields stay.
+  f.state([2], 3);
+  writeFileSync(file, JSON.stringify({ ...read(), paused: true, pause_reason: 'user-request' }));
+  p = writeUntil(stop(''), progress => progress.current_step === 1);
+  assert.deepEqual([p.completed_steps, p.current_step, p.paused, p.pause_reason], [[2], 1, true, 'user-request']);
+  // (d) A paused run with an aligned cursor: nothing to do, not a byte changes.
+  f.state([2], 1);
+  writeFileSync(file, JSON.stringify({ ...read(), paused: true, pause_reason: 'user-request' }));
+  const bytes = readFileSync(file);
+  f.run('step-progress-writer', stop(''));
+  assert.deepEqual(readFileSync(file), bytes);
+  // (e) A hand-edited progress.json without last_updated: no error on stderr (run() checks it).
+  f.state([2], 3);
+  const { last_updated: _stamp, ...unstamped } = read();
+  writeFileSync(file, JSON.stringify(unstamped));
+  p = writeUntil(stop(''), progress => progress.current_step === 1);
+  assert.equal(p.current_step, 1); assert.equal(typeof p.last_updated, 'string');
 });
 testEachProject('Stop is project scoped, bounded, sticky on stall, and resets after progress', (t, name) => {
   const f = fixture(t, name); f.state();

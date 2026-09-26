@@ -27,24 +27,40 @@ import {
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 const protectedClaudePaths = [
   "hooks/auto-approve.ps1",
+  "hooks/auto-approve.sh",
   "hooks/destructive-guard.ps1",
+  "hooks/destructive-guard.sh",
   "hooks/hooks.json",
   "hooks/html-bundler.ps1",
+  "hooks/html-bundler.sh",
   "hooks/lib/approval-policy.mjs",
+  "hooks/lib/command-guard.mjs",
   "hooks/lib/harness-activity.mjs",
   "hooks/lsp-autofix.ps1",
+  "hooks/lsp-autofix.sh",
   "hooks/mx-tag-validator.ps1",
+  "hooks/mx-tag-validator.sh",
   "hooks/permission-request-guard.ps1",
+  "hooks/permission-request-guard.sh",
   "hooks/run-hook.mjs",
   "hooks/spec-generator.ps1",
+  "hooks/spec-generator.sh",
   "hooks/step-auto-continue.ps1",
+  "hooks/step-auto-continue.sh",
   "hooks/step-obedience-guard.ps1",
+  "hooks/step-obedience-guard.sh",
   "hooks/step-progress-loader.ps1",
+  "hooks/step-progress-loader.sh",
   "hooks/step-progress-writer.ps1",
+  "hooks/step-progress-writer.sh",
   "hooks/trust5-validator.ps1",
+  "hooks/trust5-validator.sh",
   "hooks/validate-tools.ps1",
+  "hooks/validate-tools.sh",
   "hooks/webapp-trigger.ps1",
-  "tests/security-regression.ps1"
+  "hooks/webapp-trigger.sh",
+  "tests/security-regression.ps1",
+  "tests/security-regression.sh"
 ];
 
 function ids(prefix) {

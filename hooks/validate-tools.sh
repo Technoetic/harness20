@@ -55,9 +55,11 @@ case "$TOOL" in
       echo "axe-core: FAIL"; exit 1
     fi
     ;;
-  biome) npx biome --version ;;
-  stylelint) npx stylelint --version ;;
-  c8) npx c8 --version ;;
-  jscpd) npx jscpd --version ;;
+  # A version check never installs: --no-install reports a missing tool instead of downloading it,
+  # and plain `npx biome` resolves to the unrelated biome package. Same policy as lsp-autofix.
+  biome) npx --no-install @biomejs/biome --version ;;
+  stylelint) npx --no-install stylelint --version ;;
+  c8) npx --no-install c8 --version ;;
+  jscpd) npx --no-install jscpd --version ;;
   *) echo "Unknown tool: $TOOL (use playwright|aside|axe|biome|stylelint|c8|jscpd)"; exit 1 ;;
 esac

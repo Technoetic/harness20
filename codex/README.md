@@ -13,6 +13,8 @@ Codex does not provide a `/webapp` slash command. 진행 중인 Codex 워크플�
 
 플러그인 이름을 포함한 `$harness50:webapp`, `$harness50:harness50-status`, `$harness50:harness50-reset`도 지원합니다. 하위 에이전트의 요청은 부모 워크플로를 일시정지하지 않습니다.
 
+Codex는 설치할 때 Claude Code `commands/*.md`의 일부를 `source-command-<이름>` 스킬로 바꿔 플러그인 캐시(`.codex-plugin/migrated-command-skills/`)에 둘 수 있습니다. 이 변환은 호스트 동작이며, 어떤 명령이 바뀌는지는 Codex 버전과 명령 내용에 따라 다릅니다(관측: 2.10.0 설치에서는 reset·resume, 2.9.0에서는 reset·status). Codex에서는 위 표의 스킬과 `$webapp pause`·`$webapp resume`을 사용하세요. 이관된 스킬이 선택되어도 다섯 Claude 명령은 모두 Codex 작업 공간(`step_archive/.harness50-codex/state.json`)을 먼저 확인하므로, 그 공간에서는 Claude `progress.json`과 TOPIC을 만들거나 바꾸지 않고, Codex 명령을 안내하거나 Codex 상태 관리자 절차를 따릅니다.
+
 ## Jev-first direct questions
 
 When requested, Jev-first applies to every eligible typed judgment, including chat
@@ -49,6 +51,14 @@ codex plugin add harness50@harness50
 ```
 
 The published repository includes both Claude Code and Codex adapters. 어느 경로를 사용하든 설치만으로 후크가 신뢰되지는 않습니다.
+
+### Remove / 제거
+
+```text
+codex plugin remove harness50@harness50
+```
+
+이 명령은 로컬 설정과 캐시에서 플러그인을 지웁니다. 마켓플레이스 등록까지 지우려면 이어서 `codex plugin marketplace remove harness50`을 실행합니다. 진행 중인 워크플로는 캐시 안의 `codex/scripts/harness-state.mjs`를 쓰므로, 제거하거나 `codex plugin add`로 갱신하기 전에 `$webapp pause`로 멈추거나 워크플로를 완료하세요. 갱신도 이전 버전의 캐시를 지웁니다.
 
 ## Permissions and continuation / 권한과 이어가기
 
@@ -95,7 +105,7 @@ The published repository includes both Claude Code and Codex adapters. 어느 �
 가져오기나 영수증 복구 결과가 이미 `completed`라면 이 구분을 유지해 결과를 보고하며,
 완료된 작업에 다시 `resume`을 호출하지 않습니다.
 
-Claude Code hooks defer to an existing Codex workflow. While `step_archive/.harness50-codex/state.json` exists, they never create, rewrite or advance Claude `progress.json`, never block Stop, never auto-approve Claude edits and never re-initialize TOPIC; SessionStart reports the Codex step in one line instead.
+Claude Code hooks defer to an existing Codex workflow. While `step_archive/.harness50-codex/state.json` exists, they never create, rewrite or advance Claude `progress.json`, never block Stop, never auto-approve Claude edits and never re-initialize TOPIC; SessionStart reports the Codex step in one line instead. The two Claude guards still check Bash commands there, because a Claude session has no other Harness50 guard in a Codex workspace.
 같은 작업 공간을 Claude Code에서 열어도 진행 기준은 Codex 상태 관리자입니다. 이어서 진행하려면 `codex/skills/webapp/SKILL.md`의 상태 관리자 절차(`show`·`resume`·`begin`·`complete`)를 따르며, 대화 속 완료 보고는 단계를 진행시키지 않습니다. 리셋 뒤 `state.json`이 백업으로 옮겨지면 Claude 훅은 기존 동작으로 돌아갑니다.
 
 ## Hook trust gate / 후크 신뢰 게이트
@@ -105,7 +115,7 @@ Claude Code hooks defer to an existing Codex workflow. While `step_archive/.harn
 3. Confirm that no approval hook is present, then manually trust only those exact current definitions.
 4. Changed hook hashes require review and manual trust again; never bypass or automate this trust step.
 
-확인할 세 스킬은 `$webapp`, `$harness50-status`, `$harness50-reset`입니다. Hook execution stops at this trust gate until the user confirms the review. 설치 자동화가 훅 신뢰를 대신 처리해서는 안 됩니다. 스킬의 현재 대화 내 순차 실행은 훅을 실행하지 않으므로 이 신뢰 조작을 요구하지 않습니다.
+확인할 세 스킬은 `$webapp`, `$harness50-status`, `$harness50-reset`입니다. Codex가 Claude 명령에서 옮긴 `source-command-*` 스킬은 이 세 스킬에 포함되지 않습니다. Hook execution stops at this trust gate until the user confirms the review. 설치 자동화가 훅 신뢰를 대신 처리해서는 안 됩니다. 스킬의 현재 대화 내 순차 실행은 훅을 실행하지 않으므로 이 신뢰 조작을 요구하지 않습니다.
 
 ### When the workflow waits after every step / 매 단계 대기할 때
 

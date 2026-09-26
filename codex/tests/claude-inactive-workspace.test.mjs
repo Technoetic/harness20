@@ -4,16 +4,20 @@
 // pause, harness-rules 2-1) is the one exception that speaks: the loader and the prompt guard
 // print where it stopped. The progress writer also starts there, to record completion lines of the
 // turn that paused (claude-named-pause P1); its Stop here carries the pause report instead, so it
-// has nothing to record and still nothing is written.
+// has nothing to record and still nothing is written. The two guards start only in Harness50
+// workspaces (paused, drift, finished, Codex or active); on these harmless events they stay silent
+// and write no log. A run whose cursor alone is off (drift) starts only the progress writer among
+// the step hooks, and that writer puts current_step back (tested separately below).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { availableParallelism } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { spawn } from 'node:child_process';
+import { setTimeout as sleep } from 'node:timers/promises';
 
-import { HOOK_GATES } from '../../hooks/lib/harness-activity.mjs';
 import { pausedLine } from '../../scripts/lib/pause-state.mjs';
-import { PROJECT_NAMES, installPlugin, repo, runDispatcher, tempRoot, testEachName, tree, windows } from './helpers/claude-hooks.mjs';
+import { installPlugin, repo, runDispatcher, tempRoot, testEachName, tree, windows } from './helpers/claude-hooks.mjs';
 
 // Loader-created progress.json from the incident workspace: step 1 of 50 and no step bodies.
 const STALE_LOADER_PROGRESS = {
@@ -101,10 +105,13 @@ function dispatch(plugin, name, event, { cwd, env }) {
     child.stdin.end(JSON.stringify(event));
   });
 }
+// At most one dispatcher per spare CPU (at least two): a 4 vCPU runner starts three at a time,
+// because test files running in parallel share the same PowerShell start-up cost.
 async function inPool(tasks, limit = 6) {
+  const cap = Math.min(limit, Math.max(2, availableParallelism() - 1));
   const results = new Array(tasks.length);
   let next = 0;
-  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, async () => {
+  await Promise.all(Array.from({ length: Math.min(cap, tasks.length) }, async () => {
     while (next < tasks.length) {
       const index = next++;
       results[index] = await tasks[index]();
@@ -113,8 +120,12 @@ async function inPool(tasks, limit = 6) {
   return results;
 }
 
-const guards = new Set(Object.keys(HOOK_GATES).filter(name => HOOK_GATES[name] === 'always'));
 const hookList = plugin => readdirSync(join(plugin, 'hooks')).sort();
+// The two guards start a shell in paused and finished runs. They get one event per decision path
+// (destructive-guard: its Bash matcher; permission-request-guard: a command, an edit and a fetch),
+// which keeps the PowerShell starts few enough that a loaded runner stays inside their 4.5 s budget.
+const GUARD_TOOLS = { 'destructive-guard': ['Bash'], 'permission-request-guard': ['Bash', 'Write', 'WebFetch'] };
+const payloadsFor = (hook, payloads) => Object.hasOwn(GUARD_TOOLS, hook) ? payloads.filter(payload => GUARD_TOOLS[hook].includes(payload.tool_name)) : payloads;
 const writeProgress = (project, state) => {
   mkdirSync(join(project, 'step_archive'), { recursive: true });
   writeFileSync(join(project, 'step_archive', 'progress.json'), typeof state === 'string' ? state : JSON.stringify(state));
@@ -137,7 +148,8 @@ const WORKSPACES = {
   'stale-loader': project => writeProgress(project, STALE_LOADER_PROGRESS),
   paused: project => { writeProgress(project, PAUSED_RUN); writeBodies(project, [1]); },
   'total 107': project => { writeProgress(project, { ...valid, total_steps: 107 }); writeBodies(project, [1]); },
-  'gap-inconsistent': project => { writeProgress(project, { ...valid, completed_steps: [2], current_step: 3 }); writeBodies(project, [1, 2, 3]); },
+  // A cursor that is no step number is damage, not drift (drift has its own test below).
+  'cursor not a step number': project => { writeProgress(project, { ...valid, completed_steps: [2], current_step: '3' }); writeBodies(project, [1, 2, 3]); },
   corrupt: project => writeProgress(project, '{broken'),
   'step_archive link outside the project': (project, base, t) => {
     const outside = join(base, 'outside');
@@ -162,8 +174,8 @@ for (const [kind, prepare] of Object.entries(WORKSPACES)) {
     const byEvent = events(f.project, kind);
     const tasks = [];
     for (const [event, hooks] of Object.entries(registrations())) {
-      for (const hook of hooks.filter(hook => !guards.has(hook))) {
-        for (const payload of byEvent[event]) tasks.push(async () => [`${hook} ${JSON.stringify(payload).slice(0, 80)}`, await dispatch(f.plugin, hook, payload, { cwd: f.project, env: f.env })]);
+      for (const hook of hooks) {
+        for (const payload of payloadsFor(hook, byEvent[event])) tasks.push(async () => [`${hook} ${JSON.stringify(payload).slice(0, 80)}`, await dispatch(f.plugin, hook, payload, { cwd: f.project, env: f.env })]);
       }
     }
     assert.ok(tasks.length >= 30, `only ${tasks.length} hook calls`);
@@ -189,8 +201,8 @@ testEachName('finished run (50/50): only the trust5 gate speaks; progress, specs
   const byEvent = events(f.project);
   const tasks = [];
   for (const [event, hooks] of Object.entries(registrations())) {
-    for (const hook of hooks.filter(hook => !guards.has(hook))) {
-      for (const payload of byEvent[event]) tasks.push(async () => [hook, await dispatch(f.plugin, hook, payload, { cwd: f.project, env: f.env })]);
+    for (const hook of hooks) {
+      for (const payload of payloadsFor(hook, byEvent[event])) tasks.push(async () => [hook, await dispatch(f.plugin, hook, payload, { cwd: f.project, env: f.env })]);
     }
   }
   for (const [hook, result] of await inPool(tasks)) {
@@ -203,14 +215,101 @@ testEachName('finished run (50/50): only the trust5 gate speaks; progress, specs
   assert.equal(existsSync(f.npx.log), false);
 });
 
-test('the two guards still apply in every folder the plugin is installed for', t => {
-  const f = setup(t, PROJECT_NAMES[0]);
-  const deny = runDispatcher(f.plugin, 'permission-request-guard', { hook_event_name: 'PermissionRequest', tool_name: 'Write', tool_input: { file_path: '.claude/settings.json', content: '{}' }, cwd: f.project }, { cwd: f.project, env: f.env, timeoutMs: 60000 });
+// A hand edit moved current_step off the first unfinished step (drift). Among the step hooks only
+// the progress writer starts; its Stop puts the cursor back, and from then on the run is active.
+// The other hooks get the first payload of their event only, which keeps the dispatches few; the
+// guards are covered in 'the guards run only in harness workspaces'.
+testEachName('cursor drift: only the progress writer starts, and it puts current_step back on the first unfinished step', async (t, name) => {
+  const f = setup(t, name);
+  writeProgress(f.project, { ...valid, last_updated: '', completed_steps: [2], current_step: 3 });
+  writeBodies(f.project, [1, 2, 3]);
+  const before = tree(f.project);
+  const byEvent = events(f.project);
+  const tasks = [];
+  for (const [event, hooks] of Object.entries(registrations())) {
+    for (const hook of hooks) {
+      if (['destructive-guard', 'permission-request-guard', 'step-progress-writer'].includes(hook)) continue;
+      tasks.push(async () => [hook, await dispatch(f.plugin, hook, byEvent[event][0], { cwd: f.project, env: f.env })]);
+    }
+  }
+  for (const [hook, result] of await inPool(tasks)) assert.deepEqual(result, { status: 0, stdout: '', stderr: '' }, hook);
+  assert.deepEqual(tree(f.project), before);
+
+  const stop = { hook_event_name: 'Stop', session_id: 's', stop_hook_active: false, last_assistant_message: '', cwd: f.project };
+  const read = () => JSON.parse(readFileSync(join(f.project, 'step_archive', 'progress.json'), 'utf8').replace(/^\uFEFF/, ''));
+  // The PowerShell writer skips its write while another test file holds the machine-wide
+  // Global\step-progress-writer-mutex, so rerun it (bounded) until the cursor is back.
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    const writer = await dispatch(f.plugin, 'step-progress-writer', stop, { cwd: f.project, env: f.env });
+    assert.equal(writer.status, 0, writer.stderr);
+    assert.equal(writer.stderr, '');
+    if (read().current_step === 1) break;
+    await sleep(500 * attempt);
+  }
+  const after = read();
+  assert.deepEqual(after.completed_steps, [2]);
+  assert.equal(after.current_step, 1);
+  const continued = await dispatch(f.plugin, 'step-auto-continue', stop, { cwd: f.project, env: f.env });
+  assert.equal(continued.status, 0, continued.stderr);
+  const reason = JSON.parse(continued.stdout).reason;
+  assert.ok(reason.includes('step_archive/archived/step001.md'), reason);
+  assert.equal(existsSync(f.npx.log), false);
+});
+
+// The two guards run only in Harness50 workspaces: an active, paused or finished Claude run, or a
+// Codex workspace. In an unrelated folder, or next to a loader-created progress.json, no shell
+// starts and the host's permission checks decide. A block writes the guard log next to the
+// installed hooks, so this test does not compare the hooks folder.
+testEachName('the guards run only in harness workspaces', (t, name) => {
+  const f = setup(t, name);
+  const guard = (hook, project, event) => runDispatcher(f.plugin, hook, { cwd: project, ...event }, { cwd: project, env: f.env, timeoutMs: 60000 });
+  const settingsWrite = { hook_event_name: 'PermissionRequest', tool_name: 'Write', tool_input: { file_path: '.claude/settings.json', content: '{}' } };
+  const bash = (command, hook_event_name = 'PreToolUse') => ({ hook_event_name, tool_name: 'Bash', tool_input: { command } });
+  const silent = { status: 0, stdout: '', stderr: '' };
+
+  const stale = join(f.base, `${name} stale`);
+  mkdirSync(stale);
+  writeProgress(stale, STALE_LOADER_PROGRESS);
+  const staleBefore = tree(stale);
+  for (const project of [f.project, stale]) {
+    assert.deepEqual(guard('permission-request-guard', project, settingsWrite), silent, project);
+    assert.deepEqual(guard('destructive-guard', project, bash('git reset --hard')), silent, project);
+  }
+  assert.equal(existsSync(join(f.project, 'step_archive')), false);
+  assert.deepEqual(tree(stale), staleBefore);
+
+  // After /webapp <topic> the same folder is an active run: block, deny and ask apply, and a
+  // command that destructive-guard leaves to the user is never refused by permission-request-guard.
+  assert.equal(guard('webapp-trigger', f.project, { hook_event_name: 'UserPromptSubmit', prompt: '/webapp fractions' }).status, 0);
+  const deny = guard('permission-request-guard', f.project, settingsWrite);
   assert.equal(deny.status, 2, deny.stderr);
   assert.match(deny.stdout, /"deny"/);
-  const block = runDispatcher(f.plugin, 'destructive-guard', { hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'git reset --hard' }, cwd: f.project }, { cwd: f.project, env: f.env, timeoutMs: 60000 });
+  const block = guard('destructive-guard', f.project, bash('git reset --hard'));
   assert.equal(block.status, 2, block.stderr);
-  assert.equal(existsSync(join(f.project, 'step_archive')), false);
+  assert.match(block.stderr, /Rule: git-reset-hard/);
+  const ask = guard('destructive-guard', f.project, bash('sudo apt install jq'));
+  assert.equal(ask.status, 0, ask.stderr);
+  assert.match(ask.stdout, /"permissionDecision":"ask"/);
+  assert.deepEqual(guard('permission-request-guard', f.project, bash('git commit -m "remove sudo usage"', 'PermissionRequest')), silent);
+
+  // Paused, drift, finished (50/50) and Codex workspaces keep the guards as well: moving the
+  // cursor by hand never turns them off.
+  const workspaces = {
+    paused: project => { writeProgress(project, PAUSED_RUN); writeBodies(project, [1]); },
+    drift: project => { writeProgress(project, { ...valid, completed_steps: [2], current_step: 3 }); writeBodies(project, [1]); },
+    finished: project => writeProgress(project, { ...valid, completed_steps: Array.from({ length: 50 }, (_, index) => index + 1), current_step: 50 }),
+    codex: project => {
+      mkdirSync(join(project, 'step_archive', '.harness50-codex'), { recursive: true });
+      writeFileSync(join(project, 'step_archive', '.harness50-codex', 'state.json'), '{}');
+    }
+  };
+  for (const [kind, prepare] of Object.entries(workspaces)) {
+    const project = join(f.base, `${name} ${kind}`);
+    mkdirSync(project);
+    prepare(project);
+    const result = guard('destructive-guard', project, bash('git reset --hard'));
+    assert.equal(result.status, 2, `${kind}: ${result.stderr}`);
+  }
 });
 
 // Runs one registered hook through the installed dispatcher and returns trimmed stdout.

@@ -168,6 +168,107 @@ test('S6 both prompt guards put user direct requests first, and the rules cover 
   assert.match(frontmatter[1], /step001~050/);
 });
 
+// The body of a Markdown section: from its heading line (level given by the marker) up to the next
+// heading of the same or a higher level. null when the heading is missing.
+function markdownSection(document, heading, level = 2) {
+  const marker = `\n${'#'.repeat(level)} ${heading}\n`;
+  const start = document.indexOf(marker);
+  if (start === -1) return null;
+  const body = document.slice(start + marker.length);
+  const end = body.search(new RegExp(`^#{1,${level}} `, 'm'));
+  return end === -1 ? body : body.slice(0, end);
+}
+
+// What a user types to scope, turn off and remove the plugin, and the runtimes the hooks need.
+// The counts and the settings key are gone because they went stale: the guard rules change with
+// the catalog, and Claude Code reads no "plugins" path entry. The guards run only in Harness50
+// workspaces, so the README must not say they run in every folder of the install scope.
+const INSTALL_REQUIRED = [
+  '--scope local',
+  '"harness50@harness50": false',
+  'claude plugin disable harness50@harness50',
+  'claude plugin enable harness50@harness50',
+  'claude plugin uninstall harness50@harness50',
+  'claude plugin marketplace remove harness50',
+  '/plugin marketplace add /absolute/path/to/harness50',
+  'python3',
+  'powershell.exe',
+  'claude --plugin-dir'
+];
+const INSTALL_FORBIDDEN = ['"plugins": {', 'Safety_Patterns-200+', '125+', '200+', 'v1.0.0', '설치 범위 전체(모든 폴더)'];
+const REQUIREMENT_ROWS = [
+  ['Node.js 22', /^\| Node\.js 22 /],
+  ['powershell.exe', /^\| Windows PowerShell 5\.1\(`powershell\.exe`\) /],
+  ['bash + python3', /^\| bash \+ python3 /],
+  ['Git Bash', /^\| Git Bash /]
+];
+
+function installErrors(readme) {
+  const errors = [];
+  for (const needle of INSTALL_REQUIRED) if (!readme.includes(needle)) errors.push(`missing: ${needle}`);
+  for (const needle of INSTALL_FORBIDDEN) if (readme.includes(needle)) errors.push(`stale: ${needle}`);
+  const scope = markdownSection(readme, '설치 범위 — 어디서 켤지 먼저 정한다', 3);
+  const removal = markdownSection(readme, '끄기·제거', 3);
+  const requirements = markdownSection(readme, '요구 사항', 3);
+  if (scope === null || removal === null || requirements === null) return [...errors, 'missing install scope, removal or requirements section'];
+  for (const range of ['user', 'project', 'local']) {
+    if (!new RegExp(`^\\| ${range}(?:\\(기본\\))? \\|`, 'm').test(scope)) errors.push(`scope row missing: ${range}`);
+  }
+  if (!scope.includes('](#-안전-모델-한계-정직성)')) errors.push('the scope warning does not link the safety limits');
+  if (!removal.includes('claude plugin uninstall harness50@harness50')) errors.push('removal section lacks uninstall');
+  const rows = requirements.split('\n').filter(line => line.startsWith('| '));
+  for (const [runtime, pattern] of REQUIREMENT_ROWS) {
+    if (!rows.some(row => pattern.test(row))) errors.push(`requirements row missing: ${runtime}`);
+  }
+  // The three guard relays need node only; python3 must not read as a guard requirement.
+  const python = rows.find(row => /^\| bash \+ python3 /.test(row)) ?? '';
+  if (python && !/destructive-guard·permission-request-guard·auto-approve는 python3 없이/.test(python)) {
+    errors.push('the python3 row does not say that the guards need no python3');
+  }
+  return errors;
+}
+
+test('S7 the README states install scope, removal and requirements, and no stale counts', () => {
+  const readme = text('README.md');
+  assert.deepEqual(installErrors(readme), []);
+  // The check must catch a lost requirement row and a count put back.
+  const withoutPython = readme.replace(/^\| bash \+ python3 .*\n/m, '');
+  assert.notEqual(withoutPython, readme, 'the python3 requirement row was not found');
+  assert.ok(installErrors(withoutPython).includes('requirements row missing: bash + python3'), 'deleting the python3 row went unnoticed');
+  const badge = '[![Patterns](https://img.shields.io/badge/Safety_Patterns-200+-EF4444?style=for-the-badge)](hooks/destructive-guard.ps1)\n';
+  const withCount = readme.replace('[![Dual Shell]', `${badge}[![Dual Shell]`);
+  assert.notEqual(withCount, readme, 'the badge row was not found');
+  assert.ok(installErrors(withCount).includes('stale: 200+'), 'a 200+ pattern count went unnoticed');
+  const everywhere = readme.replace('하네스 작업 공간(진행 중·멈춘·50단계를 마친 실행', '설치 범위 전체(모든 폴더)(진행 중·멈춘·50단계를 마친 실행');
+  assert.notEqual(everywhere, readme, 'the guard scope line was not found');
+  assert.ok(installErrors(everywhere).includes('stale: 설치 범위 전체(모든 폴더)'), 'the old guard scope went unnoticed');
+});
+
+test('S8 codex/README explains the migrated source-command skills and how to remove the plugin', () => {
+  const guide = text('codex/README.md');
+  const host = markdownSection(guide, 'Host commands / 호스트 명령');
+  const install = markdownSection(guide, 'Codex installation / 설치');
+  const trust = markdownSection(guide, 'Hook trust gate / 후크 신뢰 게이트');
+  assert.ok(host && install && trust, 'codex/README.md lost a required section');
+  assert.ok(host.includes('`source-command-<이름>`'), 'Host commands does not name the migrated skills');
+  assert.ok(host.includes('`$webapp pause`'), 'Host commands does not point to $webapp pause');
+  assert.ok(install.includes('\n### Remove / 제거\n'), 'Codex installation has no removal subsection');
+  assert.ok(install.includes('codex plugin remove harness50@harness50'), 'Codex installation lacks the remove command');
+  assert.ok(install.includes('`$webapp pause`'), 'removal does not say to pause a running workflow first');
+  assert.ok(trust.includes('`source-command-*`'), 'the trust gate does not keep migrated skills out of the three skills');
+});
+
+test('S9 every Claude command checks for a Codex workspace before it acts', () => {
+  // Codex may turn any of these into a source-command-* skill; each must then leave a Codex
+  // workspace to the Codex state manager.
+  const commands = listFiles('commands', /\.md$/);
+  for (const name of ['harness-pause', 'harness-reset', 'harness-resume', 'harness-status', 'webapp']) {
+    assert.ok(commands.includes(`commands/${name}.md`), `commands/${name}.md is missing`);
+  }
+  const missing = commands.filter(file => !text(file).includes('step_archive/.harness50-codex/state.json'));
+  assert.deepEqual(missing, [], 'commands without the Codex workspace branch');
+});
+
 // ---------------------------------------------------------------------------------------------
 // Dynamic checks (native variant: PowerShell on Windows, bash elsewhere)
 

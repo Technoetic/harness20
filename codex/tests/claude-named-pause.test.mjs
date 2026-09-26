@@ -836,11 +836,13 @@ test('D1 the pause codes, judgement and sentences agree across the rules, pause-
     assert.deepEqual(codeList(literal(source, /^CODES=\(([^)]*)\)$/m, file)), [...PAUSE_REASONS], file);
     assert.equal(literal(source, /^PAUSED='([^']*)'$/m, file), PAUSED_TEMPLATE, file);
   }
+  // Same string, not the same source bytes: PowerShell doubles the single quote inside its
+  // single-quoted literal, and the .sh hooks hold a Python triple-quoted literal.
   for (const file of ['hooks/step-auto-continue.ps1', 'hooks/step-progress-loader.ps1']) {
-    assert.equal(literal(text(file), /\$namedPause = '([^']*)'/, file), NAMED_PAUSE, file);
+    assert.equal(literal(text(file), /\$namedPause = '((?:[^']|'')*)'$/m, file).replaceAll("''", "'"), NAMED_PAUSE, file);
   }
   for (const file of ['hooks/step-auto-continue.sh', 'hooks/step-progress-loader.sh']) {
-    assert.equal(literal(text(file), /^NAMED='([^']*)'$/m, file), NAMED_PAUSE, file);
+    assert.equal(literal(text(file), /^NAMED='''(.*)'''$/m, file), NAMED_PAUSE, file);
   }
   // The Stop reason offers exactly the three model codes; user-request stays with the user.
   assert.deepEqual(literal(NAMED_PAUSE, /named pause \(([^;]+);/, 'NAMED_PAUSE').split(' | '), [...MODEL_PAUSE_REASONS]);
@@ -892,6 +894,9 @@ test('D3 the pause commands and the step documents describe the same procedure',
     assert.ok(text(file).includes("--note '<"), file);
     assert.ok(!text(file).includes('--note "<'), file);
   }
+  // ... and so does the sentence the Stop hook and the loader add to every continue instruction.
+  assert.ok(NAMED_PAUSE.includes("--note '<user action, no quotes>'"), NAMED_PAUSE);
+  assert.ok(!NAMED_PAUSE.includes('--note "'), NAMED_PAUSE);
   assert.ok(text('commands/harness-reset.md').includes('scripts/harness-pause.mjs" reset --workspace "<project-root>"'));
   assert.ok(!/"completed_steps": \[\]/.test(text('commands/harness-reset.md')), 'harness-reset.md no longer writes the template itself');
   for (const file of ['commands/webapp.md', 'agents/step-executor.md', 'skills/evaluator/SKILL.md', 'commands/harness-reset.md']) {

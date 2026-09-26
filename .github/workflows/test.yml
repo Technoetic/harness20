@@ -16,7 +16,8 @@ jobs:
   codex-and-claude-regressions:
     name: ${{ matrix.os }} / Node ${{ matrix.node }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    # PR #15's Windows Node 22 run used 16 min 5 s of the former 20 min limit; POSIX takes 3-5 min.
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 30 || 20 }}
     strategy:
       fail-fast: false
       matrix:
@@ -33,8 +34,30 @@ jobs:
             browser-verifier/package-lock.json
       - name: Install pinned validation dependencies
         run: npm ci --ignore-scripts
+      # Pays the first-start cost of Windows PowerShell 5.1 outside the test spawn limits. The log
+      # separates the first-start and Defender hypotheses (tag run 36205595180: the first
+      # powershell.exe of several test files took more than 60 s).
+      - name: Warm up Windows PowerShell 5.1
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          try { Get-MpComputerStatus | Format-List RealTimeProtectionEnabled,AMServiceEnabled } catch { 'Defender status unavailable' }
+          foreach ($attempt in 1..3) {
+            $watch = [System.Diagnostics.Stopwatch]::StartNew()
+            & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command 'Test-Path -LiteralPath . | Out-Null; ''{}'' | ConvertFrom-Json | Out-Null'
+            $code = $LASTEXITCODE
+            $watch.Stop()
+            "powershell.exe start $attempt : exit $code in $([math]::Round($watch.Elapsed.TotalSeconds, 1)) s"
+          }
+      # Default concurrency (availableParallelism() - 1, three on a 4 vCPU runner): 4 adds
+      # PowerShell contention, 2 would need about 14 min for the 1,667 s of test time.
+      # --test-timeout turns a hang into one failed test instead of a cancelled job.
       - name: Run Codex tests
-        run: node --test codex/tests/*.test.mjs
+        run: node --test --test-timeout=600000 codex/tests/*.test.mjs
+      # First removal candidate if Windows headroom runs short again: simulation.test.mjs ("the
+      # platform Claude regression wrapper runs only in an isolated copy") already runs it.
       - name: Run isolated Claude regressions on Windows
         if: runner.os == 'Windows'
         shell: powershell

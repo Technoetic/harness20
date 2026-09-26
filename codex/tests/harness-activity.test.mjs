@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 import {
-  ACTIVE_STATUSES, EXPLICIT_WEBAPP, HOOK_GATES, MAX_PROGRESS_BYTES, STEP_COUNT,
+  ACTIVE_STATUSES, EXPLICIT_WEBAPP, GUARD_PHASES, HOOK_GATES, MAX_PROGRESS_BYTES, STEP_COUNT,
   classifyProgress, codexOwned, isActive, readRun, shouldRunHook, webappPrecheck
 } from '../../hooks/lib/harness-activity.mjs';
 import { repo, tempRoot, tree, windows } from './helpers/claude-hooks.mjs';
@@ -22,6 +22,8 @@ test('constants keep the documented values', () => {
   assert.deepEqual([...ACTIVE_STATUSES], ['active', 'running', 'in_progress']);
   assert.equal(MAX_PROGRESS_BYTES, 1024 * 1024);
   assert.ok(Object.isFrozen(HOOK_GATES));
+  assert.deepEqual([...GUARD_PHASES], ['active', 'paused', 'finished', 'codex', 'drift']);
+  assert.ok(Object.isFrozen(GUARD_PHASES));
 });
 
 test('classifyProgress: invalid structures', () => {
@@ -30,9 +32,14 @@ test('classifyProgress: invalid structures', () => {
     null: null,
     array: [],
     string: 'x',
-    'gap before current': run([2], 3),
-    'current past first gap': run([], 2),
     'string current': run([], '1'),
+    // A cursor that is no step number is damage, not drift.
+    'cursor 0': run([], 0),
+    'cursor 52': run([], 52),
+    'cursor 1.5': run([], 1.5),
+    'cursor true': run([], true),
+    'cursor null': run([], null),
+    'no cursor': { total_steps: 50, completed_steps: [] },
     duplicate: run([1, 1], 2),
     zero: run([0], 1),
     'past last': run([51], 1),
@@ -55,6 +62,16 @@ test('classifyProgress: running follows the first unfinished step', () => {
   assert.equal(classifyProgress(run([], 1, { paused: false })).phase, 'running');
   assert.equal(classifyProgress(run([], 1, { status: 'running' })).phase, 'running');
   for (const status of ACTIVE_STATUSES) assert.equal(classifyProgress(run([], 1, { status })).phase, 'running', status);
+});
+
+// A hand edit of progress.json can move current_step off the first unfinished step. The run then
+// reads as drift, and the progress writer (the one step hook that starts) puts the cursor back.
+test('classifyProgress: drift when only the cursor disagrees', () => {
+  assert.deepEqual(classifyProgress(run([2], 3)), { phase: 'drift', next: 1, completed: 1 });
+  assert.deepEqual(classifyProgress(run([], 2)), { phase: 'drift', next: 1, completed: 0 });
+  assert.deepEqual(classifyProgress(run(range(1, 24), 26)), { phase: 'drift', next: 25, completed: 24 });
+  assert.deepEqual(classifyProgress(run([], 51)), { phase: 'drift', next: 1, completed: 0 });
+  assert.deepEqual(classifyProgress(run([1, 2, 4], 3)), { phase: 'running', next: 3, completed: 3 });
 });
 
 test('classifyProgress: paused, stopped and finished', () => {
@@ -112,6 +129,12 @@ for (const name of ['x', 'x [30]']) {
     assert.equal(isActive(bom), true);
     assert.equal(readRun(project(t, name, { progress: run([], 1, { paused: true }), body: 'archived' })).phase, 'paused');
     assert.equal(readRun(project(t, name, { progress: run(range(1, 50), 50) })).phase, 'finished');
+    // Drift needs the body of the first unfinished step, like an active run.
+    assert.deepEqual(readRun(project(t, name, { progress: run([2], 3), body: 'archived' })), { phase: 'drift', next: 1, completed: 1 });
+    const bodyless = project(t, name, { progress: run([2], 3) });
+    mkdirSync(join(bodyless, 'step_archive', 'archived'));
+    writeFileSync(join(bodyless, 'step_archive', 'archived', 'step003.md'), '# Step 3\n');
+    assert.deepEqual(readRun(bodyless), { phase: 'stale', next: 1, completed: 1 });
   });
 }
 
@@ -125,7 +148,13 @@ test('readRun narrows paused to runs that would otherwise be active', t => {
   assert.deepEqual(readRun(project(t, 'p no body', { progress: run([], 1, paused) })), { phase: 'stale', next: 1, completed: 0 });
   assert.equal(readRun(project(t, 'p finished', { progress: run(range(1, 50), 50, paused), body: 'archived' })).phase, 'finished');
   assert.deepEqual(readRun(project(t, 'p total 107', { progress: run([], 1, { ...paused, total_steps: 107 }), body: 'archived' })), { phase: 'invalid' });
-  assert.deepEqual(readRun(project(t, 'p gap', { progress: run([2], 3, paused), body: 'archived' })), { phase: 'invalid' });
+  // A paused drift stays paused (the writer that starts for it puts the cursor back); without the
+  // body of the first unfinished step it is stale.
+  assert.deepEqual(readRun(project(t, 'p gap', { progress: run([2], 3, paused), body: 'archived' })), { phase: 'paused', next: 1, completed: 1 });
+  const pausedBodyless = project(t, 'p gap no body', { progress: run([2], 3, paused) });
+  mkdirSync(join(pausedBodyless, 'step_archive', 'archived'));
+  writeFileSync(join(pausedBodyless, 'step_archive', 'archived', 'step003.md'), '# Step 3\n');
+  assert.deepEqual(readRun(pausedBodyless), { phase: 'stale', next: 1, completed: 1 });
   assert.deepEqual(readRun(project(t, 'p cancelled', { progress: run([], 1, { ...paused, status: 'cancelled' }), body: 'archived' })), { phase: 'stopped' });
   for (const value of ['true', 1, null, 'yes']) {
     assert.equal(readRun(project(t, `p ${String(value)}`, { progress: run([], 1, { paused: value }), body: 'archived' })).phase, 'paused', String(value));
@@ -162,10 +191,12 @@ test('codexOwned counts any entry, dangling links included', t => {
 });
 
 const HOOKS = Object.keys(HOOK_GATES);
-const PHASES = ['absent', 'stale', 'paused', 'stopped', 'invalid', 'finished', 'codex', 'active'];
+const PHASES = ['absent', 'stale', 'paused', 'stopped', 'invalid', 'finished', 'codex', 'active', 'drift'];
+// The two guards run only where a Harness50 run is established; elsewhere the host decides. In a
+// drift run only the progress writer of the step hooks starts, to put the cursor back.
 const EXPECTED = {
-  'destructive-guard': PHASES,
-  'permission-request-guard': PHASES,
+  'destructive-guard': ['paused', 'finished', 'codex', 'active', 'drift'],
+  'permission-request-guard': ['paused', 'finished', 'codex', 'active', 'drift'],
   'webapp-trigger': [],
   'step-progress-loader': ['paused', 'codex', 'active'],
   'trust5-validator': ['finished', 'active'],
@@ -173,7 +204,7 @@ const EXPECTED = {
   'auto-approve': ['active'],
   'mx-tag-validator': ['active'],
   'lsp-autofix': ['active'],
-  'step-progress-writer': ['paused', 'active'],
+  'step-progress-writer': ['paused', 'active', 'drift'],
   'spec-generator': ['active'],
   'step-auto-continue': ['active']
 };
@@ -186,7 +217,8 @@ function phaseProject(t, phase) {
     invalid: { progress: run([], 1, { total_steps: 107 }), body: 'archived' },
     finished: { progress: run(range(1, 50), 50), body: 'archived' },
     codex: { progress: run(), body: 'archived', codex: '{}' },
-    active: { progress: run(), body: 'archived' }
+    active: { progress: run(), body: 'archived' },
+    drift: { progress: run([2], 3), body: 'archived' }
   }[phase];
   const root = project(t, `phase ${phase} [30]`, settings);
   assert.equal(readRun(root).phase, phase);
@@ -209,12 +241,12 @@ test('shouldRunHook: 12 hooks by run phase', t => {
   }
 });
 
-test('shouldRunHook: broken events start only the guards; unknown names use the active gate', t => {
+test('shouldRunHook: broken events start no hook; unknown names use the active gate', t => {
   const active = phaseProject(t, 'active');
   const absent = phaseProject(t, 'absent');
   for (const raw of ['{broken', '', 'null', '[]', '"text"', '42']) {
     for (const hook of HOOKS) {
-      assert.equal(shouldRunHook(hook, raw, { CLAUDE_PROJECT_DIR: active }, active), HOOK_GATES[hook] === 'always', `${hook} with ${JSON.stringify(raw)}`);
+      assert.equal(shouldRunHook(hook, raw, { CLAUDE_PROJECT_DIR: active }, active), false, `${hook} with ${JSON.stringify(raw)}`);
     }
   }
   assert.equal(shouldRunHook('future-hook', JSON.stringify({ cwd: active }), { CLAUDE_PROJECT_DIR: '' }, active), true);

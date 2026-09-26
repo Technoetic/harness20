@@ -70,10 +70,17 @@ async function fakeAsideDirectory() {
   return directory;
 }
 
+// options.timeout overrides the 60 s default. timedOut reports a child killed at that limit, which
+// the exit code alone would show only as -1.
 function run(file, args, options) {
   return new Promise((resolve) => {
     execFile(file, args, { windowsHide: true, timeout: 60000, ...options }, (error, stdout, stderr) => {
-      resolve({ code: error ? (typeof error.code === "number" ? error.code : -1) : 0, stdout: String(stdout ?? ""), stderr: String(stderr ?? "") });
+      resolve({
+        code: error ? (typeof error.code === "number" ? error.code : -1) : 0,
+        stdout: String(stdout ?? ""),
+        stderr: String(stderr ?? ""),
+        timedOut: Boolean(error?.killed)
+      });
     });
   });
 }
@@ -392,22 +399,26 @@ async function hookFixture(lock) {
   return { plugin, project, elsewhere };
 }
 
-async function runHook(fixture, tool) {
+// A cold powershell.exe on a fresh CI runner can take more than 60 s to start, so the Windows
+// variant gets 180 s. POSIX bash keeps the 60 s default. By default the hook runs from elsewhere
+// with CLAUDE_PROJECT_DIR naming the project; cwd and projectDir override that.
+async function runHook(fixture, tool, { cwd = fixture.elsewhere, projectDir = fixture.project } = {}) {
   const nodeDirectory = dirname(process.execPath);
   if (process.platform === "win32") {
     const system32 = join(process.env.SystemRoot ?? "C:\\Windows", "System32");
     return run(join(system32, "WindowsPowerShell", "v1.0", "powershell.exe"),
       ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", join(fixture.plugin, "hooks", "validate-tools.ps1"), "-Tool", tool],
-      { cwd: fixture.elsewhere, env: { ...envWithPath(nodeDirectory, system32), CLAUDE_PROJECT_DIR: fixture.project } });
+      { cwd, timeout: 180000, env: { ...envWithPath(nodeDirectory, system32), CLAUDE_PROJECT_DIR: projectDir } });
   }
   return run("bash", [join(fixture.plugin, "hooks", "validate-tools.sh"), tool],
-    { cwd: fixture.elsewhere, env: { ...envWithPath(nodeDirectory, "/usr/bin", "/bin"), CLAUDE_PROJECT_DIR: fixture.project } });
+    { cwd, env: { ...envWithPath(nodeDirectory, "/usr/bin", "/bin"), CLAUDE_PROJECT_DIR: projectDir } });
 }
 
 const lines = (output) => output.replace(/\r\n/g, "\n").trim().split("\n").map((line) => line.trimEnd());
 
 test("validate-tools playwright hints follow the Step 3 lock", async (t) => {
   const baseline = await runHook(await hookFixture(null), "playwright");
+  assert.equal(baseline.timedOut, false, "validate-tools did not finish within the spawn limit");
   if (baseline.code === 0) {
     t.skip("playwright resolves in this environment; the missing-tool hints cannot be exercised");
     return;
@@ -417,21 +428,25 @@ test("validate-tools playwright hints follow the Step 3 lock", async (t) => {
   assert.deepEqual(lines(baseline.stdout), [HOOK_LINES.playwrightDefault]);
 
   const lockedAside = await runHook(await hookFixture(validLock("aside")), "playwright");
+  assert.equal(lockedAside.timedOut, false, "validate-tools did not finish within the spawn limit");
   assert.equal(lockedAside.code, 1, lockedAside.stderr);
   assert.equal(lockedAside.stderr, "");
   assert.deepEqual(lines(lockedAside.stdout), [HOOK_LINES.playwrightLockedAside]);
 
   const lockedPlaywright = await runHook(await hookFixture(validLock("playwright")), "playwright");
+  assert.equal(lockedPlaywright.timedOut, false, "validate-tools did not finish within the spawn limit");
   assert.equal(lockedPlaywright.code, 1, lockedPlaywright.stderr);
   assert.equal(lockedPlaywright.stderr, "");
   assert.deepEqual(lines(lockedPlaywright.stdout), [HOOK_LINES.playwrightLockedPlaywright]);
 
   const invalid = await runHook(await hookFixture({ ...validLock("aside"), schema_version: 2 }), "playwright");
+  assert.equal(invalid.timedOut, false, "validate-tools did not finish within the spawn limit");
   assert.deepEqual(lines(invalid.stdout), [HOOK_LINES.playwrightDefault]);
 });
 
 test("validate-tools aside hints follow the Step 3 lock", async (t) => {
   const baseline = await runHook(await hookFixture(null), "aside");
+  assert.equal(baseline.timedOut, false, "validate-tools did not finish within the spawn limit");
   if (baseline.code === 0) {
     t.skip("aside resolves in this environment; the missing-tool hints cannot be exercised");
     return;
@@ -440,12 +455,33 @@ test("validate-tools aside hints follow the Step 3 lock", async (t) => {
   assert.doesNotMatch(baseline.stdout, /locked/);
 
   const lockedPlaywright = await runHook(await hookFixture(validLock("playwright")), "aside");
+  assert.equal(lockedPlaywright.timedOut, false, "validate-tools did not finish within the spawn limit");
   assert.equal(lockedPlaywright.code, baseline.code);
   assert.equal(lines(lockedPlaywright.stdout).at(-1), HOOK_LINES.asideLockedPlaywright);
 
   const lockedAside = await runHook(await hookFixture(validLock("aside")), "aside");
+  assert.equal(lockedAside.timedOut, false, "validate-tools did not finish within the spawn limit");
   assert.equal(lockedAside.code, baseline.code);
   assert.equal(lines(lockedAside.stdout).at(-1), HOOK_LINES.asideLockedAside);
+});
+
+// Without CLAUDE_PROJECT_DIR the hook works in the folder it was started in. Windows PowerShell 5.1
+// started with -File in a folder whose name has [ ] moves its location to $PSHOME, so the .ps1 used
+// to create step_archive there (access denied on stderr) and missed the project's lock.
+test("validate-tools falls back to the process directory, brackets included", async (t) => {
+  const fixture = await hookFixture(validLock("aside"));
+  const result = await runHook(fixture, "playwright", { cwd: fixture.project, projectDir: "" });
+  assert.equal(result.timedOut, false, "validate-tools did not finish within the spawn limit");
+  if (result.code === 0) {
+    t.skip("playwright resolves in this environment; the missing-tool hints cannot be exercised");
+    return;
+  }
+  assert.equal(result.code, 1, result.stderr);
+  assert.equal(result.stderr, "");
+  // The project's aside lock is read; the old .ps1 found no lock there and printed the install hint.
+  assert.deepEqual(lines(result.stdout), [HOOK_LINES.playwrightLockedAside]);
+  // Only the PowerShell variant keeps a research-scripts folder, and it lands in the project.
+  if (process.platform === "win32") assert.ok(existsSync(join(fixture.project, "step_archive", "research-scripts")));
 });
 
 test("the browser backend guide quotes the lock path and messages verbatim", async () => {

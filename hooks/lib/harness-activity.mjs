@@ -11,12 +11,16 @@
 //   - completed_steps holds distinct integers 1..STEP_COUNT;
 //   - current_step equals the first unfinished step;
 //   - that step's body exists (step_archive/archived/stepNNN.md, else step_archive/stepNNN.md).
+// When everything holds except the cursor (current_step is another integer 1..STEP_COUNT+1, as
+// after a hand edit of progress.json) the run reads as 'drift': the progress writer is the only
+// step hook that starts, and it puts current_step back on the first unfinished step. The other
+// step hooks stay off until then; the two guards keep running.
 // A progress.json created by an older SessionStart loader has no step bodies next to it, so it
 // reads as stale and never turns hooks on.
 // A named pause (scripts/harness-pause.mjs, harness-rules 2-1) is judged on the same rules with
-// the pause flag removed: 'paused' only when that run would be active, else finished, stale,
-// stopped or invalid. Only the loader, the prompt guard and the progress writer start for a paused
-// run.
+// the pause flag removed: 'paused' only when that run would be active or drift, else finished,
+// stale, stopped or invalid. Only the two guards, the loader, the prompt guard and the progress
+// writer start for a paused run.
 //
 // It never writes and never imports codex/: installed copies and hook fixtures may ship hooks/
 // without it. The CLI prints one ASCII line and always exits 0.
@@ -29,15 +33,20 @@ export const ACTIVE_STATUSES = Object.freeze(['active', 'running', 'in_progress'
 export const MAX_PROGRESS_BYTES = 1024 * 1024;
 // First line only: '^' without the m flag anchors at the start of the prompt. Case-sensitive.
 export const EXPLICIT_WEBAPP = /^[ \t]*\/(?:harness50:)?webapp[ \t]+\S/;
-// Which run phases start each registered hook. 'always' runs everywhere the plugin is installed;
-// 'explicit-webapp' runs only for a '/webapp <topic>' prompt. In a paused run the loader and the
-// prompt guard start, to say where the run stopped, and the writer starts to record the completion
-// lines the model reported in the turn it paused (harness-rules 2-1 lets it finish steps first). The
-// writer never tells the model to continue, so the pause keeps its meaning. Stop continuation,
-// approval, quality, SPEC, MX and LSP stay off until /harness-resume.
+// Which run phases start each registered hook. The two guards run only where a Harness50 run is
+// established (active, paused, drift or finished Claude run, or a Codex workspace, where a Claude
+// session has no other plugin guard); elsewhere the host permission checks apply, and Bash is never
+// auto-approved. 'explicit-webapp' runs only for a '/webapp <topic>' prompt. In a paused run the
+// loader and the prompt guard start, to say where the run stopped, and the writer starts to record
+// the completion lines the model reported in the turn it paused (harness-rules 2-1 lets it finish
+// steps first). The writer never tells the model to continue, so the pause keeps its meaning. Stop
+// continuation, approval, quality, SPEC, MX and LSP stay off until /harness-resume.
+// In a drift run the writer is the only step hook that starts, to put the cursor back; the
+// guards stay on, so moving current_step by hand never turns them off.
+export const GUARD_PHASES = Object.freeze(['active', 'paused', 'finished', 'codex', 'drift']);
 export const HOOK_GATES = Object.freeze({
-  'destructive-guard': 'always',
-  'permission-request-guard': 'always',
+  'destructive-guard': GUARD_PHASES,
+  'permission-request-guard': GUARD_PHASES,
   'webapp-trigger': 'explicit-webapp',
   'step-progress-loader': Object.freeze(['active', 'codex', 'paused']),
   'trust5-validator': Object.freeze(['active', 'finished']),
@@ -45,7 +54,7 @@ export const HOOK_GATES = Object.freeze({
   'auto-approve': Object.freeze(['active']),
   'mx-tag-validator': Object.freeze(['active']),
   'lsp-autofix': Object.freeze(['active']),
-  'step-progress-writer': Object.freeze(['active', 'paused']),
+  'step-progress-writer': Object.freeze(['active', 'paused', 'drift']),
   'spec-generator': Object.freeze(['active']),
   'step-auto-continue': Object.freeze(['active'])
 });
@@ -100,7 +109,13 @@ export function classifyProgress(state) {
   if (next === null) {
     return [STEP_COUNT, STEP_COUNT + 1].includes(state.current_step) ? { phase: 'finished', completed: STEP_COUNT } : { phase: 'invalid' };
   }
-  return state.current_step === next ? { phase: 'running', next, completed: done.length } : { phase: 'invalid' };
+  if (state.current_step === next) return { phase: 'running', next, completed: done.length };
+  // Only the cursor disagrees (a hand edit of progress.json): 'drift'. The progress writer puts
+  // current_step back on the first unfinished step. A cursor that is no step number at all stays
+  // invalid.
+  const cursor = state.current_step;
+  return Number.isInteger(cursor) && cursor >= 1 && cursor <= STEP_COUNT + 1
+    ? { phase: 'drift', next, completed: done.length } : { phase: 'invalid' };
 }
 
 const stepName = step => `step${String(step).padStart(3, '0')}.md`;
@@ -133,9 +148,11 @@ export function readRun(root) {
   try { state = readProgress(physical(root), entry.file); } catch { return { phase: 'invalid' }; }
   const run = classifyProgress(state);
   if (run.phase === 'paused') return pausedRun(root, state);
-  if (run.phase !== 'running') return run;
+  if (run.phase !== 'running' && run.phase !== 'drift') return run;
+  // Without the body of the first unfinished step a drift run is as stale as a running one.
   const body = stepBody(root, run.next);
-  return body ? { ...run, phase: 'active', stepBody: body } : { ...run, phase: 'stale' };
+  if (!body) return { ...run, phase: 'stale' };
+  return run.phase === 'drift' ? run : { ...run, phase: 'active', stepBody: body };
 }
 function stepBody(root, step) {
   const name = stepName(step);
@@ -144,13 +161,14 @@ function stepBody(root, step) {
   return null;
 }
 // classifyProgress reports 'paused' before any structural check, so judge the same state without
-// the pause: a run that would be active stays 'paused'; anything else keeps that other phase.
+// the pause: a run that would be active or drift stays 'paused'; anything else keeps that other
+// phase. The writer, which starts for a paused run, also puts a drifted cursor back.
 function pausedRun(root, state) {
   const unpaused = { ...state };
   delete unpaused.paused;
   if (unpaused.status === 'paused') delete unpaused.status;
   const run = classifyProgress(unpaused);
-  if (run.phase !== 'running') return run;
+  if (run.phase !== 'running' && run.phase !== 'drift') return run;
   return stepBody(root, run.next) ? { phase: 'paused', next: run.next, completed: run.completed } : { ...run, phase: 'stale' };
 }
 export const isActive = root => readRun(root).phase === 'active';
@@ -159,7 +177,6 @@ export const isActive = root => readRun(root).phase === 'active';
 export function shouldRunHook(name, raw, env = process.env, cwd = process.cwd()) {
   try {
     const gate = Object.hasOwn(HOOK_GATES, name) ? HOOK_GATES[name] : DEFAULT_GATE;
-    if (gate === 'always') return true;
     const text = typeof raw === 'string' ? raw : Buffer.isBuffer(raw) ? raw.toString('utf8') : '';
     const event = JSON.parse(text.replace(/^﻿/, ''));
     if (!event || typeof event !== 'object' || Array.isArray(event)) return false;
