@@ -16,7 +16,6 @@
 [![Steps](https://img.shields.io/badge/Steps-50_files-10B981?style=for-the-badge)](assets/steps/)
 
 [![Security Tests](https://img.shields.io/badge/Security_Tests-reproducible_·_FAIL%3D0-22C55E?style=for-the-badge)](tests/security-regression.sh)
-[![Patterns](https://img.shields.io/badge/Safety_Patterns-200+-EF4444?style=for-the-badge)](hooks/destructive-guard.ps1)
 [![Dual Shell](https://img.shields.io/badge/Dual_Shell-PS1_+_SH-7C3AED?style=for-the-badge&logo=powershell&logoColor=white)](hooks/)
 [![Style](https://img.shields.io/badge/style-no_questions-FF1493?style=for-the-badge)](skills/harness-rules/SKILL.md)
 
@@ -124,7 +123,7 @@ The published repository includes both Claude Code and Codex adapters. 설치 �
 
 가져온 과거 완료 기록과 Codex에서 검증한 완료 기록은 별도로 표시됩니다.
 
-Claude Code hooks defer to an existing Codex workflow. While `step_archive/.harness50-codex/state.json` exists, they never create, rewrite or advance Claude `progress.json`, never block Stop, never auto-approve Claude edits and never re-initialize TOPIC; SessionStart reports the Codex step in one line instead.
+Claude Code hooks defer to an existing Codex workflow. While `step_archive/.harness50-codex/state.json` exists, they never create, rewrite or advance Claude `progress.json`, never block Stop, never auto-approve Claude edits and never re-initialize TOPIC; SessionStart reports the Codex step in one line instead. The two Claude guards still check Bash commands there, because a Claude session has no other Harness50 guard in a Codex workspace.
 Codex로 시작한 작업을 Claude Code에서 이어갈 때는 Codex 상태 관리자(`codex/scripts/harness-state.mjs`)와 `codex/skills/webapp/SKILL.md` 절차를 따릅니다. 대화 속 완료 보고는 단계를 진행시키지 않습니다. 상태 파일이 손상되었으면 경고만 표시하고, 복구나 리셋은 사용자가 결정합니다. Codex 리셋이 `state.json`을 백업으로 옮기면 Claude 훅은 기존 동작으로 돌아갑니다.
 
 ## Hook trust gate / 후크 신뢰 게이트
@@ -286,19 +285,19 @@ flowchart TB
 
 </div>
 
-활성 작업의 프로젝트 내부 파일 편집과 WebSearch만 제한적으로 자동 승인합니다. 셸 명령과 WebFetch는 호스트의 권한 정책을 따르며, 알려진 위험 명령과 민감 경로는 계속 차단합니다.
+활성 작업의 프로젝트 내부 파일 편집과 WebSearch만 제한적으로 자동 승인합니다. 셸 명령과 WebFetch는 호스트의 권한 정책을 따르며, 하네스 작업 공간(진행·멈춤·완료된 실행, 커서만 어긋난 실행, Codex 작업 공간)에서는 알려진 위험 명령과 민감 경로를 차단하고 sudo·패키지 설치 같은 명령은 확인을 받습니다.
 
 > [!IMPORTANT]
-> **auto-approve는 유효한 진행 상태에서만 발화합니다.** 완료 단계는 1~50 사이의 중복 없는 정수이고, 현재 단계는 첫 번째 빈 단계이며, `total_steps`는 50이고, 그 단계의 본문 파일(`step_archive/archived/stepNNN.md` 또는 `step_archive/stepNNN.md`)이 있어야 합니다. 파일이 없거나 JSON이 손상됐거나 일시정지·중지·완료 상태라면 정상 권한 흐름을 따릅니다. `.mcp.json`·`CLAUDE.md`·`.husky/`·`package.json`처럼 실행과 연결되는 파일은 진행 중에도 자동 승인에서 빠집니다. 경로는 `..`, 버전이 포함된 플러그인 캐시, 디렉터리 링크를 포함해 검사합니다.
+> **auto-approve는 유효한 진행 상태에서만 발화합니다.** 완료 단계는 1~50 사이의 중복 없는 정수이고, 현재 단계는 첫 번째 빈 단계이며, `total_steps`는 50이고, 그 단계의 본문 파일(`step_archive/archived/stepNNN.md` 또는 `step_archive/stepNNN.md`)이 있어야 합니다. 파일이 없거나 JSON이 손상됐거나 일시정지·중지·완료 상태라면 정상 권한 흐름을 따릅니다. `.mcp.json`·`CLAUDE.md`·`.husky/`·`package.json`처럼 실행과 연결되는 파일은 진행 중에도 자동 승인에서 빠집니다. 경로는 `..`, 버전이 포함된 플러그인 캐시, 디렉터리 링크를 포함해 검사합니다. 대소문자·8.3 짧은 이름(`GIT~1`)·NTFS 스트림(`::$INDEX_ALLOCATION`, `::$DATA`)·끝 점과 공백도 파일 시스템이 실제로 여는 경로로 풀어 검사합니다. `:`가 평범한 글자인 macOS·Linux에서도 `:` 뒤를 떼어 낸 경로를 함께 보므로 `:`가 든 경로는 권한 창으로 넘어갈 수 있고(거부는 없음), 프로젝트 경로 자체에 `:`가 있으면 자동 승인이 모두 꺼집니다. permission-request-guard의 보호 경로 거부는 입력한 경로로 판정하며, 별칭 철자는 호스트 권한 창에 맡깁니다.
 >
-> 아래 감사 기록은 이전 버전의 이력입니다. 현재 회귀 검사는 [`tests/security-regression.sh`](tests/security-regression.sh)와 [`codex/tests/claude-security.test.mjs`](codex/tests/claude-security.test.mjs)에서 위험 명령 차단, 일반 셸 명령의 권한 위임, 비활성 상태와 경로 우회를 확인합니다. 경로 검사는 파일시스템 샌드박스를 대신하지 않습니다.
+> 아래 감사 기록은 이전 버전의 이력입니다. 현재 회귀 검사는 [`tests/security-regression.sh`](tests/security-regression.sh)와 [`codex/tests/claude-security.test.mjs`](codex/tests/claude-security.test.mjs)에서 위험 명령 차단과 확인(ask), 일반 셸 명령의 권한 위임, 비활성 상태와 경로 우회를 확인합니다. 경로 검사는 파일시스템 샌드박스를 대신하지 않습니다.
 
 ```mermaid
 flowchart LR
     Tool["🔧 Bash / Write / Edit / WebFetch"]
 
     subgraph layer1["1️⃣ destructive-guard"]
-        DG["위험 패턴 블랙리스트<br/>exit 2<br/><i>regardless of allow</i>"]
+        DG["차단(block)·확인(ask) 규칙<br/>hooks/lib/command-guard.mjs"]
     end
 
     subgraph layer2["2️⃣ auto-approve"]
@@ -306,7 +305,7 @@ flowchart LR
     end
 
     subgraph layer3["3️⃣ permission-request-guard"]
-        PRG["updatedInput 재검증<br/>최후 deny+exit 2"]
+        PRG["차단 집합 재검증<br/>+ 보호 경로"]
     end
 
     Tool --> DG
@@ -314,7 +313,8 @@ flowchart LR
     AA -->|eligible scoped action| PRG
     PRG -->|safe| Pass(["✅ allow"])
     DG -.위험.-> Block1(["🚫 BLOCK"])
-    AA -.위험.-> Block2(["🚫 BLOCK"])
+    DG -.확인.-> Prompt(["🔐 권한 창"])
+    AA -.자격 없음.-> Prompt
     PRG -.변조.-> Block3(["🚫 BLOCK"])
 
     style DG fill:#EF4444,color:#fff
@@ -322,7 +322,7 @@ flowchart LR
     style PRG fill:#7C3AED,color:#fff
     style Pass fill:#22C55E,color:#fff
     style Block1 fill:#1a1a2e,color:#FF6B6B
-    style Block2 fill:#1a1a2e,color:#FF6B6B
+    style Prompt fill:#1a1a2e,color:#FBBF24
     style Block3 fill:#1a1a2e,color:#FF6B6B
 ```
 
@@ -418,7 +418,7 @@ graph TB
 ```
 harness50/
 ├── .claude-plugin/
-│   ├── plugin.json                    ← v1.0.0 · MIT
+│   ├── plugin.json                    ← 버전 원본 · MIT
 │   └── marketplace.json               ← /plugin marketplace add 진입점
 ├── tests/
 │   └── security-regression.sh         ← 안전 회귀 (재현 가능, PASS=N FAIL=0 출력)
@@ -440,15 +440,21 @@ harness50/
 │
 ├── hooks/                             ← 14쌍 = 28 파일 (.ps1 + .sh)
 │   ├── hooks.json                     ← 6개 이벤트 바인딩
+│   ├── run-hook.mjs                   ← 모든 훅의 진입점: 활성 게이트 + 감시 타이머
+│   ├── lib/
+│   │   ├── harness-activity.mjs       ← 진행 단계 판정 (훅별 게이트)
+│   │   ├── approval-policy.mjs        ← 자동 승인 자격 + 보호 경로
+│   │   ├── command-guard.mjs          ← Bash 명령 차단(block)·확인(ask) 규칙
+│   │   └── codex-workflow.mjs         ← Codex 작업 공간 진행 단계 한 줄
 │   ├── html-bundler.{ps1,sh}          ← src/ → 단일 dist/index.html 번들러
 │   ├── webapp-trigger.{ps1,sh}        ← 트리거 감지 + 부트스트랩 (번들러 프로젝트 복사 포함)
 │   ├── step-obedience-guard.{ps1,sh}  ← 매 prompt마다 다음 step 강제
 │   ├── step-progress-loader.{ps1,sh}  ← SessionStart 로드
 │   ├── step-progress-writer.{ps1,sh}  ← transcript 스캔 + 원자적 write
 │   ├── step-auto-continue.{ps1,sh}    ← Stop 시 block JSON 자동 재개  🔥
-│   ├── destructive-guard.{ps1,sh}     ← 125+ 위험 패턴 차단  🛡️
-│   ├── auto-approve.{ps1,sh}          ← 200+ 사전 검증 + 화이트리스트  🛡️
-│   ├── permission-request-guard.{ps1,sh}  ← updatedInput 변조 방어  🛡️
+│   ├── destructive-guard.{ps1,sh}     ← 차단(block)·확인(ask) 중계 (lib/command-guard.mjs)  🛡️
+│   ├── auto-approve.{ps1,sh}          ← 활성 실행의 편집·WebSearch만 승인 (lib/approval-policy.mjs)  🛡️
+│   ├── permission-request-guard.{ps1,sh}  ← 차단 집합 재검증 + 보호 경로  🛡️
 │   ├── mx-tag-validator.{ps1,sh}      ← @MX 4종 태그 검증
 │   ├── lsp-autofix.{ps1,sh}           ← Biome / Stylelint 자동수정
 │   ├── spec-generator.{ps1,sh}        ← SPEC-NNN.md 자동 생성
@@ -550,23 +556,60 @@ Claude가 다음 2단계를 차례로 안내합니다 (사용자가 직접 입�
 
 ### 방법 3 — 로컬 경로 (개발 / 커스터마이즈)
 
-레포를 clone한 뒤 `~/.claude/settings.json` 또는 프로젝트 `.claude/settings.local.json`에 경로 등록:
+레포를 clone한 뒤 그 루트를 로컬 마켓플레이스로 등록하고 설치합니다:
 
-```jsonc
-{
-  "plugins": {
-    "harness50": {
-      "path": "/absolute/path/to/harness50"
-    }
-  }
-}
+```text
+/plugin marketplace add /absolute/path/to/harness50
+/plugin install harness50@harness50
 ```
 
-또는 CLI 진입 시 플래그로 1회 로드:
+설치하지 않고 한 세션에서만 불러오려면 CLI 진입 시 플래그를 씁니다:
 
 ```bash
-claude --plugin-dir ./path/to/harness50
+claude --plugin-dir /absolute/path/to/harness50
 ```
+
+### 설치 범위 — 어디서 켤지 먼저 정한다
+
+설치 범위는 플러그인이 켜지는 폴더를 정합니다. 마켓플레이스를 등록한 뒤(방법 1~3) 범위를 골라 설치합니다.
+
+| 범위 | 기록 위치 | 켜지는 곳 | 권장 |
+|---|---|---|---|
+| user(기본) | `~/.claude/settings.json` | 이 계정으로 여는 어느 폴더에서나 | 튜토리얼 전용 계정 |
+| project | 프로젝트의 `.claude/settings.json`(커밋됨) | 그 프로젝트, 팀 전체 | 팀 저장소 |
+| local | 프로젝트의 `.claude/settings.local.json`(커밋 안 됨) | 그 프로젝트, 나만 | 개인 사용 |
+
+프로젝트 폴더에서 실행합니다:
+
+```bash
+claude plugin install harness50@harness50 --scope local
+```
+
+> [!WARNING]
+> 진행 기록이 없는 폴더에서는 두 가드를 포함한 모든 훅이 셸을 띄우지 않지만(`/webapp <주제>` 프롬프트의 부트스트랩만 예외), 훅 호출마다 node 판정이 한 번 실행됩니다. 튜토리얼 폴더에서만 쓰려면 local을 권장합니다. 가드가 켜지는 작업 공간과 남은 한계는 [안전 모델 한계](#-안전-모델-한계-정직성)를 참고하세요.
+
+### 끄기·제거
+
+- 한 프로젝트에서만 끄기: `claude plugin disable harness50@harness50 --scope project`(개인 설정이면 `--scope local`). 같은 효과의 설정은 다음과 같습니다.
+
+  ```json
+  { "enabledPlugins": { "harness50@harness50": false } }
+  ```
+
+- 다시 켜기: `claude plugin enable harness50@harness50 --scope project`
+- 완전 제거: `claude plugin uninstall harness50@harness50 --scope <설치한 범위>` 다음 `claude plugin marketplace remove harness50`
+- 세션 안에서는 `/plugin`으로 같은 작업을 합니다. 변경은 Claude Code를 다시 시작한 뒤 적용됩니다.
+- 제거해도 프로젝트의 `step_archive/`는 남습니다. 2.9.0 이하를 Windows에서 user 범위로 쓴 적이 있으면 무관한 폴더(홈 포함)에 그 버전의 로더가 만든 `step_archive/progress.json`이 남아 있을 수 있습니다. 2.10.0부터는 단계 본문이 없는 이 파일을 실행으로 보지 않으며, 지워도 됩니다.
+- `/harness-pause`는 실행 하나의 자동 진행만 멈추고 훅은 그대로 둡니다(두 가드는 멈춘 실행에서도 동작). 훅 전체를 멈추려면 플러그인을 끕니다.
+
+### 요구 사항
+
+| 항목 | 필요한 곳 | 없을 때 |
+|---|---|---|
+| Node.js 22 이상(`node`가 PATH에) | 모든 OS. 모든 훅이 `node hooks/run-hook.mjs`로 시작하고 가드 판정도 node가 합니다(CI는 22·24로 검증) | 두 가드를 포함한 모든 훅이 시작되지 않습니다 |
+| Windows PowerShell 5.1(`powershell.exe`) | Windows | .ps1 훅을 실행할 수 없습니다 |
+| bash + python3 | macOS·Linux의 단계 훅(로더·진행 기록·이어가기·프롬프트 가드·SPEC·@MX·LSP·번들러·/webapp 부트스트랩) | 그 훅들이 조용히 통과합니다(번들러는 `python3 필요`로 실패). destructive-guard·permission-request-guard·auto-approve는 python3 없이 bash와 node만 씁니다 |
+| Git Bash | 필요 없음 | Windows는 .ps1 훅만 실행합니다 |
 
 ### 프로젝트 의존성 (1회)
 
@@ -703,23 +746,23 @@ PASS/FAIL/INCOMPLETE 판정이며 점수는 없다. PASS가 아니면 한 번 �
 |:---|:---|:---|
 | **UserPromptSubmit** | webapp-trigger → step-obedience-guard | `/webapp <주제>`일 때만 부트스트랩(완료 기록이 있는 progress는 건너뜀). 활성 실행에서는 다음 step 알림, 멈춘 실행에서는 멈춘 위치 1줄(`/webapp <주제>`에는 webapp-trigger만 답함) |
 | **SessionStart** | step-progress-loader | 진행 중인 실행에서만 progress.json 로드 + 다음 step 지시 주입(새로 만들지 않음). 멈춘 실행에서는 멈춘 위치만 알림 |
-| **PreToolUse** | destructive-guard + auto-approve | 위험 차단(Bash) + 편집·WebSearch 자동 승인 (병렬, exit 2 우선) |
-| **PermissionRequest** | permission-request-guard | `updatedInput` 변조 방어용 최후 검증 (deny+exit 2) |
+| **PreToolUse** | destructive-guard + auto-approve | 위험 명령 차단·확인(Bash) + 편집·WebSearch 자동 승인 (병렬, exit 2 우선) |
+| **PermissionRequest** | permission-request-guard | `updatedInput` 변조 방어용 최후 검증: Bash 차단 집합·보호 경로·위험 URL (deny+exit 2) |
 | **PostToolUse** | mx-tag-validator + lsp-autofix | @MX 태그 검증 + Biome/Stylelint 자동수정 |
 | **Stop** | step-progress-writer → spec-generator → trust5-validator → step-auto-continue | progress 갱신 → SPEC 생성 → r1/r2/r3 평가 → 미완료면 block JSON |
 
-`step_archive/.harness50-codex/state.json`이 있는 Codex 작업 공간에서는 step 훅(loader·writer·auto-continue·obedience-guard·webapp-trigger·spec-generator·trust5-validator)이 progress.json과 TOPIC.md를 만들거나 바꾸지 않고 Stop도 막지 않으며, Claude 편집을 자동 승인하지도 않습니다. SessionStart는 `hooks/lib/codex-workflow.mjs`가 읽은 Codex 진행 단계를 한 줄로만 알립니다([마이그레이션과 리셋](#migration-and-reset--마이그레이션과-리셋)).
+`step_archive/.harness50-codex/state.json`이 있는 Codex 작업 공간에서는 step 훅(loader·writer·auto-continue·obedience-guard·webapp-trigger·spec-generator·trust5-validator)이 progress.json과 TOPIC.md를 만들거나 바꾸지 않고 Stop도 막지 않으며, Claude 편집을 자동 승인하지도 않습니다. SessionStart는 `hooks/lib/codex-workflow.mjs`가 읽은 Codex 진행 단계를 한 줄로만 알립니다([마이그레이션과 리셋](#migration-and-reset--마이그레이션과-리셋)). 두 가드는 Codex 작업 공간에서도 Bash 명령을 검사합니다(그 공간의 Claude 세션에는 다른 Harness50 가드가 없음).
 
-**활성 조건.** Claude Code 훅은 `hooks/lib/harness-activity.mjs` 한 곳의 판정을 따릅니다. 다음을 모두 만족할 때만 진행 중인 실행입니다: `step_archive/.harness50-codex/state.json` 항목이 없음, `step_archive/progress.json`이 프로젝트 안의 1MB 이하 일반 파일, `paused`가 없거나 false, `status`가 없거나 active·running·in_progress, `total_steps`가 50, 완료 단계가 1~50의 중복 없는 정수, 현재 단계가 첫 번째 빈 단계, 그 단계의 본문 파일이 있음. `hooks/run-hook.mjs`가 셸을 띄우기 전에 이 판정을 한 번 하므로, 무관한 폴더에서는 훅이 파일을 만들거나 승인·block·지시 주입을 하지 않습니다.
+**활성 조건.** Claude Code 훅은 `hooks/lib/harness-activity.mjs` 한 곳의 판정을 따릅니다. 다음을 모두 만족할 때만 진행 중인 실행입니다: `step_archive/.harness50-codex/state.json` 항목이 없음, `step_archive/progress.json`이 프로젝트 안의 1MB 이하 일반 파일, `paused`가 없거나 false, `status`가 없거나 active·running·in_progress, `total_steps`가 50, 완료 단계가 1~50의 중복 없는 정수, 현재 단계가 첫 번째 빈 단계, 그 단계의 본문 파일이 있음. `hooks/run-hook.mjs`가 셸을 띄우기 전에 이 판정을 한 번 하므로, 무관한 폴더에서는 훅이 파일을 만들거나 승인·block·지시 주입을 하지 않습니다. 현재 단계만 첫 빈 단계와 어긋난 실행(drift: `current_step`이 1~51의 다른 정수이고 첫 빈 단계의 본문 파일이 있음)은 진행 기록 훅만 돌아 현재 단계를 첫 빈 단계로 되돌리고, 그 뒤부터 다른 훅이 다시 켜집니다. `current_step`은 완료 기록에서 정해지는 값이므로, 커서를 앞으로 옮겨도 단계를 건너뛸 수 없습니다. 어긋남을 발견한 Stop 한 번은 이어가기를 지시하지 않습니다.
 
-- destructive-guard와 permission-request-guard는 설치 범위 전체(모든 폴더)에서 실행됩니다.
+- destructive-guard와 permission-request-guard는 하네스 작업 공간(진행 중·멈춘·50단계를 마친 실행, 커서만 어긋난 실행, Codex 작업 공간)에서만 실행됩니다. 진행 기록이 없거나, 옛 로더가 남긴 본문 없는 기록이거나, 중지되었거나 손상된 기록인 폴더에서는 셸을 띄우지 않고 호스트의 정상 권한 확인을 따릅니다(Bash는 원래 자동 승인되지 않음). 판정은 `hooks/lib/command-guard.mjs` 하나가 두 OS에 똑같이 내립니다: 차단(승인 불가, PermissionRequest도 Bash는 같은 집합만 거부)과 확인(승인 가능: sudo·패키지 설치·git hooksPath 설정 등).
 - webapp-trigger는 첫 줄이 `/webapp <주제>`(또는 `/harness50:webapp <주제>`)일 때만 실행됩니다.
 - step-progress-loader는 진행 중인 실행, 멈춘 실행(멈춘 위치 한 줄), Codex 작업 공간(한 줄 안내)에서 실행됩니다.
 - step-obedience-guard는 진행 중인 실행과 멈춘 실행(멈춘 위치 한 줄)에서 실행됩니다.
-- step-progress-writer는 진행 중인 실행과 멈춘 실행에서 실행됩니다. 멈춘 실행에서는 멈춘 턴에 보고된 완료 줄만 기록하고, 기록할 줄이 없으면 아무것도 쓰지 않습니다.
+- step-progress-writer는 진행 중인 실행, 멈춘 실행, 커서만 어긋난 실행에서 실행됩니다. 멈춘 실행에서는 멈춘 턴에 보고된 완료 줄만 기록하고, 기록할 줄이 없고 커서도 맞으면 아무것도 쓰지 않습니다. 커서가 어긋난 실행에서는 새로 기록할 줄이 없어도 `current_step`을 첫 빈 단계로 되돌립니다(멈춘 실행의 멈춤 필드는 그대로 둠).
 - trust5-validator는 진행 중일 때와 50단계를 모두 마친 뒤에 실행됩니다.
 - 나머지 훅(auto-approve·mx-tag-validator·lsp-autofix·spec-generator·step-auto-continue)은 진행 중인 실행에서만 실행됩니다.
-- 진행 중에도 실행과 연결되는 파일은 자동 승인에서 빠집니다. 예: `.mcp.json`, `CLAUDE.md`, `AGENTS.md`, `.husky/`, `.github/workflows/`, `package.json`, lockfile, `harness50.quality.json`, `node_modules/`, `step_archive/tools/`, `step_archive/archived/`(단계 본문). 하위 폴더의 `step_archive/progress.json`과 `step_archive/.harness50-codex/`도 자동 승인되지 않습니다.
+- 진행 중에도 실행과 연결되는 파일은 자동 승인에서 빠집니다. 예: `.mcp.json`, `CLAUDE.md`, `AGENTS.md`, `.husky/`, `.github/workflows/`, `package.json`, lockfile, `harness50.quality.json`, `node_modules/`, `step_archive/tools/`, `step_archive/archived/`와 평면 `step_archive/stepNNN.md`(단계 본문), 홈 폴더를 프로젝트로 연 경우를 막는 `.config/systemd/`·`.config/autostart/`·`.local/bin/`·`.bin/`·`pip.conf`(`pip.ini`). 하위 폴더에 있는 `step_archive/`의 `progress.json`·`.harness50-codex/`·`archived/`·`tools/`도 자동 승인되지 않습니다. `step_archive/TOPIC/TOPIC.md`는 1단계가 직접 쓰므로 자동 승인 대상입니다.
 - lsp-autofix는 프로젝트 `node_modules`에 biome·stylelint가 있을 때만 `npx --no-install`로 실행합니다.
 
 ---
@@ -741,9 +784,10 @@ PASS/FAIL/INCOMPLETE 판정이며 점수는 없다. PASS가 아니면 한 번 �
 | 4 | **블랙리스트 방식의 본질적 불완전성** | 셸 동치표현은 무한(변수·인터프리터·인코딩·2단계) — 알려진 우회만 차단 | `tests/security-regression`으로 회귀 고정. 근본 대응은 화이트리스트 역전(로드맵) |
 | 5 | **진행 추적이 transcript 정규식 스캔 의존** (H8) | 완료 문구 변형 시 미기록→재개, 예시 인용 시 오집계 위험 | 코드펜스·인용 가드로 오탐 완화. 상태전이가 LLM 산문에 걸리는 구조적 약점은 잔존 |
 | 6 | **step 본문이 참조하는 검증기 다수 미번들** (H5) | tokei/c8/biome/semgrep 등 `*-validator.ps1` 24종 부재 | 부재 시 해당 단계 fail-open(건너뜀). 목록·정책은 [`docs/RETIRED-VALIDATORS.md`](docs/RETIRED-VALIDATORS.md) |
-| 7 | 가드 2종은 활성 여부와 무관하게 설치 범위 전체에서 동작하고, 명령 문자열 전체(따옴표 안 메시지·heredoc 본문 포함)를 정규식으로 검사 | 커밋 메시지나 PR 본문의 위험 문구도 승인할 수 없게 차단 | Write로 파일에 쓴 뒤 `git commit -F <파일>`·`gh pr create --body-file <파일>`. 문맥을 인식하는 검사는 후속 |
+| 7 | 가드 2종은 하네스 작업 공간에서만 동작하고, 명령 문자열 전체(따옴표 안 메시지·heredoc 본문 포함)를 검사. 차단 규칙은 단어 위치와 무관, 확인 규칙은 실행 명령 자리에서만 | 커밋 메시지나 PR 본문의 차단 문구도 승인할 수 없게 차단. 따옴표 안이 명령으로 시작하면(`"pip install …"`) 확인도 뜸. `remove sudo usage`처럼 문장 중간의 단어는 확인 대상이 아님 | Write로 파일에 쓴 뒤 `git commit -F <파일>`·`gh pr create --body-file <파일>`. 문맥을 인식하는 검사는 후속 |
 | 8 | 훅은 hooks.json 제한 시간 전에 스스로 멈추고 결정을 내리지 않음(POSIX는 직계 자식만 종료) | 부하가 크면 자동 승인 대신 권한 창 | — |
-| 9 | 일부 가드 정규식이 병적으로 긴 편집 내용에서 느림 | 예산을 넘기면 결정 없이 종료 | 선형 패턴·시간 제한은 후속 |
+| 9 | 가드 판정은 선형 시간이지만 입력 크기에 상한이 있음: 명령 256 KiB, 편집 내용 1 MiB | 명령이 상한을 넘으면 확인(ask), 편집 내용이 상한을 넘으면 자동 승인 보류(권한 창) | — |
+| 10 | 가드는 progress.json 상태에 따라 켜지며 보안 경계가 아님 | 모델이 진행 기록을 옮기거나 지우면 가드도 꺼짐. bypassPermissions에서 확인(ask)이 권한 창을 띄우는지는 호스트 동작을 따름 | 가드는 추가 방어. 호스트 권한 정책과 샌드박스를 대신하지 않음 |
 
 2.2부터 Bash와 WebFetch는 정상 권한 확인을 거칩니다. 위험 패턴 검사는 추가 방어이며,
 호스트 권한 정책이나 파일시스템 샌드박스를 대체하지 않습니다.
@@ -759,7 +803,7 @@ bash tests/security-regression.sh
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/security-regression.ps1
 ```
 
-두 스위트 모두 위험 명령 차단·정상 명령 승인·게이트 사례를 검사하고 `결과: PASS=N FAIL=0`을 출력한다. Windows에서는 `.sh` 훅이 OS 가드로 no-op되므로 `.ps1` 스위트가 검증 SoT다.
+두 스위트 모두 차단·확인·통과 명령, 자동 승인 경로(별칭 철자 포함), 게이트 사례를 검사하고 `결과: PASS=N FAIL=0`을 출력한다. Windows에서는 `.sh` 훅이 OS 가드로 no-op되므로 `.ps1` 스위트가 검증 SoT다.
 
 ---
 
