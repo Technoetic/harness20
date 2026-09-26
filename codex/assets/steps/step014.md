@@ -33,7 +33,7 @@ Biome CLI를 정확한 개발 의존성으로 준비하고, 기존 구성을 보
 프로젝트 루트에서 먼저 다음 명령을 실행한다.
 
 ```text
-npx biome --version
+npx --no-install @biomejs/biome --version
 ```
 
 사용할 수 없으면 프로젝트의 패키지 관리 방식을 우선한다. npm 프로젝트에서는

@@ -6,7 +6,8 @@
 // Why a separate RETIRED rule: codex/scripts/validate-steps.mjs STALE_STEP only catches a number
 // written after "step" (step104). It misses "49/69/104", "step049 / 069 / 104" and
 // '"step": 104', it only runs on the Codex step files, and its MODEL/TOOL rules do not apply to
-// Claude files. The step bodies themselves (assets/steps, codex/assets/steps) are out of scope.
+// Claude files. Step bodies are scanned by S1 for retired numbers; their failure contract lives in
+// claude-step-contract.test.mjs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -79,12 +80,18 @@ test('S0 the RETIRED rule matches retired step numbers and nothing else', () => 
   }
 });
 
-test('S1 no retired step number in the skills, commands, agents or non-comment hook and script lines', () => {
+test('S1 no retired step number in the skills, commands, agents, step bodies or non-comment hook and script lines', () => {
+  const claudeSteps = listFiles('assets/steps', /^step\d{3}\.md$/);
+  const codexSteps = listFiles('codex/assets/steps', /^step\d{3}\.md$/);
+  assert.equal(claudeSteps.length, 50, 'assets/steps body count');
+  assert.equal(codexSteps.length, 50, 'codex/assets/steps body count');
   const documents = [
     ...listFiles('skills', /^SKILL\.md$/, { recursive: true }),
     ...listFiles('commands', /\.md$/),
     ...listFiles('agents', /\.md$/),
-    ...listFiles('codex/skills', /^SKILL\.md$/, { recursive: true })
+    ...listFiles('codex/skills', /^SKILL\.md$/, { recursive: true }),
+    ...claudeSteps,
+    ...codexSteps
   ];
   const code = [
     ...listFiles('hooks', /\.(?:ps1|sh)$/),

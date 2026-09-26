@@ -69,12 +69,13 @@ Step 3이 `step_archive/outputs/browser-backend.json`에 고정한 브라우저 
 > 4. 필수 판정과 참고 점수를 분리한다:
 >    - 필수 검사·증거가 모두 통과하고 미해결 `Critical`/`Important` finding이 없을 때만 `PASS`다.
 >    - 필수 기준 위반은 `FAIL`이며, 필수 입력·증거·실행 기능 부재 또는 라운드 중단 조건 충족은 `INCOMPLETE`다.
->    - `Critical`/`Important` finding은 요구사항·기능·접근성·보안·선택된 디자인 토큰과 관찰 증거에 연결한다.
+>    - `Critical`/`Important` finding은 요구사항·기능·접근성·보안·선택된 디자인 토큰·제외 목록(30단계 `harness50-design-contract`, `docs/DESIGN-CONTRACT.md`)과 관찰 증거에 연결한다. 채택되지 않은 제외 항목 위반은 `Important`다. 계약 블록이 없는 이전 실행은 헌법 §11대로 계약을 복원하지 않고 §5의 수치만 기준으로 쓴다(`host` 제외 항목은 필수 기준이 아니다).
 >    - 근거 없는 미관·선호 의견은 `advisory`다. 필수 실패를 참고 의견으로 강등하지 않는다.
+>    - 필수 finding마다 위치(소스 `file:line`, 또는 route·viewport·selector·스크린샷 파일과 영역), 기준 출처, 기대/관찰, 재현(route·viewport·선행 조작)을 모두 쓴다. 기준을 인용할 수 없는 지적은 `advisory`다.
 >
 >    참고 루브릭:
 >    - 기능 완성도 (0-10): 요구사항 대비 구현 비율
->    - 디자인 충실도 (0-10): 원본 참조 대비 시각적 일치도
+>    - 디자인 충실도 (0-10): 원본 참조 대비 시각적 일치도. 설계 계약 제외 항목에 해당하는 참조 요소는 감점하지 않는다
 >    - 코드 품질 (0-10): 린팅/포매팅/타입 안전성
 >    - 성능 (0-10): 로드 시간, DOM 복잡도
 >
@@ -97,10 +98,10 @@ Step 3이 `step_archive/outputs/browser-backend.json`에 고정한 브라우저 
 > - 판정: PASS/FAIL/INCOMPLETE (필수 검사·증거와 중단 조건 기준)
 >
 > ### 필수 finding (있으면)
-> 1. 중요도 + 필수 기준: 구체적 설명 + 증거 경로 + 수정 방향 + 해결/미해결 + 재검증 결과
+> 1. `Critical`/`Important` | 위치: <file:line 또는 route·viewport·selector·스크린샷 영역> | 기준: <출처> | 기대/관찰: <기대값 → 관찰값> | 재현: <route·viewport·조작> | 증거 경로 | 수정 방향 | 해결/미해결 + 재검증 결과
 >
 > ### 참고 의견 (있으면)
-> 1. advisory: 미관·선호 제안
+> 1. advisory: 미관·선호 제안 (위치를 알면 함께 적는다. FAIL이나 추가 라운드의 사유가 아니다)
 >
 > ### 중단 시 인계
 > - 차단 원인 / 시도한 수정 / 남은 필수 finding / 다음 안전한 조치

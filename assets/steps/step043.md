@@ -24,6 +24,10 @@ Step 37에서 구현된 CSS가 Awwwards 조사 결과를 충실히 반영했는�
 검증자는 보충 원문·스크린샷도 직접 열어 확인한다. 기존 glob에 없는 보충 이미지를 누락하거나
 보충 전에 부족하다고 판정된 Step 23 결론만으로 비교 기준을 되돌리지 않는다.
 
+## 설계 제외 계약 우선
+
+비교 기준에는 `step_archive/step030_레이아웃설계_chunk1.md`의 `harness50-design-contract` 블록(플러그인 `docs/DESIGN-CONTRACT.md`)도 들어간다. `exclude`에서 `adopted: false`인 항목에 해당하는 Awwwards 요소는 구현에 없어도 부족한 부분이 아니다 (목록 우선). 검증자는 그 차이를 필수 finding이나 advisory로 넣지 않고 `제외 계약: <id>`로 따로 적는다. 수정자는 피드백에 있더라도 그 스타일을 들여오지 않는다.
+
 ## QA 완료 증거 (필수)
 
 신뢰한 설치 플러그인의 `docs/QA-REPORTS.md`와 `scripts/qa-report.mjs`를 사용한다.
@@ -58,6 +62,7 @@ Step 37에서 구현된 CSS가 Awwwards 조사 결과를 충실히 반영했는�
    - 채택한 모든 기존·보충 원문과 이미지의 정확한 경로를 해석하고 SHA-256을 대조한다.
    - 원문을 읽고 이미지는 직접 열어 확인한다. 기존 glob만으로 입력을 제한하지 않는다.
    - 최종 PASS 누락, 입력 누락·hash 불일치 또는 필수 이미지 미검사는 INCOMPLETE다.
+   - `step_archive/step030_레이아웃설계_chunk1.md`의 `harness50-design-contract` 블록도 Read한다. `exclude`에서 `adopted: false`인 항목에 해당하는 원본 요소는 부족한 부분으로 적지 않고 `제외 계약: <id>`로 따로 적는다 (목록 우선).
 
 2. 구현 스크린샷을 Read한다:
    - `step_archive/screenshots/compare-awwwards-applied-rN.png`
@@ -66,14 +71,24 @@ Step 37에서 구현된 CSS가 Awwwards 조사 결과를 충실히 반영했는�
    - `step_archive/outputs/step043_검증_r*.md` (Glob 검색)
    - 이전 라운드에서 FAIL로 지적한 항목이 수정되었는지 반드시 확인한다
 
-4. 원본과 구현을 비교하여 부족한 부분을 구체적으로 나열한다.
-   각 항목마다: 어떤 Awwwards 스크린샷의 어떤 요소가 구현에 빠졌는지 명시한다.
+4. 원본과 구현을 비교한다. 비교 기준은 step030 설계가 최종 manifest에서 채택한 조사 패턴이다.
+   설계가 채택했는데 구현에 빠졌거나 다르게 구현된 요소는 필수 finding이다.
+   참고 이미지에는 있지만 설계가 채택하지 않은 요소는 advisory다. 1번에서 `제외 계약: <id>`로 적은 요소는 advisory로도 적지 않는다.
+   기준 필드에는 채택 근거인 Awwwards 스크린샷 경로·영역과 step030 설계의 절을 함께 쓴다.
    이전 라운드에서 지적한 항목은: [수정됨] 또는 [미수정]으로 표시한다.
+   판정 규칙:
+   - 필수 finding(`Critical`/`Important`): 설계 명세·선택 토큰·필수 acceptance를 어긴 것, 또는 기능·접근성 결함(겹침·잘림·가림·조작 불가 포함)
+   - `advisory`: 어긴 기준을 인용할 수 없는 미관·선호 의견. advisory만 남으면 PASS이며 수정 대상이 아니다
+   - 필수 finding마다 네 필드를 모두 쓴다:
+     - 위치: 소스 `file:line`, 또는 route·viewport·selector·스크린샷 파일과 영역
+     - 기준: 어긴 명세·토큰·acceptance의 출처(파일과 절 또는 줄)
+     - 기대/관찰: 기대값과 관찰값(예: gap 24px 기대, 40px 관찰)
+     - 재현: 같은 화면을 다시 보는 route·viewport·선행 조작
 
 5. 결과를 `step_archive/outputs/step043_검증_rN.md`에 저장한다.
    - 실제 검사한 기존·보충 입력의 경로·SHA-256과 통합 조사 축별 관찰을 기록한다.
-   - 부족한 부분이 없으면: "PASS"로 시작
-   - 부족한 부분이 있으면: "FAIL"로 시작하고 구체적 피드백 나열
+   - 미해결 필수 finding이 없으면: "PASS"로 시작하고 advisory는 따로 적는다
+   - 하나라도 있으면: "FAIL"로 시작하고 필수 finding을 위 네 필드로 나열한다
 ```
 
 에이전트 B는 sonnet을 사용한다 (스크린샷 분석 필요).
@@ -105,6 +120,7 @@ Step 37에서 구현된 CSS가 Awwwards 조사 결과를 충실히 반영했는�
    - 채택한 모든 기존·보충 원문과 이미지의 정확한 경로를 해석하고 SHA-256을 대조한다.
    - 원문을 읽고 이미지는 직접 열어 확인한다. 기존 glob만으로 입력을 제한하지 않는다.
    - 최종 PASS 누락, 입력 누락·hash 불일치 또는 필수 이미지 미검사는 INCOMPLETE다.
+   - 같은 계약 블록을 Read한다. `exclude`에서 `adopted: false`인 항목의 스타일은 피드백에 있어도 들여오지 않는다.
 
 4. 피드백에 나열된 부족한 부분을 `src/css/*.css`, `src/js/Visualizer.js`에 반영한다.
 
@@ -124,12 +140,11 @@ Step 37에서 구현된 CSS가 Awwwards 조사 결과를 충실히 반영했는�
 모든 필수 항목의 현재 증거가 PASS일 때만 완료한다. 실패·누락·미검증 또는 한도 소진이면
 미해결 항목과 다음 검사를 기록하고 현재 Step을 INCOMPLETE로 인계한다.
 필수 실패를 스킵하거나 완료 보고 후 다음 Step으로 진행하지 않는다.
+한도 소진이나 같은 필수 항목의 연속 미수정으로 끝나면 `required-input-missing`, 필수 실행·시각 검사 기능이 없으면 `required-tool-failed`로 헌법 §2-1 명명된 멈춤을 기록하고 턴을 끝낸다.
 
 ## 실패 패턴 기록
 
-종료 시 (PASS 또는 INCOMPLETE) `step_archive/progress.json`의 `failure_patterns` 배열에 FAIL 항목을 추가한다.
-- PASS로 종료된 경우에도 도중 FAIL이 있었던 항목은 기록한다.
-- 형식: `{ "step": 43, "항목": "FAIL 항목 요약", "해결": true/false }`
+종료 시(PASS 또는 INCOMPLETE) 도중 FAIL 항목과 해결 여부를 이 Step 검증 보고서의 `## 실패 패턴` 절에 적는다. PASS로 끝나도 도중 FAIL은 남긴다. `step_archive/progress.json`은 수정하지 않는다(완료는 Stop 훅, 멈춤은 `harness-pause.mjs`만 기록한다).
 
 ## 파일 구조 규칙
 

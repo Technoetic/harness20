@@ -67,7 +67,7 @@ URL 형식과 구현 backend는 별개다. HTTP(S)에서 실제 사용 가능한
 | 필수 | Node.js | `node --version` |
 | 필수 | npm | `npm --version` |
 | 필수 | 브라우저 검증 백엔드 (docs/BROWSER-TOOLS.md: Aside CLI 또는 Playwright) | 검증 체크아웃에서 `node scripts/verify-output.mjs --probe` (selected가 null이 아니면 성공) |
-| 필수 | Biome | `npx biome --version` |
+| 필수 | Biome | `npx --no-install @biomejs/biome --version` |
 | 필수 | Stylelint | `npx stylelint --version` |
 | 조사 | Vitest/Jest | `package.json`과 lockfile 설치 현황 확인; 선택·검증은 6단계 |
 | 선택 | c8 | `npx c8 --version` |

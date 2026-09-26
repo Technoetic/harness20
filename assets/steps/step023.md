@@ -73,6 +73,14 @@ Step 22에서 수집된 스크린샷과 텍스트를 분석하여 디자인 패�
    - 무조건 중앙정렬 카드
    - 과도한 border-radius
    - 획일적 단색 배경
+   - 크림·오프화이트 페이지 바탕 (순백도 무채색 연회색도 아닌, 따뜻하거나 색조가 있는 거의 흰 바탕)
+   - 제목 속 이탤릭 강조어 (h1~h3 안 일부 단어만 `em`·`i`·`font-style: italic`)
+   - 01·02·03 장식 번호 섹션 라벨 (0으로 채운 두 자리 번호를 섹션 머리 장식으로 사용)
+   - 코드 밖 모노스페이스 라벨 (eyebrow·badge·nav·버튼·섹션 라벨의 monospace)
+   - 알약형 버튼 (radius가 높이의 절반 이상인 버튼·링크 버튼)
+   - `step_archive/TOPIC/TOPIC.md` `constraints`의 `디자인 제외(사용자)` 항목
+
+   반면교사 표시는 비교 자료다. 제외 여부는 30단계 설계 계약(`harness50-design-contract`)이 확정한다.
 2. **11가지 미학 축 매핑** — 수집 사례를 Brutalism / Glassmorphism / Minimalism(Swiss) / Dark OLED Luxury / Neumorphism / Cyberpunk 중 해당 축으로 분류. 각 축마다 물리적 CSS 제약(border 두께, shadow blur, grid 형태 등)을 구체 수치로 기록.
 3. **토큰 추출** — 사례에서 관찰된 간격·타이포·색상 값을 4pt/8pt 그리드와 60-30-10 규칙에 맞게 정규화하여 기록.
 4. **조립 가능성 평가** — 각 대안이 기존 디자인 시스템·Shadcn/ui 같은 컴포넌트 라이브러리로 조립 가능한지 여부.
@@ -91,7 +99,7 @@ step023_조사결과_chunk3.md (500줄 이하)
 **작성 규칙**:
 
 - 각 청크는 500줄 이하로 작성 (성능 최적화)
-- 저장 시 PostToolUse 훅(research-chunk-validator.ps1)이 각 청크 자동 검증 (BOM/CRLF/줄수/파일크기) — 일괄 재검증: `.claude/hooks/research-validator.ps1` 수동 실행
+- 저장 후 각 청크가 500줄 이하이고 UTF-8(BOM 없음)인지 직접 확인한다. 자동 검증 훅은 번들되지 않는다.
 - 청크 그대로 유지 (병합 안 함)
 
 합리적인 선에서 최대한 많은 서브에이전트를 병렬로 사용한다 (동시 실행 최대 10개).
@@ -110,7 +118,7 @@ step023_조사결과_chunk3.md (500줄 이하)
 
 ## 오류 발생 시
 
-오류 발생 시 원인을 분석하고 수정한 뒤 재시도한다. 3회 재시도 후에도 실패하면 오류를 기록하고 다음 Step으로 진행한다.
+오류 발생 시 원인을 분석하고 수정한 뒤 재시도한다. 3회 재시도 후에도 해결되지 않으면 오류·미해결 항목·다음 검사를 현재 Step 결과 파일에 기록하고 현재 Step을 INCOMPLETE로 인계한다. 완료 보고와 다음 Step 진입은 금지하고 헌법 §2-1 명명된 멈춤으로 끝낸다(필수 도구 실패 `required-tool-failed`, 권한 거부 `permission-denied`, 그 밖의 한도 소진 `required-input-missing`). 선택 도구를 쓸 수 없는 것은 미달이 아니다 — `SKIP`과 사유를 기록한다.
 
 
 ---

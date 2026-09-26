@@ -21,7 +21,7 @@ persistence: session
 
 ## 실행 내용
 
-**프로젝트 규모 파악**: `.claude/hooks/session-start.ps1`에서 자동 출력됨 (sessionStart 시)
+**프로젝트 규모 파악**: 추적 파일 수를 직접 센다(git 저장소면 `git ls-files`, 아니면 파일 목록 검색). 규모를 자동 출력하는 훅은 없다.
 
 Context 최적화 전략을 수립한다:
 
@@ -41,7 +41,7 @@ step002_context전략_chunk3.md (500줄 이하)
 **작성 규칙**:
 
 - 각 청크는 500줄 이하로 작성 (성능 최적화)
-- 저장 시 PostToolUse 훅(research-chunk-validator.ps1)이 각 청크 자동 검증 (BOM/CRLF/줄수/파일크기) — 일괄 재검증: `.claude/hooks/research-validator.ps1` 수동 실행
+- 저장 후 각 청크가 500줄 이하이고 UTF-8(BOM 없음)인지 직접 확인한다. 자동 검증 훅은 번들되지 않는다.
 - 청크 그대로 유지 (병합 안 함)
 
 ## 핵심 원칙 (이후 모든 단계 준수)
@@ -70,7 +70,7 @@ step002_context전략_chunk3.md (500줄 이하)
 
 ## 오류 발생 시
 
-오류 발생 시 원인을 분석하고 수정한 뒤 재시도한다. 3회 재시도 후에도 실패하면 오류를 기록하고 다음 Step으로 진행한다.
+오류 발생 시 원인을 분석하고 수정한 뒤 재시도한다. 3회 재시도 후에도 해결되지 않으면 오류·미해결 항목·다음 검사를 현재 Step 결과 파일에 기록하고 현재 Step을 INCOMPLETE로 인계한다. 완료 보고와 다음 Step 진입은 금지하고 헌법 §2-1 명명된 멈춤으로 끝낸다(필수 도구 실패 `required-tool-failed`, 권한 거부 `permission-denied`, 그 밖의 한도 소진 `required-input-missing`). 선택 도구를 쓸 수 없는 것은 미달이 아니다 — `SKIP`과 사유를 기록한다.
 
 
 ---

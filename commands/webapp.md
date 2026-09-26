@@ -58,7 +58,7 @@ Codex 단계부터 harness50 플러그인의 `codex/scripts/harness-state.mjs`(`
      - 단일 HTML 인터랙티브 웹 튜토리얼
      - 독립 화면마다 고유 URL 부여, 기본 hash 라우팅, 지원 HTTP(S)에서는 Navigation API 우선 및 호환 backend 제공, docs/ROUTING.md 계약 준수
      - 파일 직접 열기를 지원하려면 hash manifest 선택, history manifest는 HTTP(S) 필요, 실행 환경에 따른 mode 암묵 변환 금지
-     - AI Slop 방지 전역 제약 준수
+     - 디자인 제외(하네스 기본, 설계가 채택 사유를 기록하면 예외): 크림·오프화이트 페이지 바탕 / 제목 속 이탤릭 강조어 / 01·02·03 장식 번호 섹션 라벨 / 코드 밖 모노스페이스 라벨 / 알약형 버튼 / 맹목적 Inter·Roboto·Arial / 보라 계열 그라데이션 배경 / 무조건 중앙정렬 카드 / 과도한 border-radius / 획일적 단색 배경
      - 한국어 본문 + 기술 용어 영문 병기
    ```
 
@@ -101,7 +101,7 @@ Score는 순서 있는 2–10개 기준의 가중 평점이다. Noul에 제공�
 재확인하지 않는다. 단계 도달이나 키 존재, workflow 시작 자체는 전송 승인이 아니다.
 승인 또는 서비스가 없으면 이유를 단계 보고서에 남기고 기존 독립 검증을 수행한다.
 
-호출 책임자를 해당 step-executor로 정하고 승인 범위와 선택 근거를 인계한다.
+호출 책임자를 그 단계를 실행하는 주체 하나로 정하고(보통 step-executor, 시각 판정을 돌려받은 단계는 판정하는 호출자) 승인 범위와 선택 근거를 인계한다.
 워커가 반환한 보고서는 `inspect`하고 현재 `prepare`의 `request_hash`, `policy_hash`,
 `input_hash`, `sources`를 대조한다. 재사용할 판정이 없을 때만 같은 JSON으로
 `run --workspace ROOT --input - --allow-network`를 실행한다. 변하지 않은 입력에는

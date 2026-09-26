@@ -10,8 +10,8 @@ persistence: session
 > 모델 정책: **haiku** (조사·설치).
 > SPEC 자동 생성: step_archive/specs/SPEC-001.md (Stop hook).
 
-모든 도구 설치 검증, progress.json 초기화, .claude/ 경로 치환 맵을 확인한다.
-**또한 본 세션의 사용자 프롬프트에서 튜토리얼 주제를 추출하여 `step_archive/TOPIC/TOPIC.md`에 고정한다 (이후 모든 Step이 참조).**
+모든 도구 설치 검증, progress.json 상태 확인(읽기만), .claude/ 경로 치환 맵을 확인한다.
+**또한 `/webapp <주제>`가 `step_archive/TOPIC/TOPIC.md`의 `session_prompt`에 기록한 원문에서 튜토리얼 주제를 추출하여 같은 파일에 고정한다 (이후 모든 Step이 참조).**
 
 ## 실행 내용
 
@@ -19,7 +19,7 @@ persistence: session
 
 **이 Step의 가장 먼저 수행해야 할 작업이다.**
 
-본 세션 진입 시 사용자가 던진 프롬프트에서 다음 항목을 추출한다:
+`step_archive/TOPIC/TOPIC.md`의 `session_prompt` 블록에서 다음 항목을 추출한다:
 
 - **주제(topic)**: 한 줄. 예) "데이터 압축과 부호화", "이미지 처리 알고리즘", "정규식 기초".
 - **타깃 사용자(audience)**: "초보자 학습용" / "중급 개발자" 등.
@@ -35,7 +35,7 @@ persistence: session
   필요하며 실행 환경에 따라 mode를 암묵 변환하지 않는다. 정상 브라우저와 API 비가용
   환경 모두 검증한다.
 
-**`step_archive/TOPIC/TOPIC.md`** 파일을 다음 형식으로 작성한다 (이미 있으면 덮어쓴다):
+**`step_archive/TOPIC/TOPIC.md`** 파일을 다음 형식으로 작성한다 (`created`와 `session_prompt`는 바이트 그대로 두고 그 아래 필드만 채워 다시 쓴다):
 
 ```markdown
 ---
@@ -53,6 +53,8 @@ session_prompt: |
 - constraints:
   - <제약 1>
   - <제약 2>
+  - 디자인 제외(사용자): <사용자가 빼 달라고 한 시각 스타일 원문. 없으면 이 줄을 쓰지 않는다>
+  - 디자인 제외(하네스 기본, 설계가 채택 사유를 기록하면 예외): 크림·오프화이트 페이지 바탕 / 제목 속 이탤릭 강조어 / 01·02·03 장식 번호 섹션 라벨 / 코드 밖 모노스페이스 라벨 / 알약형 버튼 / 맹목적 Inter·Roboto·Arial / 보라 계열 그라데이션 배경 / 무조건 중앙정렬 카드 / 과도한 border-radius / 획일적 단색 배경
 
 ## 세부 의도
 
@@ -62,13 +64,15 @@ session_prompt: |
 
 - step016 (전체 조사): 주제를 기준으로 조사 키워드를 도출
 - step025 (기획): 주제·타깃·제약을 기획 입력으로 사용
-- step030 (통합 설계): 인터랙티브 요구와 디자인 제약 반영
+- step030 (통합 설계): 인터랙티브 요구와 디자인 제약 반영, 디자인 제외 줄을 설계 계약 exclude로 고정
 - step037 (구현): 단일 HTML/번들 구조 결정에 반영
 ```
 
-**사용자 프롬프트가 명확하지 않은 경우에도 질문하지 않는다.** `NEW-WORK-규칙.md` 1번 규칙에 따라 즉시 결정·기록한다. 모호한 항목은 "결정/사유" 줄에 1줄로 남긴다.
+**디자인 제외 줄:** `constraints`의 마지막 줄은 위 `디자인 제외(하네스 기본, …)` 줄을 글자 그대로 둔다. 사용자 프롬프트가 빼 달라고 한 시각 스타일이 있으면 그 앞 `디자인 제외(사용자):` 줄에 원문대로 옮긴다. 사용자가 기본 목록의 스타일을 직접 요구하면(예: 크림색 종이 느낌) 기본 줄은 그대로 두고 그 요구를 일반 제약 줄로 옮긴다. 30단계가 그 요구를 채택 사유로 기록한다. 아래 규칙으로 기존 TOPIC.md를 그대로 두는 경우에도 기본 줄이 없으면 추가한다.
 
-**`step_archive/TOPIC/TOPIC.md`가 이미 있고 본 세션 프롬프트와 모순되지 않으면** 그대로 둔다 (다른 세션에서 같은 주제로 재진입할 때 손실 방지).
+**사용자 프롬프트가 명확하지 않은 경우에도 질문하지 않는다.** 헌법 §1에 따라 즉시 결정·기록한다. 모호한 항목은 "결정/사유" 줄에 1줄로 남긴다.
+
+**`topic`~`constraints` 필드가 이미 채워져 있고 `session_prompt`와 모순되지 않으면** 그대로 둔다 (같은 주제로 재진입할 때 손실 방지).
 
 ### 1. 도구 설치 일괄 검증
 
@@ -79,7 +83,7 @@ session_prompt: |
 | Node.js | node --version | - | 필수 |
 | npm | npm --version | - | 필수 |
 | 브라우저 검증 백엔드 (docs/BROWSER-TOOLS.md: Aside CLI 또는 Playwright) | 플러그인 체크아웃에서 node scripts/verify-output.mjs --probe (selected != null, 종료 코드 0) | docs/BROWSER-TOOLS.md 절차대로 백엔드 준비 (Aside: 앱 실행 + aside --version / Playwright: browser-verifier/ 에서 npm ci 후 chromium 설치) | 필수 |
-| Biome | npx biome --version | npm i -D @biomejs/biome | 필수 |
+| Biome | npx --no-install @biomejs/biome --version | npm i -D @biomejs/biome | 필수 |
 | Stylelint | npx stylelint --version | npm i -D stylelint | 필수 |
 | Vitest/Jest | package.json·lockfile 설치 현황 조사 | 6단계 선택 후 설치 | 조사 |
 | c8 | npx c8 --version | npm i -D c8 | 선택 |
@@ -90,13 +94,12 @@ session_prompt: |
 
 ### 2. 실패 처리 정책
 
-- **필수 도구 실패**: 3회 재시도 후에도 실패하면 사용자 개입 요청 (치명적 오류)
-- **선택 도구 실패**: 경고 기록 후 계속 진행. 해당 도구가 필요한 Step에서 스킵 처리
+- **필수 도구 실패**: 서로 다른 조치로 3회 시도해도 실패하면 결과 파일에 기록하고 헌법 §2-1 `required-tool-failed` 명명된 멈춤으로 끝낸다. 다음 Step으로 가지 않는다.
+- **선택 도구 실패**: `SKIP`과 사유를 기록하고 계속 진행한다. 해당 도구가 필요한 Step은 `SKIP`과 대체 방법을 기록한다.
 
-### 3. progress.json 초기화 확인
+### 3. progress.json 상태 확인 (읽기 전용)
 
-step_archive/progress.json이 존재하면 로드하여 이전 진행 상태를 확인한다.
-존재하지 않으면 step-progress-loader.ps1이 SessionStart 훅에서 자동 생성한다.
+`/webapp <주제>`가 만든 step_archive/progress.json을 읽어 NEW/RESUMED를 확인한다. 이 파일은 직접 만들거나 고치지 않는다(완료는 Stop 훅, 멈춤은 `scripts/harness-pause.mjs`만 기록한다). 없으면 결과 파일에 `progress.json 없음 — /webapp 부트스트랩 미실행`을 적는다.
 
 ### 4. .claude/ 경로 치환 맵 확인
 
@@ -121,7 +124,7 @@ step_archive/progress.json이 존재하면 로드하여 이전 진행 상태를 
 
 - 이 Step의 목표가 100% 달성되었는가? (Y/N)
 - 불확실한 부분이 있는가? (있으면 구체적으로 명시)
-- N 또는 불확실한 부분이 있으면 재실행한다. 3회 재시도 후에도 미달이면 오류 기록 후 다음 Step 진행.
+- 불확실한 부분은 결정하고 `결정/사유: <결정> — <사유>` 줄로 기록한다(헌법 §1). N이면 재실행한다. 3회 재시도 후에도 해결되지 않으면 오류·미해결 항목·다음 검사를 현재 Step 결과 파일에 기록하고 현재 Step을 INCOMPLETE로 인계한다. 완료 보고와 다음 Step 진입은 금지하고 헌법 §2-1 명명된 멈춤으로 끝낸다(필수 도구 실패 `required-tool-failed`, 권한 거부 `permission-denied`, 그 밖의 한도 소진 `required-input-missing`). 선택 도구를 쓸 수 없는 것은 미달이 아니다 — `SKIP`과 사유를 기록한다.
 
 ## 테스트 러너와 커버리지 인계
 

@@ -18,7 +18,7 @@ persistence: session
 ## Memory-of-Thought
 
 기획 전에 다음을 확인하라:
-- step_archive/progress.json의 failure_patterns — 이전에 실패한 패턴을 반복하지 않는다
+- 이전 단계 검증 보고서(`step_archive/outputs/step0*_검증*.md`)의 `## 실패 패턴` 절(있으면) — 이전에 실패한 패턴을 반복하지 않는다
 - 이전 기획 Step의 결과 파일 — 중복되거나 상충되는 내용이 없는지 확인한다
 - 성공한 기획 패턴이 있으면 재활용한다
 
@@ -52,7 +52,7 @@ step025_planning_chunk3.md (500줄 이하)
 
 **작성 규칙**:
 - 각 청크는 500줄 이하로 작성 (성능 최적화)
-- 저장 시 PostToolUse 훅(research-chunk-validator.ps1)이 각 청크 자동 검증 (BOM/CRLF/줄수/파일크기) — 일괄 재검증: `.claude/hooks/research-validator.ps1` 수동 실행
+- 저장 후 각 청크가 500줄 이하이고 UTF-8(BOM 없음)인지 직접 확인한다. 자동 검증 훅은 번들되지 않는다.
 - 청크 그대로 유지 (병합 안 함)
 
 서브에이전트는 항상 haiku를 사용한다.
@@ -66,7 +66,7 @@ step025_planning_chunk3.md (500줄 이하)
 
 ## 오류 발생 시
 
-오류 발생 시 원인을 분석하고 수정한 뒤 재시도한다. 3회 재시도 후에도 실패하면 오류·미해결 항목·다음 검사를 기록하고 현재 Step을 INCOMPLETE로 인계한다. 완료 보고와 다음 Step 진입은 금지한다.
+오류 발생 시 원인을 분석하고 수정한 뒤 재시도한다. 3회 재시도 후에도 해결되지 않으면 오류·미해결 항목·다음 검사를 현재 Step 결과 파일에 기록하고 현재 Step을 INCOMPLETE로 인계한다. 완료 보고와 다음 Step 진입은 금지하고 헌법 §2-1 명명된 멈춤으로 끝낸다(필수 도구 실패 `required-tool-failed`, 권한 거부 `permission-denied`, 그 밖의 한도 소진 `required-input-missing`). 선택 도구를 쓸 수 없는 것은 미달이 아니다 — `SKIP`과 사유를 기록한다.
 
 
 ---

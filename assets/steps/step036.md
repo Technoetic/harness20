@@ -38,7 +38,7 @@ persistence: session
    - 반드시 Python pathlib.Path.write_text() 사용
 
 5. **검증**
-   - 저장 시 PostToolUse 훅(research-chunk-validator.ps1)이 BOM/CRLF 자동 검사
+   - 저장 후 BOM 없음과 줄끝 규칙을 직접 확인한다. 자동 검사 훅은 번들되지 않는다.
 
 ## Self-Calibration
 
