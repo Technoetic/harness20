@@ -1,9 +1,11 @@
 ﻿# step-auto-continue.ps1 - Step 미완료 시 Stop을 차단하고 자동 재개 (Stop 훅)
 #
 # 전략 (공식 스펙 기준, docs.claude.com/en/docs/claude-code/hooks):
-#   - JSON decision="block" + exit 0: Claude가 대화를 계속한다 (정식 메커니즘)
-#   - 폴백으로 exit 2 + stderr도 함께 작동 (이중 보장)
-#   - stop_hook_active=true 시 즉시 exit 0 (무한 루프 방지 - 공식 권장)
+#   - stdout JSON decision="block" + exit 0 한 채널만 쓴다: Claude가 대화를 계속한다
+#     (exit 2 + stderr를 함께 내면 exit 0이 "no block"으로 읽힐 위험이 있어 쓰지 않는다)
+#   - stop_hook_active=true여도 진전이 없는 Stop이 연속 STALL_LIMIT(3)회가 될 때까지는 계속
+#     block한다 (무한 루프 방지는 진전 없음 카운터가 맡는다)
+#   - writer가 거부한 완료(step_archive/progress-refusals.json)는 사유 끝에 이유와 할 일로 붙인다
 #   - 모든 실행을 로그로 기록해 진단 가능하게 함
 
 param()
@@ -198,13 +200,48 @@ if (Test-Path -LiteralPath $archivedCandidate) {
 # B-FIX(2026-06-05): 멈춤의 근본 원인은 검증 스킬(evaluator/verify/check)의 긴 본문을
 # 도구 호출 파라미터 안에 직렬화하다 XML이 깨지는 것. reason에 회피 지침 1줄 추가.
 $guard = "DO NOT paste verification/CoVE text into tool-call parameters - write findings to a .md file, keep tool args minimal."
+
+# A completion the writer refused (step_archive/progress-refusals.json, written by
+# step-progress-writer): name the lowest one still open, so the model knows why the step it reported
+# is asked for again. Steps recorded since then are dropped; tokens are checked and the detail is
+# cut short. Mirrors step-auto-continue.sh.
+$refusalNote = ""
+try {
+    $refusalPath = Join-Path $projectRoot "step_archive\progress-refusals.json"
+    if (Test-Path -LiteralPath $refusalPath) {
+        $refusalData = Get-Content -LiteralPath $refusalPath -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+        # A file left by an earlier run of this workspace (another run_started_at) is ignored.
+        $sameRun = [string]$refusalData.run_started_at -ceq [string]$progress.run_started_at
+        $doneSteps = @($progress.completed_steps)
+        $open = @(@($refusalData.refusals) | Where-Object {
+            $sameRun -and
+            $_ -and ($_.step -is [int] -or $_.step -is [long]) -and $_.step -ge 1 -and $_.step -le $total -and $doneSteps -notcontains [int]$_.step
+        } | Sort-Object { [int]$_.step })
+        if ($open.Count -gt 0) {
+            $r = $open[0]
+            $refusedStep = "{0:D3}" -f [int]$r.step
+            $token = { param($v) $t = [string]$v; if ($t -cmatch '^[A-Za-z][A-Za-z_-]{0,19}\z') { $t } else { 'unknown' } }
+            $detail = ([string]$r.detail -replace '[\x00-\x1f]', ' ').Trim()
+            if ($detail.Length -gt 160) { $detail = $detail.Substring(0, 157) + '...' }
+            $because = if ($detail) { " ($detail)" } else { "" }
+            switch -CaseSensitive ([string]$r.gate) {
+                'qa' { $refusalNote = "Step $refusedStep was reported complete but not recorded: QA evidence status=$(& $token $r.status) verdict=$(& $token $r.verdict). Inspect, snapshot, rerun and record its QA report (docs/QA-REPORTS.md) before reporting it again." }
+                'quality' { $refusalNote = "Step $refusedStep was reported complete but not recorded: measured quality verdict=$(& $token $r.verdict)$because. Run node `"<plugin-root>/scripts/quality-gate.mjs`" --workspace `"<project-root>`" and repair failed checks (docs/QUALITY.md) before reporting it again." }
+                'final' { $refusalNote = "Step $refusedStep was reported complete but not recorded: final evidence verdict=$(& $token $r.verdict)$because. Complete the final quality, browser routing and regression evidence (docs/QA-REPORTS.md) before reporting it again." }
+            }
+        }
+    }
+} catch {
+    Write-HookLog "progress-refusals.json read FAILED: $_"
+}
+$refusalPart = if ($refusalNote) { " $refusalNote" } else { "" }
 # The only early stop (harness-rules 2-1). Same string as NAMED in step-auto-continue.sh and
 # step-progress-loader (scripts/lib/pause-state.mjs NAMED_PAUSE); the single quote is doubled here.
 $namedPause = 'Early stop only as a named pause (permission-denied | required-tool-failed | required-input-missing; harness-rules 2-1): save evidence under step_archive/, run node "<plugin-root>/scripts/harness-pause.mjs" pause --workspace "<project-root>" --reason <code> --evidence <step_archive/file> --note ''<user action, no quotes>'', then end the turn with the pause report.'
 if ($hasQuestion) {
-    $reason = "[HARNESS] $completedCount/$total done. No user-facing questions. Resume now: read+execute $stepFile, report 'Step $nextStepStr/$total 완료', continue. $namedPause $guard (User direct requests still take priority.)"
+    $reason = "[HARNESS] $completedCount/$total done. No user-facing questions. Resume now: read+execute $stepFile, report 'Step $nextStepStr/$total 완료', continue. $namedPause $guard (User direct requests still take priority.)$refusalPart"
 } else {
-    $reason = "[HARNESS] $completedCount/$total done. Next: read+execute $stepFile, report 'Step $nextStepStr/$total 완료', then auto-advance. $namedPause $guard (User direct requests still take priority.)"
+    $reason = "[HARNESS] $completedCount/$total done. Next: read+execute $stepFile, report 'Step $nextStepStr/$total 완료', then auto-advance. $namedPause $guard (User direct requests still take priority.)$refusalPart"
 }
 
 # B-P2-2 fix: 공식 스펙은 단일 채널만 허용.

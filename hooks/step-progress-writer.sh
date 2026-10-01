@@ -47,7 +47,14 @@ a_dir=os.environ["ARCHIVED_DIR"]
 
 try:
     with open(p_path,encoding="utf-8") as f: progress=json.load(f)
-except Exception: raise SystemExit(0)
+    if progress is None: raise ValueError("progress.json holds null")
+except Exception:
+    # Nothing is inspected on this Stop, so an older refusal must not be repeated as current (the
+    # .ps1 removes it after its read retries as well).
+    if mode=="write":
+        try: os.remove(os.path.join(os.path.dirname(p_path),"progress-refusals.json"))
+        except OSError: pass
+    raise SystemExit(0)
 
 # Named pause (harness-rules 2-1): hooks/lib/harness-activity.mjs starts this hook for a paused run
 # so that the completion lines of the turn that paused are recorded; the pause fields are kept as
@@ -93,20 +100,25 @@ boundary=utc_instant(progress.get("run_started_at")) if isinstance(progress,dict
 # last_assistant_message is the final message of the turn that is stopping, written after any
 # run_started_at recorded before or during that turn (webapp-trigger at UserPromptSubmit,
 # harness-pause.mjs reset inside the turn), so it has no time and always counts.
-response=""
+texts=[]
 j=None
 try: j=json.loads(raw) if raw else None
 except Exception: j=None
 if j:
     if j.get("last_assistant_message"):
-        response+="\n"+j["last_assistant_message"]
+        texts.append(j["last_assistant_message"])
     tp=j.get("transcript_path")
     if tp and os.path.exists(tp):
         try:
             with open(tp,encoding="utf-8") as f:
                 for ln in f:
                     ln=ln.strip()
-                    if not ln: continue
+                    # Only a line with 완료 (its second syllable as 료 or as the JSON escape \ub8cc,
+                    # however the first is spelled) or with a code fence (``` or ~~~, whose state
+                    # runs across text blocks) can change the steps found below; the rest is skipped
+                    # before json.loads with the same result. Mirrors the .ps1, where parsing every
+                    # line of a long transcript ran past the hook budget.
+                    if not ln or not ("료" in ln or "\\ub8cc" in ln.lower() or "```" in ln or "~~~" in ln): continue
                     try:
                         e=json.loads(ln)
                         if e.get("type")=="assistant":
@@ -115,9 +127,12 @@ if j:
                             content=(e.get("message") or {}).get("content") or []
                             for b in content:
                                 if b.get("type")=="text" and b.get("text"):
-                                    response+="\n"+b["text"]
+                                    texts.append(b["text"])
                     except Exception: pass
         except Exception: pass
+
+# Joined once, like the .ps1 (repeated += copies the text again for every block).
+response="\n"+"\n".join(texts)
 
 total=int(progress.get("total_steps",50))
 found=set()
@@ -153,37 +168,108 @@ cursor=progress.get("current_step")
 aligned=first is None or (type(cursor) is int and cursor==first)
 
 if mode=="probe":
-    print("work" if (valid - existing) or not aligned else "idle")
+    # Steps the refusal file of this run already holds were inspected and refused before; a paused
+    # run does not count them as new work (mirrors Get-RefusedSteps in the .ps1).
+    refused_before=set()
+    try:
+        with open(os.path.join(os.path.dirname(p_path),"progress-refusals.json"),encoding="utf-8-sig") as f: old=json.load(f)
+        if isinstance(old,dict) and old.get("run_started_at")==progress.get("run_started_at"):
+            refused_before={r["step"] for r in (old.get("refusals") or []) if isinstance(r,dict) and type(r.get("step")) is int}
+    except (OSError,ValueError,TypeError,AttributeError): pass
+    print("work" if (valid - existing - refused_before) or not aligned else "idle")
     raise SystemExit(0)
 
+# Reported completions this Stop refuses, kept in step_archive/progress-refusals.json for
+# step-auto-continue to name in its block reason (mirrors Add-Refusal in the .ps1).
+refusals=[]
+def refuse(step, gate, status, verdict, detail):
+    # Inspector errors can name files by absolute path; the reason uses the same placeholder as the
+    # other hook messages. The logical and physical roots are replaced longest first (/tmp is a
+    # suffix of /private/tmp on macOS) and before whitespace is collapsed.
+    text=str(detail or "")
+    root=os.path.dirname(os.path.dirname(p_path))
+    for form in sorted({root, os.path.realpath(root)}, key=len, reverse=True):
+        if form: text=text.replace(form,"<project-root>")
+    text=" ".join(text.split())
+    if len(text)>160: text=text[:157]+"..."
+    refusals.append({"step":step,"gate":gate,"status":str(status or ""),"verdict":str(verdict or ""),"detail":text})
+
+workspace=os.path.dirname(os.path.dirname(p_path))
+# Every inspection shares one deadline that ends well inside the writer's 28 s budget in
+# run-hook.mjs, so a slow inspector is cut here instead of outliving a stopped writer.
+import time
+deadline=time.monotonic()+20
+def remaining():
+    return max(1.0, deadline-time.monotonic())
 if total == 50:
+    # The r1 (step 38) and r2 (step 44) milestones need current measured quality, as on Codex
+    # (codex/scripts/lib/acceptance.mjs); the trust5 Stop block cannot enforce them during
+    # continuous runs (stop_hook_active). Inspection only, with a deadline.
+    for step in sorted((valid - existing) & {38, 44}):
+        quality_passed = False
+        verdict, detail = "unavailable", ""
+        try:
+            inspected = subprocess.run(
+                ["node", os.environ["H50_WRITER_INSPECTOR"], "--inspect", "--workspace", workspace],
+                capture_output=True, text=True, encoding="utf-8", timeout=remaining())
+            result = json.loads(inspected.stdout)
+            verdict, detail = str(result.get("verdict") or ""), str(result.get("error") or "")
+            quality_passed = inspected.returncode == 0 and result.get("verdict") == "PASS"
+        except (OSError, ValueError, subprocess.TimeoutExpired):
+            pass
+        if not quality_passed:
+            valid.discard(step)
+            refuse(step, "quality", "", verdict, detail)
+            print(f"Step {step} remains incomplete: measured quality evidence missing, failed, or stale.")
     qa_inspector = os.path.join(os.path.dirname(os.environ["H50_WRITER_INSPECTOR"]), "qa-report.mjs")
     for step in sorted((valid - existing) & {39, 40, 43, 46, 47, 48}):
         qa_passed = False
+        status, verdict = "unavailable", ""
         try:
+            # inspect prints its result for every outcome; exit 0 means current and PASS.
             inspected = subprocess.run(
-                ["node", qa_inspector, "inspect", "--workspace", os.path.dirname(os.path.dirname(p_path)), "--step", str(step)],
-                capture_output=True, text=True, encoding="utf-8", timeout=30)
+                ["node", qa_inspector, "inspect", "--workspace", workspace, "--step", str(step)],
+                capture_output=True, text=True, encoding="utf-8", timeout=remaining())
             result = json.loads(inspected.stdout)
+            status, verdict = str(result.get("status") or ""), str(result.get("verdict") or "")
             qa_passed = inspected.returncode == 0 and result.get("status") == "current" and result.get("verdict") == "PASS"
         except (OSError, ValueError, subprocess.TimeoutExpired):
             pass
         if not qa_passed:
             valid.discard(step)
+            refuse(step, "qa", status, verdict, "")
             print(f"Step {step} remains incomplete: QA evidence missing, failed, or stale.")
 if total == 50 and 50 in valid and 50 not in existing:
     # Inspection only, with a deadline; no browser installation or project commands.
     final_passed = False
+    verdict, detail = "unavailable", ""
     try:
         inspected = subprocess.run(
-            ["node", os.environ["H50_WRITER_INSPECTOR"], "--inspect-final", "--workspace", os.path.dirname(os.path.dirname(p_path))],
-            capture_output=True, text=True, encoding="utf-8", timeout=30)
-        final_passed = inspected.returncode == 0 and json.loads(inspected.stdout).get("verdict") == "PASS"
+            ["node", os.environ["H50_WRITER_INSPECTOR"], "--inspect-final", "--workspace", workspace],
+            capture_output=True, text=True, encoding="utf-8", timeout=remaining())
+        result = json.loads(inspected.stdout)
+        verdict, detail = str(result.get("verdict") or ""), str(result.get("error") or "")
+        final_passed = inspected.returncode == 0 and result.get("verdict") == "PASS"
     except (OSError, ValueError, subprocess.TimeoutExpired):
         pass
     if not final_passed:
         valid.discard(50)
+        refuse(50, "final", "", verdict, detail)
         print("Step 50 remains incomplete: final quality/browser routing evidence missing, failed, or stale.")
+
+# Replaced or removed on every write, through a temp file and rename (mirrors the .ps1).
+refusal_path=os.path.join(os.path.dirname(p_path),"progress-refusals.json")
+try:
+    if refusals:
+        refusal_tmp=refusal_path+f".tmp.{os.getpid()}"
+        with open(refusal_tmp,"w",encoding="utf-8") as f:
+            # run_started_at ties the refusals to this run (see step-progress-writer.ps1).
+            json.dump({"schema_version":1,"run_started_at":progress.get("run_started_at"),"refusals":refusals},f,ensure_ascii=False,separators=(",",":"))
+        os.replace(refusal_tmp,refusal_path)
+    elif os.path.exists(refusal_path):
+        os.remove(refusal_path)
+except OSError:
+    pass
 new_ones=sorted(valid - existing)
 if new_ones:
     all_done=sorted(existing | valid)
@@ -214,7 +300,8 @@ log "invoked"
 # advisory file lock (best effort)
 exec 9>"$LOCK_FILE" 2>/dev/null || true
 if command -v flock >/dev/null 2>&1; then
-  flock -w 5 9 || { log "flock timeout"; exit 0; }
+  # Nothing is inspected on this Stop, so an older refusal must not be repeated as current.
+  flock -w 5 9 || { log "flock timeout"; rm -f "$STEP_ARCHIVE/progress-refusals.json"; exit 0; }
 fi
 
 writer_py write

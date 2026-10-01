@@ -37,7 +37,30 @@ try:
     if stall>=3: raise SystemExit(0)
     step=f'step{current:03d}.md'
     relative='step_archive/archived/'+step if os.path.isfile(os.path.join(archive,'archived',step)) else 'step_archive/'+step
-    print(json.dumps({'decision':'block','reason':f'[HARNESS] {len(done)}/{total} done. Read and execute {relative}, report completion, then continue. {NAMED} User direct requests take priority.'}))
+    # A completion the writer refused (step_archive/progress-refusals.json): name the lowest one still
+    # open, so the model knows why the step it reported is asked for again. Mirrors the .ps1.
+    note=''
+    try:
+        with open(os.path.join(archive,'progress-refusals.json'),encoding='utf-8-sig') as f: data=json.load(f)
+        def token(v):
+            v=str(v or '')
+            return v if re.fullmatch('[A-Za-z][A-Za-z_-]{0,19}',v) else 'unknown'
+        # A file left by an earlier run of this workspace (another run_started_at) is ignored.
+        same_run=isinstance(data,dict) and data.get('run_started_at')==p.get('run_started_at')
+        open_ones=sorted((r for r in (data.get('refusals') or []) if same_run and isinstance(r,dict) and type(r.get('step')) is int and 1<=r['step']<=total and r['step'] not in done),key=lambda r:r['step'])
+        if open_ones:
+            r=open_ones[0]
+            detail=re.sub('[\x00-\x1f]',' ',str(r.get('detail') or '')).strip()
+            if len(detail)>160: detail=detail[:157]+'...'
+            because=f' ({detail})' if detail else ''
+            n=f"{r['step']:03d}"
+            note={
+                'qa':f"Step {n} was reported complete but not recorded: QA evidence status={token(r.get('status'))} verdict={token(r.get('verdict'))}. Inspect, snapshot, rerun and record its QA report (docs/QA-REPORTS.md) before reporting it again.",
+                'quality':f"Step {n} was reported complete but not recorded: measured quality verdict={token(r.get('verdict'))}{because}. Run node \"<plugin-root>/scripts/quality-gate.mjs\" --workspace \"<project-root>\" and repair failed checks (docs/QUALITY.md) before reporting it again.",
+                'final':f"Step {n} was reported complete but not recorded: final evidence verdict={token(r.get('verdict'))}{because}. Complete the final quality, browser routing and regression evidence (docs/QA-REPORTS.md) before reporting it again.",
+            }.get(r.get('gate'),'')
+    except (OSError,ValueError,AttributeError,TypeError): note=''
+    print(json.dumps({'decision':'block','reason':f'[HARNESS] {len(done)}/{total} done. Read and execute {relative}, report completion, then continue. {NAMED} User direct requests take priority.'+(' '+note if note else '')}))
 except (OSError,ValueError,KeyError,TypeError): pass
 PY_STOP
 exit 0

@@ -2879,7 +2879,7 @@ test("implementation batch declares the exact Codex-native evidence contracts", 
       phase: "implementation",
       source: "assets/steps/step038.md",
       target: "codex/assets/steps/step038.md",
-      source_sha256: "14bf849a1dcc72535fb91647fa5a1b5c02b36d11f42484fb9da4fb4d259356f2",
+      source_sha256: "7fa7ace3ec7c9eb0fa6d3967f7d92dc5e3b4acaa6736f8d65934fc19219ecd6e",
       inputs: [
         "step_archive/step031_환경준비.md",
         "step_archive/step033_jscpd베이스라인.md",
@@ -2920,7 +2920,7 @@ test("implementation source hashes bind the reviewed source steps 031 through 03
     step035: "664d663cc7ed8cbb8605e3c5c5d2653fb139421eb469e81d1f08201fbf284acd",
     step036: "29ef9de9458af31433321b92d4ce8ec68a201cd29714195dca04b514130e37b7",
     step037: "7cd1c1a434257be3e233191fc532119e83824504b8830a55f380ac6cb786475a",
-    step038: "14bf849a1dcc72535fb91647fa5a1b5c02b36d11f42484fb9da4fb4d259356f2"
+    step038: "7fa7ace3ec7c9eb0fa6d3967f7d92dc5e3b4acaa6736f8d65934fc19219ecd6e"
   });
 });
 

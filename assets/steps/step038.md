@@ -26,12 +26,15 @@ Step 37 구현이 완료된 후, 다음 단계로 진행하기 전 빌드 안전
 1. HTML 번들링: `step_archive/tools/html-bundler.ps1` 실행 (macOS/Linux는 `bash step_archive/tools/html-bundler.sh`)
 2. dist/index.html 유효성: 직접 검사 — 파일 존재 + 크기 > 0 + `<html`/`</html>` 포함 확인
    (구 build-validator.ps1은 retired — 2026-06-10 하네스 감사 M07 정정)
-3. 순환 의존성: `npx madge --circular src/` 실행
+3. 순환 의존성 0개 확인: 프로젝트가 선언한 로컬 순환 검사 script, 이미 설치된 로컬 madge
+   (`npx --no-install madge --circular src/`), 같은 대상 파일의 결정적 정적 import graph 순으로 쓴다.
+   어느 방법도 원격 패키지를 받지 않으며, 해석하지 못한 import를 0개로 간주하지 않는다
+   (Step 15에서 madge를 `SKIP`했어도 이 확인은 건너뛰지 않는다).
 
 ### 2. 린트/포매팅 검증 (경고 — 실패해도 진행)
 
 1. Biome 포매팅+린팅: `npx --no-install @biomejs/biome check src/`
-2. Stylelint CSS 검사: `npx stylelint "src/css/*.css"`
+2. Stylelint CSS 검사: `npx --no-install stylelint "src/css/*.css"`
 3. 타입 체크: jsconfig.json 기반
 
 ### 3. 실패 시 대응
@@ -39,8 +42,8 @@ Step 37 구현이 완료된 후, 다음 단계로 진행하기 전 빌드 안전
 | 검증 | 실패 시 |
 |:---|:---|
 | html-bundler.ps1 | Step 37 재실행 (src/ 구조 문제) |
-| dist/index.html 직접 검사 | dist/index.html 수정 후 재검증 (최대 3회) |
-| madge 순환 의존성 | 순환 고리를 구체적으로 보고, Step 37 서브에이전트로 수정 |
+| dist/index.html 직접 검사 | dist/는 빌드 산출물이라 손으로 고치지 않는다. 원인을 src/(또는 번들러)에서 고치고 1번 HTML 번들링부터 다시 실행해 재검증 (최대 3회) |
+| 순환 의존성 | 순환 고리를 구체적으로 보고, Step 37 서브에이전트로 수정 |
 | biome/stylelint | 경고만 기록, 진행 허용 |
 | tsc | 경고만 기록, 진행 허용 |
 

@@ -61,7 +61,7 @@ backticks, `|` and control characters, and a line that looks like a credential s
 - It never reads `step_archive/progress.json` or the Codex state under `step_archive/.harness50-codex/`,
   so it behaves the same on both hosts.
 - It runs no project command, browser or network request and rewrites no evidence file.
-- No Stop hook runs it: Stop hooks run in parallel and would rewrite the file after every later turn.
+- No Stop hook runs it: Stop entries run in parallel (only `stop-advance` runs the writer before step-auto-continue) and would rewrite the file after every later turn.
 - `/harness-reset` keeps `step_archive/outputs/`, so an older summary stays until the next completion.
 
 ## When it runs

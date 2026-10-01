@@ -267,13 +267,26 @@ test('EXPLICIT_WEBAPP accepts only a first-line /webapp command with a topic', (
   }
 });
 
-test('HOOK_GATES names exactly the hooks registered in hooks/hooks.json', () => {
+// A sequence registered in hooks.json (run-hook.mjs 'sequences') has no gate of its own: the
+// dispatcher gates each part. The table is read from the source, since importing run-hook.mjs would
+// run the dispatcher.
+test('HOOK_GATES names exactly the hooks registered in hooks/hooks.json, with each sequence as its parts', () => {
   const config = JSON.parse(readFileSync(join(repo, 'hooks', 'hooks.json'), 'utf8'));
+  const literal = /const sequences = (\{[^}]*\});/.exec(readFileSync(join(repo, 'hooks', 'run-hook.mjs'), 'utf8'));
+  assert.ok(literal, 'run-hook.mjs keeps its sequences as a one-line JSON literal');
+  const sequences = JSON.parse(literal[1]);
   const names = new Set();
   for (const groups of Object.values(config.hooks)) {
-    for (const group of groups) for (const hook of group.hooks) names.add(/run-hook\.mjs" ([a-z0-9-]+)$/.exec(hook.command)[1]);
+    for (const group of groups) {
+      for (const hook of group.hooks) {
+        const name = /run-hook\.mjs" ([a-z0-9-]+)$/.exec(hook.command)[1];
+        for (const part of Object.hasOwn(sequences, name) ? sequences[name] : [name]) names.add(part);
+      }
+    }
   }
   assert.deepEqual(Object.keys(HOOK_GATES).sort(), [...names].sort());
+  assert.equal(Object.hasOwn(HOOK_GATES, 'stop-advance'), false);
+  for (const name of Object.keys(sequences)) assert.equal(Object.hasOwn(HOOK_GATES, name), false, name);
 });
 
 test('webappPrecheck issues only where no completed step would be lost', t => {

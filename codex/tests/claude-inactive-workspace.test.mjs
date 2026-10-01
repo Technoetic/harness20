@@ -2,12 +2,14 @@
 // runs them) in folders that have no active Harness50 run: nothing may be created, approved,
 // blocked or injected there. Only an explicit /webapp <topic> starts a run. A paused run (named
 // pause, harness-rules 2-1) is the one exception that speaks: the loader and the prompt guard
-// print where it stopped. The progress writer also starts there, to record completion lines of the
-// turn that paused (claude-named-pause P1); its Stop here carries the pause report instead, so it
-// has nothing to record and still nothing is written. The two guards start only in Harness50
-// workspaces (paused, drift, finished, Codex or active); on these harmless events they stay silent
-// and write no log. A run whose cursor alone is off (drift) starts only the progress writer among
-// the step hooks, and that writer puts current_step back (tested separately below).
+// print where it stopped. The progress writer also starts there, as the first part of the Stop
+// entry stop-advance (the writer, then step-auto-continue, each behind its own gate), to record
+// completion lines of the turn that paused (claude-named-pause P1); its Stop here carries the pause
+// report instead, so it has nothing to record, nothing is written and step-auto-continue does not
+// start. The two guards start only in Harness50 workspaces (paused, drift, finished, Codex or
+// active); on these harmless events they stay silent and write no log. A run whose cursor alone is
+// off (drift) starts only the progress writer among the step hooks (inside stop-advance as well),
+// and that writer puts current_step back (tested separately below).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -216,9 +218,11 @@ testEachName('finished run (50/50): only the trust5 gate speaks; progress, specs
 });
 
 // A hand edit moved current_step off the first unfinished step (drift). Among the step hooks only
-// the progress writer starts; its Stop puts the cursor back, and from then on the run is active.
-// The other hooks get the first payload of their event only, which keeps the dispatches few; the
-// guards are covered in 'the guards run only in harness workspaces'.
+// the progress writer starts, directly or as the first part of stop-advance, so both are left out
+// of the first pass (each rewrites progress.json). The Stop entry stop-advance then puts the cursor
+// back while its step-auto-continue stays silent (that gate failed before the writer ran), and from
+// then on the run is active. The other hooks get the first payload of their event only, which keeps
+// the dispatches few; the guards are covered in 'the guards run only in harness workspaces'.
 testEachName('cursor drift: only the progress writer starts, and it puts current_step back on the first unfinished step', async (t, name) => {
   const f = setup(t, name);
   writeProgress(f.project, { ...valid, last_updated: '', completed_steps: [2], current_step: 3 });
@@ -228,7 +232,7 @@ testEachName('cursor drift: only the progress writer starts, and it puts current
   const tasks = [];
   for (const [event, hooks] of Object.entries(registrations())) {
     for (const hook of hooks) {
-      if (['destructive-guard', 'permission-request-guard', 'step-progress-writer'].includes(hook)) continue;
+      if (['destructive-guard', 'permission-request-guard', 'step-progress-writer', 'stop-advance'].includes(hook)) continue;
       tasks.push(async () => [hook, await dispatch(f.plugin, hook, byEvent[event][0], { cwd: f.project, env: f.env })]);
     }
   }
@@ -238,18 +242,19 @@ testEachName('cursor drift: only the progress writer starts, and it puts current
   const stop = { hook_event_name: 'Stop', session_id: 's', stop_hook_active: false, last_assistant_message: '', cwd: f.project };
   const read = () => JSON.parse(readFileSync(join(f.project, 'step_archive', 'progress.json'), 'utf8').replace(/^\uFEFF/, ''));
   // The PowerShell writer skips its write while another test file holds the machine-wide
-  // Global\step-progress-writer-mutex, so rerun it (bounded) until the cursor is back.
+  // Global\step-progress-writer-mutex, so rerun the Stop (bounded) until the cursor is back.
   for (let attempt = 1; attempt <= 5; attempt += 1) {
-    const writer = await dispatch(f.plugin, 'step-progress-writer', stop, { cwd: f.project, env: f.env });
-    assert.equal(writer.status, 0, writer.stderr);
-    assert.equal(writer.stderr, '');
+    const repair = await dispatch(f.plugin, 'stop-advance', stop, { cwd: f.project, env: f.env });
+    // No block in drift, and the writer's own output is dropped.
+    assert.deepEqual(repair, { status: 0, stdout: '', stderr: '' });
     if (read().current_step === 1) break;
     await sleep(500 * attempt);
   }
   const after = read();
   assert.deepEqual(after.completed_steps, [2]);
   assert.equal(after.current_step, 1);
-  const continued = await dispatch(f.plugin, 'step-auto-continue', stop, { cwd: f.project, env: f.env });
+  // The next Stop finds an active run: after the writer, step-auto-continue names step 1.
+  const continued = await dispatch(f.plugin, 'stop-advance', stop, { cwd: f.project, env: f.env });
   assert.equal(continued.status, 0, continued.stderr);
   const reason = JSON.parse(continued.stdout).reason;
   assert.ok(reason.includes('step_archive/archived/step001.md'), reason);

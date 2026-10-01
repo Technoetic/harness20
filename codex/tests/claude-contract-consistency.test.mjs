@@ -15,6 +15,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { join, relative } from 'node:path';
 
 import { PROJECT_NAMES, gitBash, installPlugin, repo, runClaudeHook, tempRoot, testEachName, windows } from './helpers/claude-hooks.mjs';
+import { prepareQuality } from './helpers/completion-quality.mjs';
 
 // Step numbers of the retired 107-step layout (69, 81, 84, 104, 107), as standalone tokens.
 const RETIRED = /(?<![\w.#\\-])(?:0?69|0?81|0?84|104|107)(?![\w%.])/;
@@ -336,7 +337,7 @@ testEachName('D2 spec-generator writes the measured milestones and the body resu
   }
 });
 
-testEachName('D3 step-progress-writer records a completion without adding or changing trust5 fields', (t, name) => {
+testEachName('D3 step-progress-writer records a completion without adding or changing trust5 fields', async (t, name) => {
   const { base, plugin } = setup(t, 'h50-contract-writer-');
   const legacy = {
     trust5_results: { r1: null, r2: null, r3: null },
@@ -355,6 +356,8 @@ testEachName('D3 step-progress-writer records a completion without adding or cha
       last_updated: '', total_steps: 50, current_step: 38, completed_steps: range(1, 37), failed_steps: [],
       metrics: { total_sessions: 1 }, session_history: [], ...(kind === 'legacy' ? legacy : {})
     }));
+    // The writer records step 38 (r1) only with a current measured quality PASS.
+    await prepareQuality(p.root);
   }
   for (const [kind, p] of Object.entries(fixtures)) {
     // The PowerShell writer shares the machine-wide Global\step-progress-writer-mutex with other

@@ -34,19 +34,45 @@ async function fixture(completed = 49) {
   writeFileSync(join(project, 'harness50.quality.json'), JSON.stringify({ schema_version: 1, checks, coverage: { path: 'coverage/coverage-summary.json', minimum: 85 } }));
   assert.equal((await runQualityGate(project)).verdict, 'PASS');
   const runs = readFileSync(join(project, 'step_archive', 'command-runs.txt'), 'utf8');
+  // The writer skips a Stop, logging it next to itself, when another process holds the machine-wide
+  // Global\step-progress-writer-mutex (or the project's flock) for 5 s. Such a run is repeated
+  // (bounded), so the refusal file always reflects the run being checked.
+  const log = join(plugin, 'hooks', 'step-progress-writer.log');
+  const logged = () => existsSync(log) ? readFileSync(log, 'utf8') : '';
   const run = (name, event = {}) => {
     const script = join(plugin, 'hooks', `${name}.${windows && !bashFixture ? 'ps1' : 'sh'}`);
     const shell = bashFixture ? 'C:/Program Files/Git/bin/bash.exe' : windows ? 'powershell.exe' : 'bash';
     const args = bashFixture ? ['-c', 'uname(){ echo Linux; }; python3(){ python "$@"; }; export -f uname python3; bash "$1"', 'fixture', script.replaceAll('\\', '/')]
       : windows ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script] : [script];
-    const result = spawnSync(shell, args, { cwd: base, input: JSON.stringify({ cwd: project, ...event }),
-      encoding: 'utf8', timeout: 30000, env: { ...process.env, CLAUDE_PROJECT_DIR: '', PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' } });
-    assert.equal(result.status, 0, result.stderr || String(result.error));
-    assert.equal(result.stderr.trim(), '');
-    return result.stdout.trim();
+    for (let attempt = 1; ; attempt += 1) {
+      const before = logged().length;
+      const result = spawnSync(shell, args, { cwd: base, input: JSON.stringify({ cwd: project, ...event }),
+        encoding: 'utf8', timeout: 30000, env: { ...process.env, CLAUDE_PROJECT_DIR: '', PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' } });
+      assert.equal(result.status, 0, result.stderr || String(result.error));
+      assert.equal(result.stderr.trim(), '');
+      if (name !== 'step-progress-writer' || attempt === 4 || !/mutex acquire FAILED|flock timeout/.test(logged().slice(before))) {
+        return result.stdout.trim();
+      }
+    }
   };
   const noCommands = () => assert.equal(readFileSync(join(project, 'step_archive', 'command-runs.txt'), 'utf8'), runs);
-  return { project, plugin, progress, manifest, run, noCommands };
+  // A refused Step 50 is kept for step-auto-continue: one final-gate entry whose detail is the
+  // inspector error without the absolute project path.
+  const refusalFile = join(project, 'step_archive', 'progress-refusals.json');
+  const refused = () => {
+    const { refusals: [refusal, ...others], ...file } = JSON.parse(readFileSync(refusalFile, 'utf8'));
+    assert.deepEqual(file, { schema_version: 1, run_started_at: null });
+    assert.deepEqual(others, []);
+    const { detail, ...entry } = refusal;
+    assert.deepEqual(entry, { step: 50, gate: 'final', status: '', verdict: 'INCOMPLETE' });
+    assert.ok(detail.length > 0 && detail.length <= 160, detail);
+    for (const form of [project, project.replaceAll('\\', '/')]) {
+      assert.equal(detail.toLowerCase().includes(form.toLowerCase()), false, detail);
+    }
+    return detail;
+  };
+  const noRefusal = () => assert.equal(existsSync(refusalFile), false, 'no refusal file');
+  return { project, plugin, progress, manifest, run, noCommands, refused, noRefusal };
 }
 
 test('Claude cannot record new Step 50 from completion text without browser route evidence', async () => {
@@ -55,6 +81,8 @@ test('Claude cannot record new Step 50 from completion text without browser rout
   const progress = JSON.parse(readFileSync(f.progress, 'utf8'));
   assert.equal(progress.completed_steps.length, 49);
   assert.equal(progress.current_step, 50);
+  // The browser inspector names the missing report by path; the writer keeps it as <project-root>.
+  assert.match(f.refused(), /<project-root>/);
   f.noCommands();
 });
 
@@ -72,6 +100,7 @@ test('Claude final completion rejects missing regression matrices despite passin
   writeFileSync(join(f.project, 'step_archive', 'outputs', 'browser-output.json'), JSON.stringify(browser));
   f.run('step-progress-writer', { last_assistant_message: 'Step 050/50 완료' });
   assert.equal(JSON.parse(readFileSync(f.progress, 'utf8')).completed_steps.length, 49);
+  f.refused();
   assert.match(f.run('trust5-validator'), /"decision":"block"/);
   f.noCommands();
 });
@@ -91,6 +120,7 @@ test('historical Claude Step 50 remains recorded without retroactive browser ver
   const f = await fixture(50);
   f.run('step-progress-writer', { last_assistant_message: 'Step 050/50 완료' });
   assert.equal(JSON.parse(readFileSync(f.progress, 'utf8')).completed_steps.length, 50);
+  f.noRefusal();
   f.noCommands();
 });
 
@@ -115,12 +145,14 @@ test('Claude final writer rejects old, incomplete and mismatched evidence, then 
     writeFileSync(reportPath, JSON.stringify(changed));
     f.run('step-progress-writer', { last_assistant_message: 'Step 050/50 완료' });
     assert.equal(JSON.parse(readFileSync(f.progress, 'utf8')).completed_steps.length, 49);
+    f.refused();
   }
   writeFileSync(reportPath, JSON.stringify(valid));
   assert.equal(f.run('trust5-validator'), '');
   assert.match(readFileSync(join(f.project, 'step_archive', 'outputs', 'trust5_r3.md'), 'utf8'), /Verdict: PASS/);
   f.run('step-progress-writer', { last_assistant_message: 'Step 050/50 완료' });
   assert.equal(JSON.parse(readFileSync(f.progress, 'utf8')).completed_steps.length, 50);
+  f.noRefusal();
   f.noCommands();
 });
 
@@ -143,5 +175,6 @@ test('final summary printed after the completion line keeps Step 50 recording ex
   f.run('step-progress-writer', { last_assistant_message: `Step 050/50 완료\n${summary.stdout}` });
   const progress = JSON.parse(readFileSync(f.progress, 'utf8'));
   assert.deepEqual(progress.completed_steps, [...Array.from({ length: 48 }, (_, i) => i + 1), 50]);
+  f.noRefusal();
   f.noCommands();
 });
