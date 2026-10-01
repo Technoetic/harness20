@@ -43,6 +43,8 @@ export const EXPLICIT_WEBAPP = /^[ \t]*\/(?:harness50:)?webapp[ \t]+\S/;
 // continuation, approval, quality, SPEC, MX and LSP stay off until /harness-resume.
 // In a drift run the writer is the only step hook that starts, to put the cursor back; the
 // guards stay on, so moving current_step by hand never turns them off.
+// The Stop event runs the writer and then step-auto-continue through run-hook.mjs's 'stop-advance'
+// sequence; each part keeps its own gate below.
 export const GUARD_PHASES = Object.freeze(['active', 'paused', 'finished', 'codex', 'drift']);
 export const HOOK_GATES = Object.freeze({
   'destructive-guard': GUARD_PHASES,

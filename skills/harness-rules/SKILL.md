@@ -179,7 +179,7 @@ Sub-lines: `@MX:SPEC`, `@MX:LEGACY`, `@MX:REASON`, `@MX:TEST`, `@MX:PRIORITY`
   - 도구 설치·조사·구현: **haiku**
   - 평가·시각 검증(단계 본문이 sonnet을 지정한 단계, 예: step039·040·043·049): **sonnet**
   - 스크린샷·이미지를 읽고 판단하는 일(PASS/FAIL, finding 중요도, 스크린샷을 보고 쓰는 CSS — step037): **메인 세션 또는 sonnet 이상**. haiku는 촬영·브라우저 조작·증거 수집만 하고 경로·viewport·URL만 돌려준다. 단계 본문이 "서브에이전트는 항상 haiku"라고 해도 판정은 이 행을 따른다. `step-executor`(haiku 고정)는 판정하지 않는다
-  - 품질 마일스톤 r1·r2·r3(완료 38·44·49단계)은 모델 판정이 아니라 Stop 훅(`trust5-validator` → `scripts/quality-gate.mjs --hook`)의 측정 증거 검사다.
+  - 품질 마일스톤 r1·r2·r3(완료 38·44·49단계)은 모델 판정이 아니라 측정 증거 검사다. 진행 기록 훅이 새 `Step 038/50 완료`·`Step 044/50 완료`는 `scripts/quality-gate.mjs --inspect` PASS일 때만, Step 050은 최종 PASS일 때만 기록하고, 거부하면 다음 이어가기 지시에 이유를 한 문장으로 붙인다. Stop 훅(`trust5-validator` → `scripts/quality-gate.mjs --hook`)은 trust5 보고서를 쓴다.
 
 ## 8. .claude/ 보호 (전역 규칙 상속)
 

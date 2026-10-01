@@ -106,7 +106,10 @@ if j:
             with open(tp,encoding="utf-8") as f:
                 for ln in f:
                     ln=ln.strip()
-                    if not ln: continue
+                    # Only a line with 완료 (as text or as the JSON escape \uc644\ub8cc) can hold a
+                    # completion report; the rest is skipped before json.loads. Mirrors the .ps1,
+                    # where parsing every line of a long transcript ran past the hook budget.
+                    if not ln or ("완료" not in ln and "\\uc644\\ub8cc" not in ln.lower()): continue
                     try:
                         e=json.loads(ln)
                         if e.get("type")=="assistant":
@@ -156,34 +159,91 @@ if mode=="probe":
     print("work" if (valid - existing) or not aligned else "idle")
     raise SystemExit(0)
 
+# Reported completions this Stop refuses, kept in step_archive/progress-refusals.json for
+# step-auto-continue to name in its block reason (mirrors Add-Refusal in the .ps1).
+refusals=[]
+def refuse(step, gate, status, verdict, detail):
+    # Inspector errors can name files by absolute path; the reason uses the same placeholder as the
+    # other hook messages. The logical and physical roots are replaced longest first (/tmp is a
+    # suffix of /private/tmp on macOS) and before whitespace is collapsed.
+    text=str(detail or "")
+    root=os.path.dirname(os.path.dirname(p_path))
+    for form in sorted({root, os.path.realpath(root)}, key=len, reverse=True):
+        if form: text=text.replace(form,"<project-root>")
+    text=" ".join(text.split())
+    if len(text)>160: text=text[:157]+"..."
+    refusals.append({"step":step,"gate":gate,"status":str(status or ""),"verdict":str(verdict or ""),"detail":text})
+
+workspace=os.path.dirname(os.path.dirname(p_path))
 if total == 50:
+    # The r1 (step 38) and r2 (step 44) milestones need current measured quality, as on Codex
+    # (codex/scripts/lib/acceptance.mjs); the trust5 Stop block cannot enforce them during
+    # continuous runs (stop_hook_active). Inspection only, with a deadline.
+    for step in sorted((valid - existing) & {38, 44}):
+        quality_passed = False
+        verdict, detail = "unavailable", ""
+        try:
+            inspected = subprocess.run(
+                ["node", os.environ["H50_WRITER_INSPECTOR"], "--inspect", "--workspace", workspace],
+                capture_output=True, text=True, encoding="utf-8", timeout=30)
+            result = json.loads(inspected.stdout)
+            verdict, detail = str(result.get("verdict") or ""), str(result.get("error") or "")
+            quality_passed = inspected.returncode == 0 and result.get("verdict") == "PASS"
+        except (OSError, ValueError, subprocess.TimeoutExpired):
+            pass
+        if not quality_passed:
+            valid.discard(step)
+            refuse(step, "quality", "", verdict, detail)
+            print(f"Step {step} remains incomplete: measured quality evidence missing, failed, or stale.")
     qa_inspector = os.path.join(os.path.dirname(os.environ["H50_WRITER_INSPECTOR"]), "qa-report.mjs")
     for step in sorted((valid - existing) & {39, 40, 43, 46, 47, 48}):
         qa_passed = False
+        status, verdict = "unavailable", ""
         try:
+            # inspect prints its result for every outcome; exit 0 means current and PASS.
             inspected = subprocess.run(
-                ["node", qa_inspector, "inspect", "--workspace", os.path.dirname(os.path.dirname(p_path)), "--step", str(step)],
+                ["node", qa_inspector, "inspect", "--workspace", workspace, "--step", str(step)],
                 capture_output=True, text=True, encoding="utf-8", timeout=30)
             result = json.loads(inspected.stdout)
+            status, verdict = str(result.get("status") or ""), str(result.get("verdict") or "")
             qa_passed = inspected.returncode == 0 and result.get("status") == "current" and result.get("verdict") == "PASS"
         except (OSError, ValueError, subprocess.TimeoutExpired):
             pass
         if not qa_passed:
             valid.discard(step)
+            refuse(step, "qa", status, verdict, "")
             print(f"Step {step} remains incomplete: QA evidence missing, failed, or stale.")
 if total == 50 and 50 in valid and 50 not in existing:
     # Inspection only, with a deadline; no browser installation or project commands.
     final_passed = False
+    verdict, detail = "unavailable", ""
     try:
         inspected = subprocess.run(
-            ["node", os.environ["H50_WRITER_INSPECTOR"], "--inspect-final", "--workspace", os.path.dirname(os.path.dirname(p_path))],
+            ["node", os.environ["H50_WRITER_INSPECTOR"], "--inspect-final", "--workspace", workspace],
             capture_output=True, text=True, encoding="utf-8", timeout=30)
-        final_passed = inspected.returncode == 0 and json.loads(inspected.stdout).get("verdict") == "PASS"
+        result = json.loads(inspected.stdout)
+        verdict, detail = str(result.get("verdict") or ""), str(result.get("error") or "")
+        final_passed = inspected.returncode == 0 and result.get("verdict") == "PASS"
     except (OSError, ValueError, subprocess.TimeoutExpired):
         pass
     if not final_passed:
         valid.discard(50)
+        refuse(50, "final", "", verdict, detail)
         print("Step 50 remains incomplete: final quality/browser routing evidence missing, failed, or stale.")
+
+# Replaced or removed on every write, through a temp file and rename (mirrors the .ps1).
+refusal_path=os.path.join(os.path.dirname(p_path),"progress-refusals.json")
+try:
+    if refusals:
+        refusal_tmp=refusal_path+f".tmp.{os.getpid()}"
+        with open(refusal_tmp,"w",encoding="utf-8") as f:
+            # run_started_at ties the refusals to this run (see step-progress-writer.ps1).
+            json.dump({"schema_version":1,"run_started_at":progress.get("run_started_at"),"refusals":refusals},f,ensure_ascii=False,separators=(",",":"))
+        os.replace(refusal_tmp,refusal_path)
+    elif os.path.exists(refusal_path):
+        os.remove(refusal_path)
+except OSError:
+    pass
 new_ones=sorted(valid - existing)
 if new_ones:
     all_done=sorted(existing | valid)

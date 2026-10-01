@@ -83,8 +83,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.mjs\" step-progress-writer",
-            "timeout": 30
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.mjs\" stop-advance",
+            "timeout": 40
           },
           {
             "type": "command",
@@ -95,11 +95,6 @@
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.mjs\" trust5-validator",
             "timeout": 60
-          },
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.mjs\" step-auto-continue",
-            "timeout": 10
           }
         ]
       }

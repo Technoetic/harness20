@@ -67,3 +67,9 @@ visual inspection is unavailable.
 | Source | Reviewed digest change | Codex decision and reason |
 | --- | --- | --- |
 | step044 | `bad68534ce5d04e52a1b4ff933f15fcb5dcaa6a03958f695810b044682489f35` → `d238b47246569421402b3eebf755345943fb3e74a1ef285506c0cba97541325d` | Keep the Codex target and acceptance unchanged. It already records failed checks in the routing report, prohibits Step 45 after failure, and leaves progress to the workflow manager and receipts. The Claude change adds named-pause codes and CLI evidence/note syntax, which this contract does not port. |
+
+## Review follow-up (2026-10-01)
+
+| Source | Reviewed digest change | Codex decision and reason |
+| --- | --- | --- |
+| step038 | `14bf849a1dcc72535fb91647fa5a1b5c02b36d11f42484fb9da4fb4d259356f2` → `7fa7ace3ec7c9eb0fa6d3967f7d92dc5e3b4acaa6736f8d65934fc19219ecd6e` | Keep the Codex target and acceptance unchanged. The Codex step already checks zero cycles with a declared local cycle script, a local `madge` or a deterministic static import graph, never a remote package, and requires a build-produced `dist/index.html`. The Claude change brings its own body to the same rule: no plain `npx` for madge and stylelint, and a failed `dist/index.html` check is repaired in `src/` and rebundled. |

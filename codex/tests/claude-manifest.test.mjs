@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn, spawnSync } from 'node:child_process';
 import { makeWorkspace } from './helpers/workspace.mjs';
+import { readRun } from '../../hooks/lib/harness-activity.mjs';
 
 const repo = fileURLToPath(new URL('../../', import.meta.url));
 const dispatcher = path.join(repo, 'hooks/run-hook.mjs');
@@ -15,7 +16,7 @@ const expected = {
   PreToolUse: [['Bash', 'destructive-guard', 5], ['Write|Edit|MultiEdit|NotebookEdit|WebSearch', 'auto-approve', 3]],
   PermissionRequest: [['Bash|Write|Edit|MultiEdit|NotebookEdit|WebFetch|WebSearch', 'permission-request-guard', 5]],
   PostToolUse: [['Write|Edit', 'mx-tag-validator', 10], ['Write|Edit', 'lsp-autofix', 30]],
-  Stop: [['', 'step-progress-writer', 30], ['', 'spec-generator', 15], ['', 'trust5-validator', 60], ['', 'step-auto-continue', 10]],
+  Stop: [['', 'stop-advance', 40], ['', 'spec-generator', 15], ['', 'trust5-validator', 60]],
 };
 test('Claude manifest has a hooks envelope and one dispatcher per preserved registration', () => {
   const config = JSON.parse(fs.readFileSync(path.join(repo, 'hooks/hooks.json'), 'utf8'));
@@ -61,11 +62,15 @@ test('dispatcher runs only native shell and preserves stdin, output, and exit co
   assert.equal(result.stdout, event);
   assert.equal(result.stderr, 'fixture stderr');
 });
-test('dispatcher budgets cover every registration and stay below the manifest timeout', () => {
+test('dispatcher budgets cover every registration and sequence part and stay below the manifest timeout', () => {
   const source = fs.readFileSync(dispatcher, 'utf8');
-  const literal = /const budgets = (\{[^}]*\});/.exec(source);
-  assert.ok(literal, 'run-hook.mjs keeps its budgets as a one-line JSON literal');
-  const budgets = JSON.parse(literal[1]);
+  const table = name => {
+    const literal = new RegExp(`const ${name} = (\\{[^}]*\\});`).exec(source);
+    assert.ok(literal, `run-hook.mjs keeps its ${name} as a one-line JSON literal`);
+    return JSON.parse(literal[1]);
+  };
+  const budgets = table('budgets');
+  const sequences = table('sequences');
   const config = JSON.parse(fs.readFileSync(path.join(repo, 'hooks/hooks.json'), 'utf8'));
   const timeouts = new Map();
   for (const groups of Object.values(config.hooks)) {
@@ -73,14 +78,26 @@ test('dispatcher budgets cover every registration and stay below the manifest ti
       for (const hook of group.hooks) timeouts.set(/ ([a-z0-9-]+)$/.exec(hook.command)[1], hook.timeout);
     }
   }
-  assert.deepEqual(Object.keys(budgets).sort(), [...timeouts.keys()].sort());
+  assert.deepEqual(sequences, { 'stop-advance': ['step-progress-writer', 'step-auto-continue'] });
+  // A sequence is registered in hooks.json; its parts are not, and keep budgets for direct calls.
+  const parts = Object.values(sequences).flat();
+  for (const name of Object.keys(sequences)) assert.ok(timeouts.has(name), `${name} is registered in hooks/hooks.json`);
+  for (const part of parts) assert.equal(timeouts.has(part), false, `${part} runs inside a sequence, not as its own registration`);
+  assert.deepEqual(Object.keys(budgets).sort(), [...new Set([...timeouts.keys(), ...parts])].sort());
   for (const [name, timeout] of timeouts) {
     assert.ok(budgets[name] >= timeout * 1000 - 2000 && budgets[name] < timeout * 1000, `${name}: ${budgets[name]} ms for a ${timeout} s host timeout`);
   }
+  // The parts run one after the other on their own budgets; a stopped part's tree needs time to end.
+  for (const [name, list] of Object.entries(sequences)) {
+    const sum = list.reduce((total, part) => total + budgets[part], 0);
+    assert.ok(budgets[name] >= sum + 2000, `${name}: ${budgets[name]} ms for parts with ${sum} ms of budgets`);
+  }
 });
 
-// The activity gate: a fake script for every registered hook records its stdin in <name>.ran, so
-// a sentinel file shows exactly which hooks the dispatcher started.
+// The activity gate: a fake script for every hook name that runs a script of its own (each
+// hooks.json registration but the stop-advance sequence, plus that sequence's two parts, which stay
+// callable by name) records its stdin in <name>.ran, so a sentinel file shows exactly which hooks
+// the dispatcher started. The sequence has its own fixture below.
 const GUARDS = ['destructive-guard', 'permission-request-guard'];
 const ACTIVITY_GATED = ['step-progress-loader', 'step-obedience-guard', 'auto-approve', 'mx-tag-validator', 'lsp-autofix',
   'step-progress-writer', 'spec-generator', 'trust5-validator', 'step-auto-continue'];
@@ -118,7 +135,7 @@ async function gatedDispatcher({ withLib = true } = {}) {
     assert.equal(result.stderr, '', name);
     return fs.existsSync(sentinel) ? fs.readFileSync(sentinel, 'utf8') : null;
   };
-  return { empty, active, hooks, call };
+  return { root, empty, active, hooks, call };
 }
 test('dispatcher starts activity-gated hooks and the two guards only in a project with a run', async () => {
   const f = await gatedDispatcher();
@@ -154,6 +171,159 @@ test('dispatcher without hooks/lib starts only the two guards', async () => {
     const event = JSON.stringify({ cwd: f.active, tool_name: 'Bash' });
     assert.equal(f.call(name, event), event, name);
   }
+});
+
+// stop-advance with fake parts. Each part records its stdin bytes in <name>.ran and a time in
+// <name>.time (epoch ms): the writer when it ends, after a short sleep, and step-auto-continue when
+// its process was created, so parts started together would overlap. PowerShell takes that time from
+// the process, because two PowerShells started together can reach their first line over a second
+// apart; bash starts at once, so its first line stands for it. The fake writer prints noise that
+// must not reach stdout, exits with H50_FAKE_WRITER_EXIT and, with H50_FAKE_PROGRESS set, replaces
+// that progress.json as the real writer moves a run on. step-auto-continue exits with
+// H50_FAKE_NEXT_EXIT.
+const WRITER = 'step-progress-writer';
+const NEXT = 'step-auto-continue';
+const NEXT_OUTPUT = '{"decision":"block","reason":"fake step-auto-continue"}\n';
+const RUN = { current_step: 1, total_steps: 50, completed_steps: [] };
+const ALL_STEPS = Array.from({ length: 50 }, (_, index) => index + 1);
+async function sequenceDispatcher(options) {
+  const f = await gatedDispatcher(options);
+  const parts = process.platform === 'win32' ? {
+    [`${WRITER}.ps1`]: [
+      '$stdin = New-Object System.IO.MemoryStream',
+      '[Console]::OpenStandardInput().CopyTo($stdin)',
+      `[System.IO.File]::WriteAllBytes((Join-Path $PSScriptRoot '${WRITER}.ran'), $stdin.ToArray())`,
+      'Start-Sleep -Milliseconds 500',
+      'if ($env:H50_FAKE_PROGRESS) { [System.IO.File]::WriteAllText($env:H50_FAKE_PROGRESS, $env:H50_FAKE_PROGRESS_JSON) }',
+      "[Console]::Out.Write('writer noise' + [char]10)",
+      `[System.IO.File]::WriteAllText((Join-Path $PSScriptRoot '${WRITER}.time'), [string][DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())`,
+      'exit [int]$env:H50_FAKE_WRITER_EXIT'
+    ],
+    [`${NEXT}.ps1`]: [
+      `[System.IO.File]::WriteAllText((Join-Path $PSScriptRoot '${NEXT}.time'), [string]([DateTimeOffset](Get-Process -Id $PID).StartTime).ToUnixTimeMilliseconds())`,
+      '$stdin = New-Object System.IO.MemoryStream',
+      '[Console]::OpenStandardInput().CopyTo($stdin)',
+      `[System.IO.File]::WriteAllBytes((Join-Path $PSScriptRoot '${NEXT}.ran'), $stdin.ToArray())`,
+      `[Console]::Out.Write('${NEXT_OUTPUT.trim()}' + [char]10)`,
+      'exit [int]$env:H50_FAKE_NEXT_EXIT'
+    ]
+  } : {
+    [`${WRITER}.sh`]: [
+      `cat > "$(dirname "$0")/${WRITER}.ran"`,
+      'sleep 0.5',
+      'if [ -n "${H50_FAKE_PROGRESS:-}" ]; then printf \'%s\' "$H50_FAKE_PROGRESS_JSON" > "$H50_FAKE_PROGRESS"; fi',
+      'echo "writer noise"',
+      `"$HARNESS50_NODE" -p 'Date.now()' </dev/null > "$(dirname "$0")/${WRITER}.time"`,
+      'exit "${H50_FAKE_WRITER_EXIT:-0}"'
+    ],
+    [`${NEXT}.sh`]: [
+      `"$HARNESS50_NODE" -p 'Date.now()' </dev/null > "$(dirname "$0")/${NEXT}.time"`,
+      `cat > "$(dirname "$0")/${NEXT}.ran"`,
+      `printf '%s\\n' '${NEXT_OUTPUT.trim()}'`,
+      'exit "${H50_FAKE_NEXT_EXIT:-0}"'
+    ]
+  };
+  for (const [file, lines] of Object.entries(parts)) fs.writeFileSync(path.join(f.hooks, file), `${lines.join('\n')}\n`);
+  // A project next to the plugin with this progress.json and, unless body is false, step 1's body.
+  const project = (name, progress, { body = true, codex = false } = {}) => {
+    const root = path.join(f.root, name);
+    fs.mkdirSync(path.join(root, 'step_archive', 'archived'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'step_archive', 'progress.json'), JSON.stringify(progress));
+    if (body) fs.writeFileSync(path.join(root, 'step_archive', 'archived', 'step001.md'), '# Step 1\n');
+    if (codex) {
+      fs.mkdirSync(path.join(root, 'step_archive', '.harness50-codex'));
+      fs.writeFileSync(path.join(root, 'step_archive', '.harness50-codex', 'state.json'), '{}');
+    }
+    return root;
+  };
+  // One Stop as hooks.json runs it. The non-ASCII message shows each part gets the exact bytes.
+  const stopAdvance = (cwd, env = {}) => {
+    const read = file => fs.existsSync(path.join(f.hooks, file)) ? fs.readFileSync(path.join(f.hooks, file)) : null;
+    for (const name of [WRITER, NEXT]) for (const file of [`${name}.ran`, `${name}.time`]) fs.rmSync(path.join(f.hooks, file), { force: true });
+    const event = JSON.stringify({ hook_event_name: 'Stop', session_id: 's', stop_hook_active: false, last_assistant_message: 'Step 001/50 완료', cwd });
+    // Up to two PowerShell starts, so the limit is generous.
+    const result = spawnSync(process.execPath, [path.join(f.hooks, 'run-hook.mjs'), 'stop-advance'], {
+      input: event, encoding: 'utf8', timeout: 60000, env: { ...process.env, CLAUDE_PROJECT_DIR: '', ...env }
+    });
+    assert.equal(result.error, undefined, 'stop-advance');
+    return {
+      event: Buffer.from(event), status: result.status, stdout: result.stdout, stderr: result.stderr,
+      ran: [WRITER, NEXT].filter(name => read(`${name}.ran`) !== null), writer: read(`${WRITER}.ran`), next: read(`${NEXT}.ran`),
+      writerEnded: Number(String(read(`${WRITER}.time`)).trim()), nextStarted: Number(String(read(`${NEXT}.time`)).trim())
+    };
+  };
+  return { ...f, project, stopAdvance };
+}
+// Both parts ran, and step-auto-continue's process was created only after the writer had ended.
+function assertWriterFirst(result) {
+  assert.deepEqual(result.ran, [WRITER, NEXT]);
+  assert.ok(result.nextStarted >= result.writerEnded, `step-auto-continue started at ${result.nextStarted}, the writer ended at ${result.writerEnded}`);
+}
+test('stop-advance runs the progress writer, then step-auto-continue, and passes on only its answer', async () => {
+  const f = await sequenceDispatcher();
+  const result = f.stopAdvance(f.active);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+  // The writer's stdout is dropped: the block JSON is the whole output.
+  assert.equal(result.stdout, NEXT_OUTPUT);
+  assertWriterFirst(result);
+  assert.deepEqual(result.writer, result.event);
+  assert.deepEqual(result.next, result.event);
+});
+test('stop-advance: a failing writer still lets step-auto-continue answer, and its exit code is returned', async () => {
+  const f = await sequenceDispatcher();
+  const failed = f.stopAdvance(f.active, { H50_FAKE_WRITER_EXIT: '1' });
+  assert.deepEqual([failed.status, failed.stdout, failed.stderr], [0, NEXT_OUTPUT, '']);
+  assertWriterFirst(failed);
+  const blocked = f.stopAdvance(f.active, { H50_FAKE_NEXT_EXIT: '2' });
+  assert.deepEqual([blocked.status, blocked.stdout, blocked.stderr], [2, NEXT_OUTPUT, '']);
+  assertWriterFirst(blocked);
+});
+test('stop-advance in a paused or drifted run starts only the writer', async () => {
+  const f = await sequenceDispatcher();
+  const paused = f.project('paused', { ...RUN, paused: true });
+  assert.equal(readRun(paused).phase, 'paused');
+  // The writer fails as well: with no step-auto-continue the dispatcher still exits 0.
+  const pausedStop = f.stopAdvance(paused, { H50_FAKE_WRITER_EXIT: '1' });
+  assert.deepEqual([pausedStop.status, pausedStop.stdout, pausedStop.stderr, pausedStop.ran], [0, '', '', [WRITER]]);
+  assert.deepEqual(pausedStop.writer, pausedStop.event);
+  // The writer puts the cursor back, so the run is active afterwards; step-auto-continue still
+  // stays silent because its gate failed before the writer ran.
+  const drift = f.project('drift', { ...RUN, completed_steps: [2], current_step: 3 });
+  assert.equal(readRun(drift).phase, 'drift');
+  const driftStop = f.stopAdvance(drift, {
+    H50_FAKE_PROGRESS: path.join(drift, 'step_archive', 'progress.json'),
+    H50_FAKE_PROGRESS_JSON: JSON.stringify({ ...RUN, completed_steps: [2] })
+  });
+  assert.deepEqual([driftStop.status, driftStop.stdout, driftStop.stderr, driftStop.ran], [0, '', '', [WRITER]]);
+  assert.equal(readRun(drift).phase, 'active');
+});
+test('stop-advance: step-auto-continue stays silent when the writer finishes the run', async () => {
+  const f = await sequenceDispatcher();
+  const result = f.stopAdvance(f.active, {
+    H50_FAKE_PROGRESS: path.join(f.active, 'step_archive', 'progress.json'),
+    H50_FAKE_PROGRESS_JSON: JSON.stringify({ ...RUN, completed_steps: ALL_STEPS, current_step: 51 })
+  });
+  assert.deepEqual([result.status, result.stdout, result.stderr, result.ran], [0, '', '', [WRITER]]);
+  assert.equal(readRun(f.active).phase, 'finished');
+});
+test('stop-advance starts no part outside a Claude run', async () => {
+  const f = await sequenceDispatcher();
+  const projects = {
+    empty: f.empty,
+    'loader-created progress without step bodies': f.project('stale', RUN, { body: false }),
+    'finished run': f.project('finished', { ...RUN, completed_steps: ALL_STEPS, current_step: 50 }),
+    'Codex workspace': f.project('codex', RUN, { codex: true })
+  };
+  for (const [kind, project] of Object.entries(projects)) {
+    const result = f.stopAdvance(project);
+    assert.deepEqual([result.status, result.stdout, result.stderr, result.ran], [0, '', '', []], kind);
+  }
+});
+test('stop-advance without hooks/lib starts neither part', async () => {
+  const f = await sequenceDispatcher({ withLib: false });
+  const result = f.stopAdvance(f.active);
+  assert.deepEqual([result.status, result.stdout, result.stderr, result.ran], [0, '', '', []]);
 });
 
 // Watchdog fixtures use hooks the dispatcher always starts (the two guards), so a copy of

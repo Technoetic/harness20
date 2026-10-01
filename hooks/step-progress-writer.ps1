@@ -18,6 +18,9 @@ try {
 
 
 $ErrorActionPreference = "Continue"
+# Node prints UTF-8; Windows PowerShell 5.1 decodes native output in the console code page (cp949 on
+# Korean Windows), which garbled Korean paths in the inspector results kept for refusals.
+try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch {}
 $logFile = Join-Path $PSScriptRoot "step-progress-writer.log"
 function Write-WriterLog($msg) {
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
@@ -26,6 +29,44 @@ function Write-WriterLog($msg) {
 $projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { [System.IO.Directory]::GetCurrentDirectory() }
 $stepArchive = Join-Path $projectRoot "step_archive"
 $progressFile = Join-Path $stepArchive "progress.json"
+
+# Reported completions this Stop refused, kept in step_archive/progress-refusals.json for
+# step-auto-continue to name in its block reason. Before, a refusal reached only this log: the model
+# was asked for the same step again with no reason until the stall counter released the run.
+$refusalFile = Join-Path $stepArchive "progress-refusals.json"
+$refusals = New-Object System.Collections.Generic.List[object]
+$script:rootForms = $null
+function Get-RootForms {
+    # The hook's spellings of the project root and the physical path that quality-gate.mjs reports
+    # (realpath: junctions, symlinks and 8.3 names resolved), longest first so that one form never
+    # leaves part of another behind.
+    if ($null -ne $script:rootForms) { return $script:rootForms }
+    $forms = New-Object System.Collections.Generic.List[string]
+    $physical = ''
+    try { $physical = [string](& node -e "try{process.stdout.write(require('fs').realpathSync.native(process.argv[1]))}catch{}" $projectRoot 2>$null) } catch {}
+    foreach ($form in @([string]$projectRoot, $physical)) {
+        if (-not $form) { continue }
+        foreach ($spelling in @($form, ($form -replace '\\', '/'), ($form -replace '/', '\'))) {
+            if ($spelling -and -not $forms.Contains($spelling)) { $forms.Add($spelling) }
+        }
+    }
+    $script:rootForms = @($forms | Sort-Object { $_.Length } -Descending)
+    return $script:rootForms
+}
+function Add-Refusal($step, $gate, $status, $verdict, $detail) {
+    # Inspector errors can name files by absolute path; the reason uses the same placeholder as the
+    # other hook messages. Root forms are replaced before whitespace is collapsed, so a root with
+    # repeated spaces still matches.
+    $text = [string]$detail
+    if ($text) {
+        foreach ($rootForm in Get-RootForms) {
+            $text = [regex]::Replace($text, [regex]::Escape($rootForm), '<project-root>', 'IgnoreCase')
+        }
+    }
+    $text = ($text -replace '\s+', ' ').Trim()
+    if ($text.Length -gt 160) { $text = $text.Substring(0, 157) + '...' }
+    $refusals.Add([pscustomobject]@{ step = [int]$step; gate = $gate; status = [string]$status; verdict = [string]$verdict; detail = $text })
+}
 
 # stdin 이벤트 JSON — UTF-8 명시 read (PS 5.1 default는 시스템 코드페이지로 한글 mojibake 위험)
 $inputJson = $null
@@ -70,23 +111,36 @@ if ($inputJson -and $inputJson.last_assistant_message) {
     $responseParts.Add([pscustomobject]@{ Ticks = $null; Text = [string]$inputJson.last_assistant_message })
 }
 
+# Only a line that contains 완료, as text or as the JSON escape \uc644\ub8cc, can hold a completion
+# report, so every other line is skipped before ConvertFrom-Json. Parsing every line and joining
+# every text block (see Get-ReportedSteps) took 29 s on a 4.6 MiB transcript of 8,000 text blocks
+# in Windows PowerShell 5.1, past this hook's 28 s budget in run-hook.mjs, and the completions of a
+# long session were then never recorded. Lines are streamed, not read whole. Mirrors
+# step-progress-writer.sh.
+$completionLine = [regex]::new('완료|\\u[cC]644\\u[bB]8[cC][cC]')
 if ($inputJson -and $inputJson.transcript_path -and (Test-Path -LiteralPath $inputJson.transcript_path)) {
     try {
-        # transcript 전체를 스캔 (JSONL). 파일이 클 수 있으나 Step당 KB 단위라 수용 가능
-        $allLines = Get-Content -LiteralPath $inputJson.transcript_path -Encoding UTF8
-        foreach ($line in $allLines) {
-            if (-not $line) { continue }
-            try {
-                $entry = $line | ConvertFrom-Json
-                if ($entry.type -eq 'assistant' -and $entry.message.content) {
-                    $entryTicks = Get-UtcTicks $entry.timestamp
-                    foreach ($block in $entry.message.content) {
-                        if ($block.type -eq 'text' -and $block.text) {
-                            $responseParts.Add([pscustomobject]@{ Ticks = $entryTicks; Text = [string]$block.text })
+        $transcriptPath = (Resolve-Path -LiteralPath $inputJson.transcript_path).ProviderPath
+        # Shared read like Get-Content: the host may still hold the transcript open for appending.
+        $transcriptStream = [System.IO.FileStream]::new($transcriptPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, ([System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete))
+        $transcriptReader = [System.IO.StreamReader]::new($transcriptStream, [System.Text.Encoding]::UTF8)
+        try {
+            while ($null -ne ($line = $transcriptReader.ReadLine())) {
+                if (-not $line -or -not $completionLine.IsMatch($line)) { continue }
+                try {
+                    $entry = $line | ConvertFrom-Json
+                    if ($entry.type -eq 'assistant' -and $entry.message.content) {
+                        $entryTicks = Get-UtcTicks $entry.timestamp
+                        foreach ($block in $entry.message.content) {
+                            if ($block.type -eq 'text' -and $block.text) {
+                                $responseParts.Add([pscustomobject]@{ Ticks = $entryTicks; Text = [string]$block.text })
+                            }
                         }
                     }
-                }
-            } catch {}
+                } catch {}
+            }
+        } finally {
+            $transcriptReader.Dispose()
         }
     } catch {}
 }
@@ -101,11 +155,13 @@ function Get-ReportedSteps($state) {
     # before the boundary existed. A missing or unparsable run_started_at (runs started by 2.9.0
     # and earlier) sets no boundary: the whole transcript counts.
     $boundary = Get-UtcTicks $state.run_started_at
-    $response = ""
+    # Joined once: repeated += copied the whole string for every text block (quadratic).
+    $texts = New-Object System.Collections.Generic.List[string]
     foreach ($part in $responseParts) {
         if ($null -ne $boundary -and $null -ne $part.Ticks -and $part.Ticks -lt $boundary) { continue }
-        $response += "`n" + $part.Text
+        $texts.Add([string]$part.Text)
     }
+    $response = "`n" + ($texts -join "`n")
 
     # 2) Step 완료 패턴 매칭 - 엄격한 명시 완료 보고만 허용
     #    total_steps 범위를 벗어난 숫자는 무시 (본문 언급 오탐 방지)
@@ -228,21 +284,50 @@ foreach ($s in @($progress.completed_steps)) { [void]$existing.Add([int]$s) }
 $completedNew = @()
 foreach ($s in $validSteps) {
     if (-not $existing.Contains($s)) {
+        if ($totalSteps -eq 50 -and $s -in @(38, 44)) {
+            # The r1 (step 38) and r2 (step 44) milestones need current measured quality, as on Codex
+            # (codex/scripts/lib/acceptance.mjs). The trust5 Stop block cannot enforce them during
+            # continuous runs (stop_hook_active). Inspection only: no project commands run here.
+            $qualityPassed = $false
+            $qualityVerdict = 'unavailable'
+            $qualityDetail = ''
+            $qualityInspector = Join-Path (Split-Path $PSScriptRoot -Parent) 'scripts/quality-gate.mjs'
+            if ((Test-Path -LiteralPath $qualityInspector) -and (Get-Command node -ErrorAction SilentlyContinue)) {
+                try {
+                    $qualityJson = (& node $qualityInspector --inspect --workspace $projectRoot 2>$null | Out-String)
+                    $qualityExit = $LASTEXITCODE
+                    $qualityResult = $qualityJson | ConvertFrom-Json -ErrorAction Stop
+                    $qualityVerdict = [string]$qualityResult.verdict
+                    $qualityDetail = [string]$qualityResult.error
+                    $qualityPassed = $qualityExit -eq 0 -and $qualityResult.verdict -eq 'PASS'
+                } catch {}
+            }
+            if (-not $qualityPassed) {
+                Write-WriterLog "Step $s remains incomplete: measured quality evidence missing, failed, or stale."
+                Add-Refusal $s 'quality' '' $qualityVerdict $qualityDetail
+                continue
+            }
+        }
         if ($totalSteps -eq 50 -and $s -in @(39, 40, 43, 46, 47, 48)) {
             # Inspect immutable QA evidence only; a completion sentence is not proof.
             $qaPassed = $false
+            $qaStatus = 'unavailable'
+            $qaVerdict = ''
             $qaInspector = Join-Path (Split-Path $PSScriptRoot -Parent) 'scripts/qa-report.mjs'
             if ((Test-Path -LiteralPath $qaInspector) -and (Get-Command node -ErrorAction SilentlyContinue)) {
                 try {
+                    # inspect prints its result for every outcome; exit 0 means current and PASS.
                     $qaJson = (& node $qaInspector inspect --workspace $projectRoot --step $s 2>$null | Out-String)
-                    if ($LASTEXITCODE -eq 0) {
-                        $qaResult = $qaJson | ConvertFrom-Json -ErrorAction Stop
-                        $qaPassed = $qaResult.status -eq 'current' -and $qaResult.verdict -eq 'PASS'
-                    }
+                    $qaExit = $LASTEXITCODE
+                    $qaResult = $qaJson | ConvertFrom-Json -ErrorAction Stop
+                    $qaStatus = [string]$qaResult.status
+                    $qaVerdict = [string]$qaResult.verdict
+                    $qaPassed = $qaExit -eq 0 -and $qaResult.status -eq 'current' -and $qaResult.verdict -eq 'PASS'
                 } catch {}
             }
             if (-not $qaPassed) {
                 Write-WriterLog "Step $s remains incomplete: QA evidence missing, failed, or stale."
+                Add-Refusal $s 'qa' $qaStatus $qaVerdict ''
                 continue
             }
         }
@@ -250,23 +335,44 @@ foreach ($s in $validSteps) {
             # New final completion needs current measured evidence. Inspection only:
             # never install a browser or run project commands inside a Stop hook.
             $finalPassed = $false
+            $finalVerdict = 'unavailable'
+            $finalDetail = ''
             $inspector = Join-Path (Split-Path $PSScriptRoot -Parent) 'scripts/quality-gate.mjs'
             if ((Test-Path -LiteralPath $inspector) -and (Get-Command node -ErrorAction SilentlyContinue)) {
                 try {
                     $finalJson = (& node $inspector --inspect-final --workspace $projectRoot 2>$null | Out-String)
-                    if ($LASTEXITCODE -eq 0) {
-                        $finalResult = $finalJson | ConvertFrom-Json -ErrorAction Stop
-                        $finalPassed = $finalResult.verdict -eq 'PASS'
-                    }
+                    $finalExit = $LASTEXITCODE
+                    $finalResult = $finalJson | ConvertFrom-Json -ErrorAction Stop
+                    $finalVerdict = [string]$finalResult.verdict
+                    $finalDetail = [string]$finalResult.error
+                    $finalPassed = $finalExit -eq 0 -and $finalResult.verdict -eq 'PASS'
                 } catch {}
             }
             if (-not $finalPassed) {
                 Write-WriterLog 'Step 50 remains incomplete: final quality/browser routing evidence missing, failed, or stale.'
+                Add-Refusal $s 'final' '' $finalVerdict $finalDetail
                 continue
             }
         }
         $completedNew += $s
     }
+}
+
+# Refused completions for step-auto-continue (see Add-Refusal): replaced or removed on every Stop that
+# gets this far, through a temp file and rename, so a reader never sees a half-written file.
+try {
+    if ($refusals.Count -gt 0) {
+        # run_started_at ties the refusals to this run: step-auto-continue ignores a file left by an
+        # earlier run of the workspace (after /harness-reset or a new /webapp bootstrap).
+        $refusalJson = [pscustomobject]@{ schema_version = 1; run_started_at = $progress.run_started_at; refusals = @($refusals.ToArray()) } | ConvertTo-Json -Depth 4 -Compress
+        $refusalTemp = "$refusalFile.tmp.$PID"
+        [System.IO.File]::WriteAllText($refusalTemp, $refusalJson, (New-Object System.Text.UTF8Encoding($false)))
+        Move-Item -LiteralPath $refusalTemp -Destination $refusalFile -Force -ErrorAction Stop
+    } elseif (Test-Path -LiteralPath $refusalFile) {
+        Remove-Item -LiteralPath $refusalFile -Force -ErrorAction Stop
+    }
+} catch {
+    Write-WriterLog "refusal file update FAILED: $_"
 }
 
 if ($completedNew.Count -gt 0) {
