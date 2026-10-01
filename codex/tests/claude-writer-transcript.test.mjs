@@ -169,6 +169,30 @@ testEachName('T6 a transcript that another process holds open for appending is s
   }
 });
 
+// T7: lines that pass the filter but hold no report. Every filler entry mentions 완료 inside a
+// sentence, in twenty text blocks, so each line is parsed and every block is kept; the texts must be
+// joined once (repeated concatenation grew with the square of the 20,000 blocks).
+test('T7 thousands of text blocks that mention 완료 are joined within the writer budget', { timeout: 300000 }, t => {
+  const f = setup(t, PROJECT_NAMES[0]);
+  const BLOCK = '모듈 하나의 검증을 완료하고 다음 모듈로 넘어갑니다. ';
+  const lines = [];
+  for (let index = 0; index < 1000; index += 1) {
+    lines.push(assistantEntry(Array(20).fill(BLOCK), {
+      index, timestamp: new Date(Date.UTC(2026, 9, 1, 8, 0, 0) + index * 1000).toISOString()
+    }));
+  }
+  writeFileSync(f.transcript, jsonl([...lines, assistantEntry('Step 002/50 완료', { index: lines.length })]));
+  const after = writeUntil(f, () => {
+    const result = runDispatcher(f.plugin, 'step-progress-writer', stopEvent(f), {
+      cwd: f.base, env: { CLAUDE_PROJECT_DIR: f.project }, timeoutMs: 120000
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '');
+  }, written);
+  assert.deepEqual(after.completed_steps, [1, 2]);
+  assert.equal(after.current_step, 3);
+});
+
 // Filler for T5: assistant entries of about 2 KiB, each an answer in ten text blocks (a message may
 // hold any number), with Korean text but no 완료 in any spelling. The 2.11.0 writer parsed every line
 // and joined every text block into one string; on this input it took about a minute in Windows

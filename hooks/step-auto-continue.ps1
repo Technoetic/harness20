@@ -224,7 +224,7 @@ try {
             $detail = ([string]$r.detail -replace '[\x00-\x1f]', ' ').Trim()
             if ($detail.Length -gt 160) { $detail = $detail.Substring(0, 157) + '...' }
             $because = if ($detail) { " ($detail)" } else { "" }
-            switch ([string]$r.gate) {
+            switch -CaseSensitive ([string]$r.gate) {
                 'qa' { $refusalNote = "Step $refusedStep was reported complete but not recorded: QA evidence status=$(& $token $r.status) verdict=$(& $token $r.verdict). Inspect, snapshot, rerun and record its QA report (docs/QA-REPORTS.md) before reporting it again." }
                 'quality' { $refusalNote = "Step $refusedStep was reported complete but not recorded: measured quality verdict=$(& $token $r.verdict)$because. Run node `"<plugin-root>/scripts/quality-gate.mjs`" --workspace `"<project-root>`" and repair failed checks (docs/QUALITY.md) before reporting it again." }
                 'final' { $refusalNote = "Step $refusedStep was reported complete but not recorded: final evidence verdict=$(& $token $r.verdict)$because. Complete the final quality, browser routing and regression evidence (docs/QA-REPORTS.md) before reporting it again." }

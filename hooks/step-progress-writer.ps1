@@ -53,6 +53,22 @@ function Get-RootForms {
     $script:rootForms = @($forms | Sort-Object { $_.Length } -Descending)
     return $script:rootForms
 }
+# Steps the refusal file of this run (same run_started_at) already holds. A paused run does not
+# count them as new work: they were inspected and refused before, and are inspected again once
+# the run resumes.
+function Get-RefusedSteps($state) {
+    $steps = New-Object System.Collections.Generic.HashSet[int]
+    try {
+        if (Test-Path -LiteralPath $refusalFile) {
+            $data = Get-Content -LiteralPath $refusalFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+            if ($null -ne $data -and [string]$data.run_started_at -ceq [string]$state.run_started_at) {
+                foreach ($r in @($data.refusals)) { if ($r -and ($r.step -is [int] -or $r.step -is [long])) { [void]$steps.Add([int]$r.step) } }
+            }
+        }
+    } catch {}
+    # The comma keeps the set whole instead of unrolling it into the pipeline.
+    return ,$steps
+}
 function Add-Refusal($step, $gate, $status, $verdict, $detail) {
     # Inspector errors can name files by absolute path; the reason uses the same placeholder as the
     # other hook messages. Root forms are replaced before whitespace is collapsed, so a root with
@@ -233,7 +249,8 @@ $isPaused = ($hasPaused -and -not ($peek.paused -is [bool] -and -not $peek.pause
 if ($null -ne $peek -and $isPaused) {
     $recorded = New-Object System.Collections.Generic.HashSet[int]
     foreach ($s in @($peek.completed_steps)) { try { [void]$recorded.Add([int]$s) } catch {} }
-    $pending = @((Get-ReportedSteps $peek) | Where-Object { -not $recorded.Contains([int]$_) })
+    $refusedBefore = Get-RefusedSteps $peek
+    $pending = @((Get-ReportedSteps $peek) | Where-Object { -not $recorded.Contains([int]$_) -and -not $refusedBefore.Contains([int]$_) })
     $peekFirst = $null
     for ($i = 1; $i -le [int]$peek.total_steps; $i++) { if (-not $recorded.Contains($i)) { $peekFirst = $i; break } }
     $peekAligned = ($null -eq $peekFirst) -or (($peek.current_step -is [int] -or $peek.current_step -is [long]) -and $peek.current_step -eq $peekFirst)
@@ -248,6 +265,8 @@ $mutexAcquired = $false
 try { $mutexAcquired = $mutex.WaitOne(5000) } catch { $mutexAcquired = $false }
 if (-not $mutexAcquired) {
     Write-WriterLog "mutex acquire FAILED (timeout 5s) -> exit 0"
+    # Nothing was inspected on this Stop, so an older refusal must not be repeated as current.
+    Remove-Item -LiteralPath $refusalFile -Force -ErrorAction SilentlyContinue
     exit 0
 }
 
@@ -269,6 +288,7 @@ for ($i = 0; $i -lt 3; $i++) {
 # B-P2-6 fix: $null 가드 — null이면 절대 직렬화하지 않음
 if ($null -eq $progress) {
     Write-WriterLog "progress.json read failed after 3 retries -> exit 0 (preserve existing file)"
+    Remove-Item -LiteralPath $refusalFile -Force -ErrorAction SilentlyContinue
     try { $mutex.ReleaseMutex() } catch {}
     exit 0
 }
@@ -297,8 +317,11 @@ foreach ($s in $validSteps) {
                     $qualityJson = (& node $qualityInspector --inspect --workspace $projectRoot 2>$null | Out-String)
                     $qualityExit = $LASTEXITCODE
                     $qualityResult = $qualityJson | ConvertFrom-Json -ErrorAction Stop
-                    $qualityVerdict = [string]$qualityResult.verdict
-                    $qualityDetail = [string]$qualityResult.error
+                    # An empty output parses to $null in Windows PowerShell 5.1: keep 'unavailable'.
+                    if ($null -ne $qualityResult) {
+                        $qualityVerdict = [string]$qualityResult.verdict
+                        $qualityDetail = [string]$qualityResult.error
+                    }
                     $qualityPassed = $qualityExit -eq 0 -and $qualityResult.verdict -eq 'PASS'
                 } catch {}
             }
@@ -320,8 +343,10 @@ foreach ($s in $validSteps) {
                     $qaJson = (& node $qaInspector inspect --workspace $projectRoot --step $s 2>$null | Out-String)
                     $qaExit = $LASTEXITCODE
                     $qaResult = $qaJson | ConvertFrom-Json -ErrorAction Stop
-                    $qaStatus = [string]$qaResult.status
-                    $qaVerdict = [string]$qaResult.verdict
+                    if ($null -ne $qaResult) {
+                        $qaStatus = [string]$qaResult.status
+                        $qaVerdict = [string]$qaResult.verdict
+                    }
                     $qaPassed = $qaExit -eq 0 -and $qaResult.status -eq 'current' -and $qaResult.verdict -eq 'PASS'
                 } catch {}
             }
@@ -343,8 +368,10 @@ foreach ($s in $validSteps) {
                     $finalJson = (& node $inspector --inspect-final --workspace $projectRoot 2>$null | Out-String)
                     $finalExit = $LASTEXITCODE
                     $finalResult = $finalJson | ConvertFrom-Json -ErrorAction Stop
-                    $finalVerdict = [string]$finalResult.verdict
-                    $finalDetail = [string]$finalResult.error
+                    if ($null -ne $finalResult) {
+                        $finalVerdict = [string]$finalResult.verdict
+                        $finalDetail = [string]$finalResult.error
+                    }
                     $finalPassed = $finalExit -eq 0 -and $finalResult.verdict -eq 'PASS'
                 } catch {}
             }

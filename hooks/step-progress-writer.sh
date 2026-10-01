@@ -93,13 +93,13 @@ boundary=utc_instant(progress.get("run_started_at")) if isinstance(progress,dict
 # last_assistant_message is the final message of the turn that is stopping, written after any
 # run_started_at recorded before or during that turn (webapp-trigger at UserPromptSubmit,
 # harness-pause.mjs reset inside the turn), so it has no time and always counts.
-response=""
+texts=[]
 j=None
 try: j=json.loads(raw) if raw else None
 except Exception: j=None
 if j:
     if j.get("last_assistant_message"):
-        response+="\n"+j["last_assistant_message"]
+        texts.append(j["last_assistant_message"])
     tp=j.get("transcript_path")
     if tp and os.path.exists(tp):
         try:
@@ -118,9 +118,12 @@ if j:
                             content=(e.get("message") or {}).get("content") or []
                             for b in content:
                                 if b.get("type")=="text" and b.get("text"):
-                                    response+="\n"+b["text"]
+                                    texts.append(b["text"])
                     except Exception: pass
         except Exception: pass
+
+# Joined once, like the .ps1 (repeated += copies the text again for every block).
+response="\n"+"\n".join(texts)
 
 total=int(progress.get("total_steps",50))
 found=set()
@@ -156,7 +159,15 @@ cursor=progress.get("current_step")
 aligned=first is None or (type(cursor) is int and cursor==first)
 
 if mode=="probe":
-    print("work" if (valid - existing) or not aligned else "idle")
+    # Steps the refusal file of this run already holds were inspected and refused before; a paused
+    # run does not count them as new work (mirrors Get-RefusedSteps in the .ps1).
+    refused_before=set()
+    try:
+        with open(os.path.join(os.path.dirname(p_path),"progress-refusals.json"),encoding="utf-8-sig") as f: old=json.load(f)
+        if isinstance(old,dict) and old.get("run_started_at")==progress.get("run_started_at"):
+            refused_before={r["step"] for r in (old.get("refusals") or []) if isinstance(r,dict) and type(r.get("step")) is int}
+    except (OSError,ValueError,TypeError,AttributeError): pass
+    print("work" if (valid - existing - refused_before) or not aligned else "idle")
     raise SystemExit(0)
 
 # Reported completions this Stop refuses, kept in step_archive/progress-refusals.json for
@@ -175,6 +186,12 @@ def refuse(step, gate, status, verdict, detail):
     refusals.append({"step":step,"gate":gate,"status":str(status or ""),"verdict":str(verdict or ""),"detail":text})
 
 workspace=os.path.dirname(os.path.dirname(p_path))
+# Every inspection shares one deadline that ends well inside the writer's 28 s budget in
+# run-hook.mjs, so a slow inspector is cut here instead of outliving a stopped writer.
+import time
+deadline=time.monotonic()+20
+def remaining():
+    return max(1.0, deadline-time.monotonic())
 if total == 50:
     # The r1 (step 38) and r2 (step 44) milestones need current measured quality, as on Codex
     # (codex/scripts/lib/acceptance.mjs); the trust5 Stop block cannot enforce them during
@@ -185,7 +202,7 @@ if total == 50:
         try:
             inspected = subprocess.run(
                 ["node", os.environ["H50_WRITER_INSPECTOR"], "--inspect", "--workspace", workspace],
-                capture_output=True, text=True, encoding="utf-8", timeout=30)
+                capture_output=True, text=True, encoding="utf-8", timeout=remaining())
             result = json.loads(inspected.stdout)
             verdict, detail = str(result.get("verdict") or ""), str(result.get("error") or "")
             quality_passed = inspected.returncode == 0 and result.get("verdict") == "PASS"
@@ -203,7 +220,7 @@ if total == 50:
             # inspect prints its result for every outcome; exit 0 means current and PASS.
             inspected = subprocess.run(
                 ["node", qa_inspector, "inspect", "--workspace", workspace, "--step", str(step)],
-                capture_output=True, text=True, encoding="utf-8", timeout=30)
+                capture_output=True, text=True, encoding="utf-8", timeout=remaining())
             result = json.loads(inspected.stdout)
             status, verdict = str(result.get("status") or ""), str(result.get("verdict") or "")
             qa_passed = inspected.returncode == 0 and result.get("status") == "current" and result.get("verdict") == "PASS"
@@ -220,7 +237,7 @@ if total == 50 and 50 in valid and 50 not in existing:
     try:
         inspected = subprocess.run(
             ["node", os.environ["H50_WRITER_INSPECTOR"], "--inspect-final", "--workspace", workspace],
-            capture_output=True, text=True, encoding="utf-8", timeout=30)
+            capture_output=True, text=True, encoding="utf-8", timeout=remaining())
         result = json.loads(inspected.stdout)
         verdict, detail = str(result.get("verdict") or ""), str(result.get("error") or "")
         final_passed = inspected.returncode == 0 and result.get("verdict") == "PASS"
@@ -274,7 +291,8 @@ log "invoked"
 # advisory file lock (best effort)
 exec 9>"$LOCK_FILE" 2>/dev/null || true
 if command -v flock >/dev/null 2>&1; then
-  flock -w 5 9 || { log "flock timeout"; exit 0; }
+  # Nothing is inspected on this Stop, so an older refusal must not be repeated as current.
+  flock -w 5 9 || { log "flock timeout"; rm -f "$STEP_ARCHIVE/progress-refusals.json"; exit 0; }
 fi
 
 writer_py write

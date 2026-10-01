@@ -7,6 +7,7 @@
 // Windows the .ps1 and .sh variants both run and must give the same results.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { makeWorkspace } from './helpers/workspace.mjs';
@@ -60,7 +61,7 @@ async function setup(variant, { recorded, name = 'project', progress = {} }) {
     }
   };
   return {
-    project, archive, refusalFile, hook,
+    base, plugin, project, archive, refusalFile, hook,
     progress: () => JSON.parse(readFileSync(progressFile, 'utf8')),
     refusals: () => existsSync(refusalFile) ? JSON.parse(readFileSync(refusalFile, 'utf8')) : null,
     // An object is written as JSON, a string as it is.
@@ -250,6 +251,52 @@ for (const variant of VARIANTS) {
     }
     f.refuse(file([entry(38, 'quality', { verdict: '<b>PASS</b>', detail: 'x' })]));
     assert.equal(stop(f), `${base} ${sentence.quality(38, 'unknown', 'x')}`);
+  });
+
+  test(`${variant}: a paused run does not count a completion refused before as new work`, async () => {
+    const f = await setup(variant, { recorded: 37, progress: { paused: true, pause_reason: 'user-request' } });
+    f.refuse(file([entry(38, 'quality')]));
+    const progressFile = join(f.archive, 'progress.json');
+    const before = readFileSync(progressFile);
+    // The refused report is still in the transcript; the paused writer must stay idle anyway.
+    report(f, 38);
+    assert.deepEqual(readFileSync(progressFile), before);
+    assert.equal(existsSync(`${progressFile}.bak`), false);
+    assert.deepEqual(f.refusals(), file([entry(38, 'quality')]));
+  });
+
+  test(`${variant}: an inspector that prints nothing is recorded as unavailable`, async () => {
+    const f = await setup(variant, { recorded: 38 });
+    // qa-report.mjs failing before it prints anything; both variants keep their defaults.
+    writeFileSync(join(f.plugin, 'scripts', 'qa-report.mjs'), 'process.exitCode = 2;\n');
+    report(f, 39);
+    assert.deepEqual(f.refusals().refusals, [entry(39, 'qa', { status: 'unavailable', verdict: '' })]);
+  });
+
+  test(`${variant}: a Stop that cannot take the writer lock drops an older refusal`, { skip: variant !== 'ps1' }, async () => {
+    const f = await setup(variant, { recorded: 38 });
+    f.refuse(file([entry(39, 'qa', { status: 'missing' })]));
+    const ready = join(f.base, 'holder.ready');
+    // Another writer holds the machine-wide lock for longer than the writer's 5 s wait.
+    const holder = spawn('powershell.exe', ['-NoProfile', '-Command',
+      `$m = New-Object System.Threading.Mutex($false, 'Global\\step-progress-writer-mutex'); [void]$m.WaitOne(); Set-Content -LiteralPath '${ready}' -Value ok; Start-Sleep -Seconds 15; $m.ReleaseMutex()`],
+      { stdio: 'ignore', windowsHide: true });
+    try {
+      for (let waited = 0; !existsSync(ready) && waited < 60000; waited += 200) await new Promise(resolve => setTimeout(resolve, 200));
+      assert.ok(existsSync(ready), 'the lock holder did not start');
+      const progressFile = join(f.archive, 'progress.json');
+      const before = readFileSync(progressFile);
+      // One run only: the shared helper repeats a run that met a held lock.
+      const result = runClaudeHook(f.plugin, 'step-progress-writer',
+        { hook_event_name: 'Stop', cwd: f.project, last_assistant_message: 'Step 039/50 완료' }, { variant, cwd: f.base });
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(result.stderr.trim(), '');
+      // Nothing was inspected, so the old refusal is gone and the progress is untouched.
+      assert.equal(f.refusals(), null);
+      assert.deepEqual(readFileSync(progressFile), before);
+    } finally {
+      holder.kill();
+    }
   });
 
   test(`${variant}: Stop shows a token that ends with a line break as unknown`, async () => {

@@ -734,7 +734,7 @@ Step 050/50 완료
 | **r2** | 44 | test·lint·typecheck·security 네 명령 exit 0 + 측정 커버리지 ≥ 85% | `step_archive/outputs/trust5_r2.md` |
 | **r3** | 49 이후(최종 Step 050) | r1·r2와 같은 검사 + 현재 HTML의 schema-v3 브라우저 라우팅 증거 + Step 50 회귀 행렬 6종 | `step_archive/outputs/trust5_r3.md` |
 
-PASS/FAIL/INCOMPLETE 판정이며 점수는 없다. 진행 기록 훅은 새 `Step 038/50 완료`·`Step 044/50 완료`를 `quality-gate.mjs --inspect`가 PASS일 때만, Step 050은 최종 PASS(`--inspect-final`)일 때만 기록하고(Codex도 38·44·50에서 같다), 거부한 완료는 다음 이어가기 지시에 이유 한 문장으로 알린다. trust5 Stop 훅은 PASS가 아니면 한 번 복구를 요구하지만, 이미 이어가는 Stop 턴은 다시 막지 않는다. 상세: [docs/QUALITY.md](docs/QUALITY.md)
+PASS/FAIL/INCOMPLETE 판정이며 점수는 없다. 진행 기록 훅은 새 `Step 038/50 완료`·`Step 044/50 완료`를 `quality-gate.mjs --inspect`가 PASS일 때만, Step 050은 최종 PASS(`--inspect-final`)일 때만 기록하고, 거부한 완료는 다음 이어가기 지시에 이유 한 문장으로 알린다. 검사는 완료를 보고한 순간이 아니라 다음 Stop에서 그때의 소스로 한다(Codex는 완료를 제출할 때 검사). 같은 턴에서 다음 단계가 소스를 바꿨다면 보고서가 낡아 거부되므로 `quality-gate.mjs`를 다시 실행한다. trust5 Stop 훅은 PASS가 아니면 한 번 복구를 요구하지만, 이미 이어가는 Stop 턴은 다시 막지 않는다. 상세: [docs/QUALITY.md](docs/QUALITY.md)
 
 ---
 

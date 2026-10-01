@@ -16,7 +16,7 @@ const expected = {
   PreToolUse: [['Bash', 'destructive-guard', 5], ['Write|Edit|MultiEdit|NotebookEdit|WebSearch', 'auto-approve', 3]],
   PermissionRequest: [['Bash|Write|Edit|MultiEdit|NotebookEdit|WebFetch|WebSearch', 'permission-request-guard', 5]],
   PostToolUse: [['Write|Edit', 'mx-tag-validator', 10], ['Write|Edit', 'lsp-autofix', 30]],
-  Stop: [['', 'stop-advance', 40], ['', 'spec-generator', 15], ['', 'trust5-validator', 60]],
+  Stop: [['', 'stop-advance', 45], ['', 'spec-generator', 15], ['', 'trust5-validator', 60]],
 };
 test('Claude manifest has a hooks envelope and one dispatcher per preserved registration', () => {
   const config = JSON.parse(fs.readFileSync(path.join(repo, 'hooks/hooks.json'), 'utf8'));
@@ -90,7 +90,8 @@ test('dispatcher budgets cover every registration and sequence part and stay bel
   // The parts run one after the other on their own budgets; a stopped part's tree needs time to end.
   for (const [name, list] of Object.entries(sequences)) {
     const sum = list.reduce((total, part) => total + budgets[part], 0);
-    assert.ok(budgets[name] >= sum + 2000, `${name}: ${budgets[name]} ms for parts with ${sum} ms of budgets`);
+    // Each part that runs out of time also gets up to 2 s for ending its process tree.
+    assert.ok(budgets[name] >= sum + 2000 * list.length, `${name}: ${budgets[name]} ms for parts with ${sum} ms of budgets`);
   }
 });
 
@@ -324,6 +325,48 @@ test('stop-advance without hooks/lib starts neither part', async () => {
   const f = await sequenceDispatcher({ withLib: false });
   const result = f.stopAdvance(f.active);
   assert.deepEqual([result.status, result.stdout, result.stderr, result.ran], [0, '', '', []]);
+});
+// A writer that outlives its part budget: this copy of run-hook.mjs gives it 1.5 s. The fake writer
+// waits on a node child that would write late.marker after 3 s, the way a slow inspector would. The
+// whole part (on macOS and Linux its process group) must end, so nothing is written after
+// step-auto-continue has started, and step-auto-continue still answers.
+test('stop-advance: a writer past its budget is stopped with all it started, and step-auto-continue still answers', async () => {
+  const f = await sequenceDispatcher();
+  const copy = path.join(f.hooks, 'run-hook.mjs');
+  const source = fs.readFileSync(copy, 'utf8');
+  assert.match(source, /"step-progress-writer":28000/);
+  fs.writeFileSync(copy, source.replace('"step-progress-writer":28000', '"step-progress-writer":1500'));
+  const marker = path.join(f.hooks, 'late.marker');
+  const late = "setTimeout(()=>require('fs').writeFileSync(process.argv[1],'late'),3000)";
+  fs.writeFileSync(path.join(f.hooks, `${WRITER}${process.platform === 'win32' ? '.ps1' : '.sh'}`), process.platform === 'win32'
+    ? `$null = [Console]::In.ReadToEnd()\n[Console]::Out.Write('writer noise' + [char]10)\n& $env:HARNESS50_NODE -e "${late}" (Join-Path $PSScriptRoot 'late.marker')\n`
+    : `cat >/dev/null\necho "writer noise"\n"$HARNESS50_NODE" -e "${late}" "$(dirname "$0")/late.marker"\n`);
+  const result = f.stopAdvance(f.active);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, NEXT_OUTPUT);
+  assert.match(result.stderr, /step-progress-writer did not finish within 1\.5 s/);
+  assert.deepEqual(result.ran, [NEXT]);
+  // Past the moment the node child would have written.
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 4000);
+  assert.equal(fs.existsSync(marker), false, 'a process the stopped writer started kept running');
+});
+// SIGTERM forwarded during the writer ends the sequence: step-auto-continue does not start.
+// Windows has no catchable SIGTERM for a child process, so this runs on macOS and Linux.
+test('stop-advance: a forwarded SIGTERM during the writer starts no further part', { skip: process.platform === 'win32' }, async () => {
+  const f = await sequenceDispatcher();
+  fs.writeFileSync(path.join(f.hooks, `${WRITER}.sh`), `cat > "$(dirname "$0")/${WRITER}.ran"\nsleep 5\n`);
+  const event = JSON.stringify({ hook_event_name: 'Stop', session_id: 's', stop_hook_active: false, cwd: f.active });
+  const child = spawn(process.execPath, [path.join(f.hooks, 'run-hook.mjs'), 'stop-advance'], { env: { ...process.env, CLAUDE_PROJECT_DIR: '' } });
+  let stdout = '';
+  child.stdout.on('data', chunk => { stdout += chunk; });
+  child.stdin.end(event);
+  const ranFile = path.join(f.hooks, `${WRITER}.ran`);
+  for (let waited = 0; !fs.existsSync(ranFile) && waited < 20000; waited += 100) await new Promise(resolve => setTimeout(resolve, 100));
+  child.kill('SIGTERM');
+  const code = await new Promise(resolve => child.once('close', resolve));
+  assert.equal(code, 143);
+  assert.equal(stdout, '');
+  assert.equal(fs.existsSync(path.join(f.hooks, `${NEXT}.ran`)), false);
 });
 
 // Watchdog fixtures use hooks the dispatcher always starts (the two guards), so a copy of
