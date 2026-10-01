@@ -734,7 +734,7 @@ Step 050/50 완료
 | **r2** | 44 | test·lint·typecheck·security 네 명령 exit 0 + 측정 커버리지 ≥ 85% | `step_archive/outputs/trust5_r2.md` |
 | **r3** | 49 이후(최종 Step 050) | r1·r2와 같은 검사 + 현재 HTML의 schema-v3 브라우저 라우팅 증거 + Step 50 회귀 행렬 6종 | `step_archive/outputs/trust5_r3.md` |
 
-PASS/FAIL/INCOMPLETE 판정이며 점수는 없다. 진행 기록 훅은 새 `Step 038/50 완료`·`Step 044/50 완료`를 `quality-gate.mjs --inspect`가 PASS일 때만, Step 050은 최종 PASS(`--inspect-final`)일 때만 기록하고, 거부한 완료는 다음 이어가기 지시에 이유 한 문장으로 알린다. 검사는 완료를 보고한 순간이 아니라 다음 Stop에서 그때의 소스로 한다(Codex는 완료를 제출할 때 검사). 같은 턴에서 다음 단계가 소스를 바꿨다면 보고서가 낡아 거부되므로 `quality-gate.mjs`를 다시 실행한다. trust5 Stop 훅은 PASS가 아니면 한 번 복구를 요구하지만, 이미 이어가는 Stop 턴은 다시 막지 않는다. 상세: [docs/QUALITY.md](docs/QUALITY.md)
+PASS/FAIL/INCOMPLETE 판정이며 점수는 없다. 진행 기록 훅은 새 `Step 038/50 완료`·`Step 044/50 완료`를 `quality-gate.mjs --inspect`가 PASS일 때만, Step 050은 최종 PASS(`--inspect-final`)일 때만 기록하고, 거부한 완료는 다음 이어가기 지시 끝에 이유와 할 일을 짧게 알린다. 검사는 완료를 보고한 순간이 아니라 다음 Stop에서 그때의 소스로 한다(Codex는 완료를 제출할 때 검사). 같은 턴에서 다음 단계가 소스를 바꿨다면 보고서가 낡아 거부되므로 `quality-gate.mjs`를 다시 실행한다. trust5 Stop 훅은 PASS가 아니면 한 번 복구를 요구하지만, 이미 이어가는 Stop 턴은 다시 막지 않는다. 상세: [docs/QUALITY.md](docs/QUALITY.md)
 
 ---
 
@@ -751,7 +751,7 @@ PASS/FAIL/INCOMPLETE 판정이며 점수는 없다. 진행 기록 훅은 새 `St
 | **PreToolUse** | destructive-guard + auto-approve | 위험 명령 차단·확인(Bash) + 편집·WebSearch 자동 승인 (병렬, exit 2 우선) |
 | **PermissionRequest** | permission-request-guard | `updatedInput` 변조 방어용 최후 검증: Bash 차단 집합·보호 경로·위험 URL (deny+exit 2) |
 | **PostToolUse** | mx-tag-validator + lsp-autofix | @MX 태그 검증 + Biome/Stylelint 자동수정 |
-| **Stop** | stop-advance(step-progress-writer 다음 step-auto-continue, 순서대로) + spec-generator + trust5-validator (셋은 병렬) | progress 갱신 뒤 미완료면 block JSON(거부된 완료는 이유 한 문장) · SPEC 생성 · r1/r2/r3 평가 |
+| **Stop** | stop-advance(step-progress-writer 다음 step-auto-continue, 순서대로) + spec-generator + trust5-validator (셋은 병렬) | progress 갱신 뒤 미완료면 block JSON(거부된 완료는 끝에 이유와 할 일) · SPEC 생성 · r1/r2/r3 평가 |
 
 `step_archive/.harness50-codex/state.json`이 있는 Codex 작업 공간에서는 step 훅(loader·writer·auto-continue·obedience-guard·webapp-trigger·spec-generator·trust5-validator)이 progress.json과 TOPIC.md를 만들거나 바꾸지 않고 Stop도 막지 않으며, Claude 편집을 자동 승인하지도 않습니다. SessionStart는 `hooks/lib/codex-workflow.mjs`가 읽은 Codex 진행 단계를 한 줄로만 알립니다([마이그레이션과 리셋](#migration-and-reset--마이그레이션과-리셋)). 두 가드는 Codex 작업 공간에서도 Bash 명령을 검사합니다(그 공간의 Claude 세션에는 다른 Harness50 가드가 없음).
 
@@ -761,7 +761,7 @@ PASS/FAIL/INCOMPLETE 판정이며 점수는 없다. 진행 기록 훅은 새 `St
 - webapp-trigger는 첫 줄이 `/webapp <주제>`(또는 `/harness50:webapp <주제>`)일 때만 실행됩니다.
 - step-progress-loader는 진행 중인 실행, 멈춘 실행(멈춘 위치 한 줄), Codex 작업 공간(한 줄 안내)에서 실행됩니다.
 - step-obedience-guard는 진행 중인 실행과 멈춘 실행(멈춘 위치 한 줄)에서 실행됩니다.
-- step-progress-writer는 진행 중인 실행, 멈춘 실행, 커서만 어긋난 실행에서 실행됩니다. Stop에서는 `stop-advance` 안에서 먼저 돌고(출력은 버림, 28초 예산), 보고된 완료를 거부하면 `step_archive/progress-refusals.json`에 남겨 step-auto-continue가 이유를 한 문장으로 전합니다(거부할 것이 없으면 지움). 멈춘 실행에서는 멈춘 턴에 보고된 완료 줄만 기록하고, 기록할 줄이 없고 커서도 맞으면 아무것도 쓰지 않습니다. 커서가 어긋난 실행에서는 새로 기록할 줄이 없어도 `current_step`을 첫 빈 단계로 되돌립니다(멈춘 실행의 멈춤 필드는 그대로 둠).
+- step-progress-writer는 진행 중인 실행, 멈춘 실행, 커서만 어긋난 실행에서 실행됩니다. Stop에서는 `stop-advance` 안에서 먼저 돌고(출력은 버림, 28초 예산), 보고된 완료를 거부하면 `step_archive/progress-refusals.json`에 남겨 step-auto-continue가 이유와 할 일을 짧게 전합니다(거부할 것이 없으면 지움). 멈춘 실행에서는 멈춘 턴에 보고된 완료 줄만 기록하고, 기록할 줄이 없고 커서도 맞으면 아무것도 쓰지 않습니다. 커서가 어긋난 실행에서는 새로 기록할 줄이 없어도 `current_step`을 첫 빈 단계로 되돌립니다(멈춘 실행의 멈춤 필드는 그대로 둠).
 - trust5-validator는 진행 중일 때와 50단계를 모두 마친 뒤에 실행됩니다.
 - 나머지 훅(auto-approve·mx-tag-validator·lsp-autofix·spec-generator·step-auto-continue)은 진행 중인 실행에서만 실행됩니다. step-auto-continue는 `stop-advance` 안에서 진행 기록 훅 다음에 돌며, 진행 기록 훅이 시간을 넘겨 멈춰도 답합니다.
 - 진행 중에도 실행과 연결되는 파일은 자동 승인에서 빠집니다. 예: `.mcp.json`, `CLAUDE.md`, `AGENTS.md`, `.husky/`, `.github/workflows/`, `package.json`, lockfile, `harness50.quality.json`, `node_modules/`, `step_archive/tools/`, `step_archive/archived/`와 평면 `step_archive/stepNNN.md`(단계 본문), 홈 폴더를 프로젝트로 연 경우를 막는 `.config/systemd/`·`.config/autostart/`·`.local/bin/`·`.bin/`·`pip.conf`(`pip.ini`). 하위 폴더에 있는 `step_archive/`의 `progress.json`·`.harness50-codex/`·`archived/`·`tools/`도 자동 승인되지 않습니다. `step_archive/TOPIC/TOPIC.md`는 1단계가 직접 쓰므로 자동 승인 대상입니다.

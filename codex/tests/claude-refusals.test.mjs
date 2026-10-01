@@ -1,7 +1,7 @@
 // Refused completions (2.12.0). The progress writer records a new step 38 (r1) or 44 (r2) only
 // with current measured quality, which it inspects and never runs, and keeps every completion it
 // refuses in step_archive/progress-refusals.json. step-auto-continue names the lowest refused step
-// that is still open in one sentence at the very end of its block reason.
+// that is still open in a short note at the very end of its block reason.
 //
 // Hooks run in the native variant (PowerShell on Windows, bash elsewhere). With H50_TEST_BASH=1 on
 // Windows the .ps1 and .sh variants both run and must give the same results.
@@ -297,6 +297,19 @@ for (const variant of VARIANTS) {
     } finally {
       holder.kill();
     }
+  });
+
+  test(`${variant}: a Stop that cannot read progress.json drops an older refusal`, async () => {
+    const f = await setup(variant, { recorded: 38 });
+    f.refuse(file([entry(39, 'qa', { status: 'missing' })]));
+    const progressFile = join(f.archive, 'progress.json');
+    // A damaged progress.json: the writer reads it (the .ps1 three times), inspects nothing and
+    // leaves the file as it is.
+    const damaged = '{"total_steps": 50,';
+    writeFileSync(progressFile, damaged);
+    report(f, 39);
+    assert.equal(f.refusals(), null);
+    assert.equal(readFileSync(progressFile, 'utf8'), damaged);
   });
 
   test(`${variant}: Stop shows a token that ends with a line break as unknown`, async () => {

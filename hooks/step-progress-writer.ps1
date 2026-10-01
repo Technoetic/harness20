@@ -127,13 +127,15 @@ if ($inputJson -and $inputJson.last_assistant_message) {
     $responseParts.Add([pscustomobject]@{ Ticks = $null; Text = [string]$inputJson.last_assistant_message })
 }
 
-# Only a line that contains 완료, as text or as the JSON escape \uc644\ub8cc, can hold a completion
-# report, so every other line is skipped before ConvertFrom-Json. Parsing every line and joining
-# every text block (see Get-ReportedSteps) took 29 s on a 4.6 MiB transcript of 8,000 text blocks
-# in Windows PowerShell 5.1, past this hook's 28 s budget in run-hook.mjs, and the completions of a
-# long session were then never recorded. Lines are streamed, not read whole. Mirrors
-# step-progress-writer.sh.
-$completionLine = [regex]::new('완료|\\u[cC]644\\u[bB]8[cC][cC]')
+# Only two kinds of line can change the steps Get-ReportedSteps finds: a line with 완료, whose second
+# syllable is in it as 료 or as the JSON escape \ub8cc (either hex case) however the first is
+# spelled, and a line with a code fence (``` or ~~~), which turns the fence state that runs across
+# text blocks on or off. Every other line is skipped before ConvertFrom-Json, and the steps found are
+# the same as when every line was parsed. Parsing every line and joining every text block took 29 s
+# on a 4.6 MiB transcript of 8,000 text blocks in Windows PowerShell 5.1, past this hook's 28 s budget
+# in run-hook.mjs, and the completions of a long session were then never recorded. Lines are
+# streamed, not read whole. Mirrors step-progress-writer.sh.
+$scanLine = [regex]::new('료|\\u[bB]8[cC][cC]|```|~~~')
 if ($inputJson -and $inputJson.transcript_path -and (Test-Path -LiteralPath $inputJson.transcript_path)) {
     try {
         $transcriptPath = (Resolve-Path -LiteralPath $inputJson.transcript_path).ProviderPath
@@ -142,7 +144,7 @@ if ($inputJson -and $inputJson.transcript_path -and (Test-Path -LiteralPath $inp
         $transcriptReader = [System.IO.StreamReader]::new($transcriptStream, [System.Text.Encoding]::UTF8)
         try {
             while ($null -ne ($line = $transcriptReader.ReadLine())) {
-                if (-not $line -or -not $completionLine.IsMatch($line)) { continue }
+                if (-not $line -or -not $scanLine.IsMatch($line)) { continue }
                 try {
                     $entry = $line | ConvertFrom-Json
                     if ($entry.type -eq 'assistant' -and $entry.message.content) {

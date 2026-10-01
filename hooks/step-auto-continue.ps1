@@ -5,7 +5,7 @@
 #     (exit 2 + stderr를 함께 내면 exit 0이 "no block"으로 읽힐 위험이 있어 쓰지 않는다)
 #   - stop_hook_active=true여도 진전이 없는 Stop이 연속 STALL_LIMIT(3)회가 될 때까지는 계속
 #     block한다 (무한 루프 방지는 진전 없음 카운터가 맡는다)
-#   - writer가 거부한 완료(step_archive/progress-refusals.json)는 사유에 한 문장으로 붙인다
+#   - writer가 거부한 완료(step_archive/progress-refusals.json)는 사유 끝에 이유와 할 일로 붙인다
 #   - 모든 실행을 로그로 기록해 진단 가능하게 함
 
 param()

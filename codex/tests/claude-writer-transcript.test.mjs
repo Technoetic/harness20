@@ -1,13 +1,14 @@
 // The progress writer also finds completion reports in the session transcript (transcript_path), not
-// only in last_assistant_message. It streams the transcript and parses only the lines that can hold
-// a report: 완료 as text or as the JSON escape \uc644\ub8cc (either hex case). The 2.11.0
-// writer parsed every line and kept every assistant text; a 4.6 MiB transcript then took 29 s in
-// Windows PowerShell 5.1, past the writer's 28 s budget in run-hook.mjs, and the completions of a
-// long session were never recorded.
+// only in last_assistant_message. It streams the transcript and parses only the lines that can change
+// the steps it finds: 완료 (its second syllable as 료 or as the JSON escape \ub8cc, either hex case)
+// and code fences, whose state runs across text blocks. The steps found are the same as when every
+// line was parsed. The 2.11.0 writer parsed every line and kept every assistant text; a 4.6 MiB
+// transcript then took 29 s in Windows PowerShell 5.1, past the writer's 28 s budget in
+// run-hook.mjs, and the completions of a long session were never recorded.
 //
-// T1-T4 run the writer script directly with the native variant (PowerShell on Windows, bash
-// elsewhere; the .sh through Git Bash with H50_TEST_BASH=1). T5 dispatches it through run-hook.mjs as
-// the host does.
+// T1-T4, T6 and T8-T10 run the writer script directly with the native variant (PowerShell on
+// Windows, bash elsewhere; the .sh through Git Bash with H50_TEST_BASH=1). T5 and T7 dispatch it
+// through run-hook.mjs as the host does.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { closeSync, mkdirSync, openSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -18,8 +19,9 @@ import { PROJECT_NAMES, installPlugin, runClaudeHook, runDispatcher, tempRoot, t
 const BOM = String.fromCharCode(0xfeff);
 const MIB = 1024 * 1024;
 const pad = step => String(step).padStart(3, '0');
-// Every spelling of 완료 that the writer's line filter lets through.
-const COMPLETION_TOKEN = /완료|\\u[cC]644\\u[bB]8[cC][cC]/;
+// What lets a line through the writer's filter: the second syllable of 완료 in any spelling, or a
+// code fence.
+const FILTER_TOKEN = /료|\\u[bB]8[cC][cC]|```|~~~/;
 
 // A 50-step run with step 1 done and the cursor on step 2, step bodies 1..9 and an installed plugin
 // copy. The transcript lives outside the project in a folder with the project's name, so its path
@@ -169,6 +171,44 @@ testEachName('T6 a transcript that another process holds open for appending is s
   }
 });
 
+// T8-T9: a code fence (``` or ~~~) turns the fence state on or off, and the state runs across text
+// blocks: a report inside a fence is a quoted example, not a completion. A text block without 완료
+// can still open or close a fence, so its line must pass the filter.
+testEachName('T8 a fence closed in a text block without 완료 does not hide the next report', (t, name) => {
+  const f = setup(t, name);
+  writeFileSync(f.transcript, jsonl([
+    assistantEntry(['Step 002/50 완료', '확인 명령은 다음과 같습니다.\n```bash'], { index: 1 }),
+    assistantEntry(['npm test\n```', 'The checks passed.'], { index: 2 }),
+    assistantEntry('Step 003/50 완료', { index: 3 })
+  ]));
+  const after = writeUntil(f, () => runWriter(f), written);
+  assert.deepEqual(after.completed_steps, [1, 2, 3]);
+  assert.equal(after.current_step, 4);
+});
+
+testEachName('T9 a report quoted inside a fence that a text block without 완료 opened is not recorded', (t, name) => {
+  const f = setup(t, name);
+  writeFileSync(f.transcript, jsonl([
+    assistantEntry('The report line looks like this:\n~~~', { index: 1 }),
+    assistantEntry('Step 002/50 완료\n~~~', { index: 2 }),
+    assistantEntry('The checks come next.', { index: 3 })
+  ]));
+  const after = writeUntil(f, () => runWriter(f), written);
+  assert.deepEqual(after.completed_steps, [1]);
+  assert.equal(after.current_step, 2);
+});
+
+testEachName('T10 a completion whose 완료 is half escaped is recorded', (t, name) => {
+  const f = setup(t, name);
+  writeFileSync(f.transcript, jsonl([
+    escapedEntry('Step 002/50 완료', '\\uc644료', { index: 1 }),
+    escapedEntry('Step 003/50 완료', '완\\uB8CC', { index: 2 })
+  ]));
+  const after = writeUntil(f, () => runWriter(f), written);
+  assert.deepEqual(after.completed_steps, [1, 2, 3]);
+  assert.equal(after.current_step, 4);
+});
+
 // T7: lines that pass the filter but hold no report. Every filler entry mentions 완료 inside a
 // sentence, in twenty text blocks, so each line is parsed and every block is kept; the texts must be
 // joined once (repeated concatenation grew with the square of the 20,000 blocks).
@@ -210,7 +250,7 @@ test('T5 a 6 MiB transcript dispatched through run-hook.mjs is read within the w
     bytes += Buffer.byteLength(lines.at(-1)) + 1;
   }
   const filler = jsonl(lines);
-  assert.doesNotMatch(filler, COMPLETION_TOKEN, 'the filler must not pass the line filter');
+  assert.doesNotMatch(filler, FILTER_TOKEN, 'the filler must not pass the line filter');
   writeFileSync(f.transcript, filler + jsonl([assistantEntry('Step 002/50 완료', { index: lines.length })]));
   assert.ok(statSync(f.transcript).size > 6 * MIB);
   // run-hook.mjs stops the writer at its 28 s budget with exit 1 and a line on stderr, so exit 0

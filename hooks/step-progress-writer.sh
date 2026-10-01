@@ -47,7 +47,14 @@ a_dir=os.environ["ARCHIVED_DIR"]
 
 try:
     with open(p_path,encoding="utf-8") as f: progress=json.load(f)
-except Exception: raise SystemExit(0)
+    if progress is None: raise ValueError("progress.json holds null")
+except Exception:
+    # Nothing is inspected on this Stop, so an older refusal must not be repeated as current (the
+    # .ps1 removes it after its read retries as well).
+    if mode=="write":
+        try: os.remove(os.path.join(os.path.dirname(p_path),"progress-refusals.json"))
+        except OSError: pass
+    raise SystemExit(0)
 
 # Named pause (harness-rules 2-1): hooks/lib/harness-activity.mjs starts this hook for a paused run
 # so that the completion lines of the turn that paused are recorded; the pause fields are kept as
@@ -106,10 +113,12 @@ if j:
             with open(tp,encoding="utf-8") as f:
                 for ln in f:
                     ln=ln.strip()
-                    # Only a line with 완료 (as text or as the JSON escape \uc644\ub8cc) can hold a
-                    # completion report; the rest is skipped before json.loads. Mirrors the .ps1,
-                    # where parsing every line of a long transcript ran past the hook budget.
-                    if not ln or ("완료" not in ln and "\\uc644\\ub8cc" not in ln.lower()): continue
+                    # Only a line with 완료 (its second syllable as 료 or as the JSON escape \ub8cc,
+                    # however the first is spelled) or with a code fence (``` or ~~~, whose state
+                    # runs across text blocks) can change the steps found below; the rest is skipped
+                    # before json.loads with the same result. Mirrors the .ps1, where parsing every
+                    # line of a long transcript ran past the hook budget.
+                    if not ln or not ("료" in ln or "\\ub8cc" in ln.lower() or "```" in ln or "~~~" in ln): continue
                     try:
                         e=json.loads(ln)
                         if e.get("type")=="assistant":

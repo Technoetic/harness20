@@ -34,6 +34,11 @@ string concatenation, which grows with the square of the number of blocks.
 - `stop-advance` (writer, then step-auto-continue): 12 of 12 recorded, stale Next 0 of 12, about
   1.7-1.9 s per Stop.
 
+These timings were taken with a filter that kept only lines holding 완료. It now also keeps lines with
+료 or its JSON escape and lines with a code fence, so the steps found match a scan of every line (the
+fence state runs across text blocks). In the independent check of 2026-10-02, a 6.39 MiB transcript
+in which every line passes the filter took 1.7 s.
+
 The regression tests that pin these behaviours are `codex/tests/claude-writer-transcript.test.mjs`
 (T5: a 6 MiB transcript through `run-hook.mjs` stays inside the writer budget) and the `stop-advance`
 tests in `codex/tests/claude-manifest.test.mjs` (order, gates and timeouts).
