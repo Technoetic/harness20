@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { delimiter, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
@@ -24,6 +24,19 @@ test('isolated packaged preflight validates both definitions and refuses missing
 }, async () => {
   const sandbox = await makeWorkspace(); // Existing helper guards cleanup beneath the temporary test root.
   const packaged = join(sandbox, 'package');
+  const bin = join(sandbox, 'bin');
+  await mkdir(bin);
+  await writeFile(join(bin, 'codex.cmd'), [
+    '@echo off',
+    'rem Isolated test fixture: version query only; no installation.',
+    'if not "%~1"=="--version" exit /b 9',
+    'if not "%~2"=="" exit /b 9',
+    'echo codex-cli 0.150.1',
+    'exit /b 0',
+    ''
+  ].join('\r\n'), 'utf8');
+  const pathKey = Object.keys(process.env).find(key => key.toLowerCase() === 'path') ?? 'Path';
+  const environment = { ...process.env, [pathKey]: `${bin}${delimiter}${process.env[pathKey] ?? ''}` };
   for (const path of ['.codex-plugin', '.claude-plugin', 'codex', 'assets', 'hooks', 'scripts', 'docs']) {
     await cp(join(repo, path), join(packaged, path), {
       recursive: true, filter: path => !path.includes(`${join('codex', 'tests')}`)
@@ -32,12 +45,13 @@ test('isolated packaged preflight validates both definitions and refuses missing
   const smoke = () => {
     const result = runPowerShell(['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
       resolve(repo, 'codex/tests/install-smoke.ps1'), '-PluginRoot', packaged, '-Mode', 'Preflight'],
-    { encoding: 'utf8', timeout: 60000, windowsHide: true });
+    { env: environment, encoding: 'utf8', timeout: 60000, windowsHide: true });
     assert.ifError(result.error);
     return { exit: result.status, report: JSON.parse(result.stdout.trim()) };
   };
   const positive = smoke();
   assert.equal(positive.exit, 0, JSON.stringify(positive.report));
+  assert.equal(positive.report.codex_version, 'codex-cli 0.150.1');
   assert.equal(positive.report.step_count, 36);
   assert.deepEqual(positive.report.workflow_profiles, { 'legacy-50-v1': 50, 'research-free-36-v1': 36 });
   assert.equal(positive.report.shared_dependencies_verified, true);
