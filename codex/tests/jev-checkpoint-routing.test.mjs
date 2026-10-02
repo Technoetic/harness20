@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -86,9 +86,10 @@ for (const { profile, total, checkpoints, flags } of [
   { profile: 'research-free-36-v1', total: 36, checkpoints: [17, 18, 25, 31, 35], flags: [] },
   { profile: 'legacy-50-v1', total: 50, checkpoints: [16, 24, 25, 30, 37, 45, 49], flags: ['--legacy'] }
 ]) test(`documented ${profile} inputs prepare offline in a missing workspace through the actual CLI`, async t => {
-  const directory = await mkdtemp(join(tmpdir(), 'harness50-jev-routing-'));
+  const temporaryRoot = await realpath(tmpdir());
+  const directory = await mkdtemp(join(temporaryRoot, 'harness50-jev-routing-'));
   t.after(async () => {
-    assert.ok(resolve(directory).startsWith(resolve(tmpdir()) + sep));
+    assert.ok(resolve(directory).startsWith(resolve(temporaryRoot) + sep));
     assert.ok(basename(directory).startsWith('harness50-jev-routing-'));
     await rm(directory, { recursive: true, force: true });
   });
