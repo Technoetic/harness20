@@ -69,6 +69,12 @@ if (Test-Path -LiteralPath $codexState) {
 # The loader never creates progress.json or step_archive/: only an explicit /webapp <topic>
 # starts a run (webapp-trigger). Without a progress file there is nothing to resume.
 if (-not (Test-Path -LiteralPath $progressFile -PathType Leaf)) { exit 0 }
+# Resolve profile/count/body identity before reading or mutating this run.
+$profileJson = @(& node (Join-Path $PSScriptRoot 'lib/workflow-profile.mjs') resolve (Join-Path $projectRoot '.') 2>$null)
+if ($LASTEXITCODE -ne 0 -or $profileJson.Count -eq 0) { exit 0 }
+try { $selectedProfile = ($profileJson -join "`n") | ConvertFrom-Json -ErrorAction Stop } catch { exit 0 }
+$selectedArchive = Join-Path $projectRoot $selectedProfile.body_directory
+
 try { $existingProgress = Get-Content -LiteralPath $progressFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop } catch { exit 0 }
 if ($null -eq $existingProgress) { exit 0 }
 
@@ -110,7 +116,7 @@ Write-Host "=== Step Progress Loader ==="
 # 기존 progress.json이 있어도 total_steps가 실제 파일 수와 다르면 경고
 # stepNNN.md 개수: flat + archived/ 둘 다 스캔 후 파일명 기준 unique (재가동 시 archived/ 이동 대응)
 $stepFiles = @(Get-ChildItem -LiteralPath $stepArchive -Filter "step???.md" -ErrorAction SilentlyContinue)
-$archivedDir2 = Join-Path $stepArchive "archived"
+$archivedDir2 = $selectedArchive
 if (Test-Path -LiteralPath $archivedDir2) {
     $stepFiles += @(Get-ChildItem -LiteralPath $archivedDir2 -Filter "step???.md" -ErrorAction SilentlyContinue)
 }
@@ -173,7 +179,7 @@ Write-Host "=== Ready to resume from step$('{0:D3}' -f $currentStep) ==="
 # ── 복종 지시 ──────────────────────────────────────────────────────────────
 # 다음 실행해야 할 step 파일 경로를 명확히 못박아 모델에 주입.
 # step001.md 끝의 "즉시 다음 step 읽고 실행" 지시를 다른 세션에서도 강제한다.
-$archivedDir = Join-Path $stepArchive "archived"
+$archivedDir = $selectedArchive
 $nextStep = $null
 $completedArr = @($progress.completed_steps)
 for ($i = 1; $i -le [int]$progress.total_steps; $i++) {
@@ -184,7 +190,7 @@ if ($null -ne $nextStep) {
     # F9 fix (2026-06-10): archived/ 우선, flat 폴백 이중 해석 (auto-continue와 동일 규약)
     $nextStepRel = $null
     if (Test-Path -LiteralPath (Join-Path $archivedDir "$nextStepFmt.md")) {
-        $nextStepRel = "step_archive/archived/$nextStepFmt.md"
+        $nextStepRel = "$($selectedProfile.body_directory)/$nextStepFmt.md"
     } elseif (Test-Path -LiteralPath (Join-Path $stepArchive "$nextStepFmt.md")) {
         $nextStepRel = "step_archive/$nextStepFmt.md"
     }

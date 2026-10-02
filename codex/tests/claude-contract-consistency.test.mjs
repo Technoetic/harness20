@@ -16,6 +16,7 @@ import { join, relative } from 'node:path';
 
 import { PROJECT_NAMES, gitBash, installPlugin, repo, runClaudeHook, tempRoot, testEachName, windows } from './helpers/claude-hooks.mjs';
 import { prepareQuality } from './helpers/completion-quality.mjs';
+import { getWorkflowProfile } from '../../scripts/lib/workflow-profiles.mjs';
 
 // Step numbers of the retired 107-step layout (69, 81, 84, 104, 107), as standalone tokens.
 const RETIRED = /(?<![\w.#\\-])(?:0?69|0?81|0?84|104|107)(?![\w%.])/;
@@ -109,15 +110,25 @@ test('S1 no retired step number in the skills, commands, agents, step bodies or 
 
 test('S2 the SPEC milestone line matches the quality-gate thresholds and names the body result path', () => {
   const gate = text('scripts/quality-gate.mjs');
-  const first = /done\.length < (\d+)\) return;/.exec(gate);
-  const later = /done\.length >= (\d+) \? 'r3' : done\.length >= (\d+) \? 'r2'/.exec(gate);
-  assert.ok(first && later, 'milestone thresholds not found in scripts/quality-gate.mjs');
-  const [r1, r2, r3] = [first[1], later[2], later[1]].map(Number);
+  assert.match(gate, /const \[quality1, quality2\] = profile\.milestones\.quality/);
+  assert.match(gate, /done\.length < quality1/);
+  assert.match(gate, /done\.length >= finalStep - 1 \? 'r3' : done\.length >= quality2 \? 'r2'/);
+  const legacy = getWorkflowProfile('legacy-50-v1');
+  const [r1, r2] = legacy.milestones.quality;
+  const r3 = legacy.milestones.final - 1;
+  assert.deepEqual(getWorkflowProfile('research-free-36-v1').milestones.quality, [26, 30, 36]);
   assert.deepEqual([r1, r2, r3], [38, 44, 49]);
   assert.equal(milestoneLine(r1, r2, r3), MILESTONE_LINE);
   for (const file of ['hooks/spec-generator.sh', 'hooks/spec-generator.ps1']) {
     const source = text(file);
-    assert.ok(source.includes(MILESTONE_LINE), `${file} lacks the milestone line`);
+    // Render only the allowlisted numeric placeholders; D2 executes the real generator too.
+    const rendered = source
+      .replaceAll('${quality1}', String(r1)).replaceAll('${quality2}', String(r2))
+      .replaceAll('${beforeFinal}', String(r3)).replaceAll('$finalNumber', '050')
+      .replaceAll('{profile["milestones"]["quality"][0]}', String(r1))
+      .replaceAll('{profile["milestones"]["quality"][1]}', String(r2))
+      .replaceAll('{total-1}', String(r3)).replaceAll('{total:03d}', '050');
+    assert.ok(rendered.includes(MILESTONE_LINE), `${file} lacks the milestone line`);
     assert.ok(source.includes(RESULT_PATH_RULE), `${file} lacks the result path rule`);
     assert.doesNotMatch(source, /step_archive\/step(?:\{num\}|\$\{stepNum\})_\*\.md/, file);
   }
@@ -166,7 +177,8 @@ test('S6 both prompt guards put user direct requests first, and the rules cover 
   }
   const frontmatter = /^---\n([\s\S]*?)\n---/.exec(text('skills/harness-rules/SKILL.md'));
   assert.ok(frontmatter, 'harness-rules has no frontmatter');
-  assert.match(frontmatter[1], /step001~050/);
+  assert.match(frontmatter[1], /step001~036/);
+  assert.match(frontmatter[1], /legacy step001~050/);
 });
 
 // The body of a Markdown section: from its heading line (level given by the marker) up to the next
@@ -315,7 +327,8 @@ testEachName('D1 webapp-trigger bootstraps /webapp without eval_rounds or trust5
   assert.ok(existsSync(join(root, 'step_archive', 'TOPIC', 'TOPIC.md')), 'TOPIC.md was not written');
   const progress = readJson(join(root, 'step_archive', 'progress.json'));
   assert.equal(progress.current_step, 1);
-  assert.equal(progress.total_steps, 50);
+  assert.equal(progress.total_steps, 36);
+  assert.equal(progress.workflow_profile, "research-free-36-v1");
   assert.equal(Object.hasOwn(progress, 'eval_rounds'), false);
   assert.equal(Object.hasOwn(progress, 'trust5_results'), false);
 });

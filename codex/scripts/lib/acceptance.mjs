@@ -592,7 +592,7 @@ function historicalReplayContract(contract, persistedEvidence) {
 async function measuredReports(step, workspaceRoot, afterArtifactOpen, workflowProfile) {
   const profile = getWorkflowProfile(workflowProfile);
   if (!runtimeReportIds(step, workflowProfile).length) return [];
-  const quality = await inspectQualityReport(workspaceRoot);
+  const quality = await inspectQualityReport(workspaceRoot, { workflowProfile });
   if (quality.verdict !== "PASS") {
     fail("ACCEPTANCE_QUALITY_INCOMPLETE", "current measured quality PASS is required", { reason: quality.error });
   }
@@ -612,7 +612,7 @@ async function measuredReports(step, workspaceRoot, afterArtifactOpen, workflowP
   }
   // Recheck after all artifact callbacks: inspected source, coverage and QA
   // evidence must still describe this candidate, and the report bytes must match.
-  const current = await inspectQualityReport(workspaceRoot);
+  const current = await inspectQualityReport(workspaceRoot, { workflowProfile });
   if (current.verdict !== "PASS" || !sameJson(current, quality)) {
     fail("ACCEPTANCE_QUALITY_INCOMPLETE", "measured quality changed during completion");
   }

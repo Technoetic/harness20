@@ -22,7 +22,6 @@ $ErrorActionPreference = "Continue"
 try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch {}
 $projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { [System.IO.Directory]::GetCurrentDirectory() }
 $stepArchive = Join-Path $projectRoot "step_archive"
-$archivedDir = Join-Path $stepArchive "archived"
 $progressFile = Join-Path $stepArchive "progress.json"
 
 # Codex coexistence: no Claude step reminder while the Codex state manager owns this workspace.
@@ -33,6 +32,12 @@ if (Test-Path -LiteralPath (Join-Path (Join-Path $stepArchive ".harness50-codex"
 if ([string]$harnessEvent.prompt -cmatch '^\s*/(harness50:)?harness-(pause|resume|status|reset)(\s|$)') { exit 0 }
 
 if (-not (Test-Path -LiteralPath $progressFile)) { exit 0 }
+
+# Resolve profile/count/body identity before reading or mutating this run.
+$profileJson = @(& node (Join-Path $PSScriptRoot 'lib/workflow-profile.mjs') resolve (Join-Path $projectRoot '.') 2>$null)
+if ($LASTEXITCODE -ne 0 -or $profileJson.Count -eq 0) { exit 0 }
+try { $selectedProfile = ($profileJson -join "`n") | ConvertFrom-Json -ErrorAction Stop } catch { exit 0 }
+$selectedArchive = Join-Path $projectRoot $selectedProfile.body_directory
 
 try {
     $progress = Get-Content -LiteralPath $progressFile -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -82,10 +87,11 @@ if ($isPaused) {
 }
 
 $nextStepFmt = "step$('{0:D3}' -f $nextStep)"
+$archivedDir = $selectedArchive
 # F9 fix (2026-06-10): archived/ 우선, flat 폴백 이중 해석 (auto-continue와 동일 규약)
 $nextStepRel = $null
 if (Test-Path -LiteralPath (Join-Path $archivedDir "$nextStepFmt.md")) {
-    $nextStepRel = "step_archive/archived/$nextStepFmt.md"
+    $nextStepRel = "$($selectedProfile.body_directory)/$nextStepFmt.md"
 } elseif (Test-Path -LiteralPath (Join-Path $stepArchive "$nextStepFmt.md")) {
     $nextStepRel = "step_archive/$nextStepFmt.md"
 }

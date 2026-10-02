@@ -28,6 +28,11 @@ if [ -e "$STEP_ARCHIVE/.harness50-codex/state.json" ]; then
   exit 0
 fi
 [ -f "$PROGRESS_FILE" ] || exit 0
+# Shared profile/archive identity; invalid metadata never activates a mixed archive.
+H50_PROFILE="$(node "$(dirname "${BASH_SOURCE[0]}")/lib/workflow-profile.mjs" resolve "$PROJECT_ROOT" 2>/dev/null)" || { rm -f "$STEP_ARCHIVE/progress-refusals.json"; exit 0; }
+export H50_PROFILE
+ARCHIVED_DIR="$PROJECT_ROOT/$(printf '%s' "$H50_PROFILE" | python3 -c 'import json,sys; print(json.load(sys.stdin)["body_directory"])' | tr -d '\r')"
+
 command -v python3 >/dev/null 2>&1 || { log "python3 missing"; exit 0; }
 
 H50_WRITER_INSPECTOR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/quality-gate.mjs"
@@ -44,6 +49,7 @@ mode=sys.argv[1] if len(sys.argv)>1 else "write"
 raw=os.environ.get("RAW","")
 p_path=os.environ["PROGRESS_FILE"]
 a_dir=os.environ["ARCHIVED_DIR"]
+profile=json.loads(os.environ["H50_PROFILE"])
 
 try:
     with open(p_path,encoding="utf-8") as f: progress=json.load(f)
@@ -131,6 +137,13 @@ if j:
                     except Exception: pass
         except Exception: pass
 
+# Re-resolve inside the writer lock and compare with the exact record being updated.
+helper=os.path.join(os.path.dirname(os.path.dirname(os.environ["H50_WRITER_INSPECTOR"])),"hooks","lib","workflow-profile.mjs")
+resolved=subprocess.run(["node",helper,"resolve",os.path.dirname(os.path.dirname(p_path))],capture_output=True,text=True)
+if resolved.returncode: raise SystemExit(0)
+profile=json.loads(resolved.stdout)
+if progress.get("total_steps")!=profile["total"] or progress.get("run_started_at")!=profile.get("run_started_at") or progress.get("workflow_profile", "legacy-50-v1")!=profile["workflow_profile"]: raise SystemExit(0)
+
 # Joined once, like the .ps1 (repeated += copies the text again for every block).
 response="\n"+"\n".join(texts)
 
@@ -201,11 +214,11 @@ import time
 deadline=time.monotonic()+20
 def remaining():
     return max(1.0, deadline-time.monotonic())
-if total == 50:
+if total == profile["total"]:
     # The r1 (step 38) and r2 (step 44) milestones need current measured quality, as on Codex
     # (codex/scripts/lib/acceptance.mjs); the trust5 Stop block cannot enforce them during
     # continuous runs (stop_hook_active). Inspection only, with a deadline.
-    for step in sorted((valid - existing) & {38, 44}):
+    for step in sorted((valid - existing) & set(profile["milestones"]["quality"][:-1])):
         quality_passed = False
         verdict, detail = "unavailable", ""
         try:
@@ -222,7 +235,7 @@ if total == 50:
             refuse(step, "quality", "", verdict, detail)
             print(f"Step {step} remains incomplete: measured quality evidence missing, failed, or stale.")
     qa_inspector = os.path.join(os.path.dirname(os.environ["H50_WRITER_INSPECTOR"]), "qa-report.mjs")
-    for step in sorted((valid - existing) & {39, 40, 43, 46, 47, 48}):
+    for step in sorted((valid - existing) & set(profile["milestones"]["independentQa"])):
         qa_passed = False
         status, verdict = "unavailable", ""
         try:
@@ -239,7 +252,8 @@ if total == 50:
             valid.discard(step)
             refuse(step, "qa", status, verdict, "")
             print(f"Step {step} remains incomplete: QA evidence missing, failed, or stale.")
-if total == 50 and 50 in valid and 50 not in existing:
+final=profile["milestones"]["final"]
+if final in valid and final not in existing:
     # Inspection only, with a deadline; no browser installation or project commands.
     final_passed = False
     verdict, detail = "unavailable", ""
@@ -253,9 +267,9 @@ if total == 50 and 50 in valid and 50 not in existing:
     except (OSError, ValueError, subprocess.TimeoutExpired):
         pass
     if not final_passed:
-        valid.discard(50)
-        refuse(50, "final", "", verdict, detail)
-        print("Step 50 remains incomplete: final quality/browser routing evidence missing, failed, or stale.")
+        valid.discard(final)
+        refuse(final, "final", "", verdict, detail)
+        print(f"Step {final} remains incomplete: final quality/browser routing evidence missing, failed, or stale.")
 
 # Replaced or removed on every write, through a temp file and rename (mirrors the .ps1).
 refusal_path=os.path.join(os.path.dirname(p_path),"progress-refusals.json")

@@ -1,6 +1,6 @@
 import { LEGACY_WORKFLOW_PROFILE, getWorkflowProfile } from "../../../scripts/lib/workflow-profiles.mjs";
 import assert from 'node:assert/strict';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runQualityGate } from '../../../scripts/lib/quality.mjs';
 import { snapshotQa, recordQa } from '../../../scripts/lib/qa-report.mjs';
@@ -33,6 +33,17 @@ export async function prepareQuality(root, { fail = false } = {}) {
 }
 
 export async function prepareFinalRegression(root, { status = 'pass', workflowProfile = LEGACY_WORKFLOW_PROFILE, verifierMode = 'independent' } = {}) {
+  if (workflowProfile !== LEGACY_WORKFLOW_PROFILE) {
+    let exists = false;
+    for (const file of ['step_archive/.harness50-codex/state.json', 'step_archive/progress.json']) {
+      try { await access(join(root, file)); exists = true; } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    }
+    if (!exists) {
+      await mkdir(join(root, 'step_archive'), { recursive: true });
+      await writeFile(join(root, 'step_archive/workflow-profile.json'), JSON.stringify({ schema_version: 2, workflow_profile: workflowProfile, total_steps: 36 }));
+      await writeFile(join(root, 'step_archive/progress.json'), JSON.stringify({ schema_version: 2, workflow_profile: workflowProfile, total_steps: 36, current_step: 36, completed_steps: [], run_started_at: '2026-10-02T01:00:00.000Z' }));
+    }
+  }
   const checks = ['e2e', 'screenshot', 'keyboard', 'mouse', 'design', 'console'].map(name => ({
     id: `${name}-regression`, requirement: `Verify final ${name} regression.`
   }));

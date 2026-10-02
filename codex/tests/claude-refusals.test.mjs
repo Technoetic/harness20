@@ -301,15 +301,17 @@ for (const variant of VARIANTS) {
 
   test(`${variant}: a Stop that cannot read progress.json drops an older refusal`, async () => {
     const f = await setup(variant, { recorded: 38 });
-    f.refuse(file([entry(39, 'qa', { status: 'missing' })]));
     const progressFile = join(f.archive, 'progress.json');
-    // A damaged progress.json: the writer reads it (the .ps1 three times), inspects nothing and
-    // leaves the file as it is.
-    const damaged = '{"total_steps": 50,';
-    writeFileSync(progressFile, damaged);
-    report(f, 39);
-    assert.equal(f.refusals(), null);
-    assert.equal(readFileSync(progressFile, 'utf8'), damaged);
+    const valid = JSON.parse(readFileSync(progressFile, 'utf8'));
+    // Neither broken JSON nor a rejected profile reaches evidence inspection. Both drop stale
+    // refusal hints without changing the invalid progress bytes.
+    for (const damaged of ['{"total_steps": 50,', JSON.stringify({ ...valid, workflow_profile: 'unknown-profile' })]) {
+      f.refuse(file([entry(39, 'qa', { status: 'missing' })]));
+      writeFileSync(progressFile, damaged);
+      report(f, 39);
+      assert.equal(f.refusals(), null);
+      assert.equal(readFileSync(progressFile, 'utf8'), damaged);
+    }
   });
 
   test(`${variant}: Stop shows a token that ends with a line break as unknown`, async () => {

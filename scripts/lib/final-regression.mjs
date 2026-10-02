@@ -27,7 +27,7 @@ export async function inspectFinalRegression(workspaceRoot, workflowProfile = LE
     if (!artifact || sha256(await readSafe(root, 'dist/index.html')) !== artifact.sha256) {
       throw new Error('Final regression snapshot does not bind the current final HTML');
     }
-    const reportPath = `step_archive/outputs/qa-reports/${qa.report_sha256}.report.json`;
+    const reportPath = qa.report_path;
     if (sha256(await readSafe(root, reportPath, 64 * 1024)) !== qa.report_sha256) {
       throw new Error('Final regression report changed during inspection');
     }

@@ -74,17 +74,9 @@ if [ "$PRECHECK" != "issue" ]; then
   exit 0
 fi
 
-mkdir -p "$STEP_ARCHIVE" "$ARCHIVED_DIR" "$TOPIC_DIR"
-
-# copy step001~050 if missing
-if [ -d "$ASSET_STEPS" ]; then
-  for src in "$ASSET_STEPS"/step*.md; do
-    [ -e "$src" ] || continue
-    base="$(basename "$src")"
-    dst="$ARCHIVED_DIR/$base"
-    [ ! -e "$dst" ] && cp "$src" "$dst"
-  done
-fi
+# The shared helper validates every allowlisted source before copying.
+PROFILE_JSON="$(node "$PLUGIN_ROOT/hooks/lib/workflow-profile.mjs" bootstrap "$PROJECT_ROOT" 2>/dev/null)" || { echo '[HARNESS] Profile bootstrap failed; nothing was initialized.'; exit 0; }
+mkdir -p "$TOPIC_DIR"
 
 # H4 수정: html-bundler를 프로젝트로 복사 (step038에서 실행 가능하게)
 TOOLS_DIR="$STEP_ARCHIVE/tools"
@@ -133,7 +125,9 @@ cat >"$PROGRESS_FILE" <<JSON
   "completed_steps": [],
   "skipped_steps": [],
   "failed_steps": [],
-  "total_steps": 50,
+  "schema_version": 2,
+  "workflow_profile": "research-free-36-v1",
+  "total_steps": 36,
   "metrics": { "total_duration_minutes": 0, "total_sessions": 0, "steps_per_session_avg": 0 },
   "session_history": [],
   "last_updated": "$NOW"
@@ -149,19 +143,19 @@ WEBAPP TUTORIAL TRIGGER DETECTED
 Bootstrap complete:
   - step_archive/ ready
   - step_archive/TOPIC/TOPIC.md written with the user prompt
-  - step_archive/progress.json initialized (current_step=1, total=50)
-  - step_archive/archived/step001.md ~ step050.md available
+  - step_archive/progress.json initialized (current_step=1, total=36)
+  - step_archive/profiles/research-free-36-v1/archived/step001.md ~ step036.md available
 
 ABSOLUTE OVERRIDE:
   Before addressing anything else, IMMEDIATELY:
-    1. Read step_archive/archived/step001.md
+    1. Read step_archive/profiles/research-free-36-v1/archived/step001.md
     2. Execute its instructions in full (including TOPIC pickup from TOPIC.md)
-    3. On completion report 'Step 001/50 완료' and Read step002.md
-    4. Continue without user confirmation through step050
+    3. On completion report 'Step 001/36 완료' and Read step002.md
+    4. Continue without user confirmation through step036
 
 Do NOT ask the user any clarifying questions.
 Do NOT pause for confirmation.
-Do NOT end the turn before step050 except by a named pause (harness-rules 2-1).
+Do NOT end the turn before step036 except by a named pause (harness-rules 2-1).
 </harness50-trigger>
 REMINDER
 exit 0

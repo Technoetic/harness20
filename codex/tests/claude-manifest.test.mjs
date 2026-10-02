@@ -10,6 +10,13 @@ import { readRun } from '../../hooks/lib/harness-activity.mjs';
 const repo = fileURLToPath(new URL('../../', import.meta.url));
 const dispatcher = path.join(repo, 'hooks/run-hook.mjs');
 const activity = path.join(repo, 'hooks/lib/harness-activity.mjs');
+function copyActivity(target) {
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.copyFileSync(activity, target);
+  const shared = path.resolve(path.dirname(target), '../../scripts/lib');
+  fs.mkdirSync(shared, { recursive: true });
+  for (const name of ['workflow-profiles.mjs', 'claude-profile.mjs']) fs.copyFileSync(path.join(repo, 'scripts/lib', name), path.join(shared, name));
+}
 const expected = {
   SessionStart: [['', 'step-progress-loader', 30]],
   UserPromptSubmit: [['', 'webapp-trigger', 10], ['', 'step-obedience-guard', 5]],
@@ -40,10 +47,11 @@ test('dispatcher rejects missing, unknown, traversal, and extra hook arguments',
   }
 });
 test('dispatcher runs only native shell and preserves stdin, output, and exit code', async () => {
-  const root = await makeWorkspace();
+  const root = path.join(await makeWorkspace(), 'hooks');
+  fs.mkdirSync(root);
   fs.copyFileSync(dispatcher, path.join(root, 'run-hook.mjs'));
   fs.mkdirSync(path.join(root, 'lib'));
-  fs.copyFileSync(activity, path.join(root, 'lib', 'harness-activity.mjs'));
+  copyActivity(path.join(root, 'lib', 'harness-activity.mjs'));
   const windows = process.platform === 'win32';
   // Only the native counterpart exists; attempting the other platform fails.
   fs.writeFileSync(path.join(root, windows ? 'destructive-guard.ps1' : 'destructive-guard.sh'), windows
@@ -109,7 +117,7 @@ async function gatedDispatcher({ withLib = true } = {}) {
   fs.copyFileSync(dispatcher, path.join(hooks, 'run-hook.mjs'));
   if (withLib) {
     fs.mkdirSync(path.join(hooks, 'lib'));
-    fs.copyFileSync(activity, path.join(hooks, 'lib', 'harness-activity.mjs'));
+    copyActivity(path.join(hooks, 'lib', 'harness-activity.mjs'));
   }
   const windows = process.platform === 'win32';
   for (const name of [...GUARDS, ...ACTIVITY_GATED, 'webapp-trigger']) {

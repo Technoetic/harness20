@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { open, unlink } from 'node:fs/promises';
 import { physicalWorkspace, safePath, readSafe, writeSafe, sha256 } from './quality-files.mjs';
 
+import { workflowContext, recheckWorkflowContext, evidenceDirectory } from './workflow-context.mjs';
+
 const BASE = 'step_archive/outputs/qa-reports';
 const UUID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const HASH = /^[a-f0-9]{64}$/;
@@ -12,7 +14,7 @@ const error = () => new Error('QA evidence rejected: invalid, unsafe, changed or
 const require = condition => { if (!condition) throw error(); };
 const bytes = value => Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
 const stepName = step => `step${String(step).padStart(3, '0')}`;
-const pointerPath = step => `${BASE}/${stepName(step)}.latest.json`;
+const pointerPath = (step, base) => `${base}/${stepName(step)}.latest.json`;
 
 function object(value, fields) {
   require(value && typeof value === 'object' && !Array.isArray(value));
@@ -101,9 +103,9 @@ function snapshotShape(value, step, id) {
   unique(value.artifacts.map(entry => entry.path));
   checks(value.checks);
 }
-async function snapshotRead(root, step, id) {
+async function snapshotRead(root, step, id, base) {
   require(typeof id === 'string' && UUID.test(id));
-  const loaded = await json(root, `${BASE}/${id}.snapshot.json`);
+  const loaded = await json(root, `${base}/${id}.snapshot.json`);
   snapshotShape(loaded.value, step, id);
   return loaded;
 }
@@ -142,27 +144,34 @@ function reportShape(report, snapshot, step, snapshotDigest) {
   require(report.verdict === (outcomes.every(outcome => outcome.status === 'pass') ? 'PASS' : 'INCOMPLETE'));
 }
 
-export async function snapshotQa(workspaceRoot, step, input) {
+export async function snapshotQa(workspaceRoot, step, input, options = {}) {
   try {
     stepNumber(step);
     object(input, ['artifacts', 'checks']);
     const names = [...list(input.artifacts, 128, 1)];
     const criteria = checks(input.checks);
     const root = await physicalWorkspace(workspaceRoot);
+    const context = await workflowContext(root, options);
+    require(step <= context.profile.stepCount);
+    const base = evidenceDirectory(BASE, context);
     const artifacts = await hashes(root, names, 'artifact');
     const snapshot = { schema_version: 1, snapshot_id: randomUUID(), step, created_at: new Date().toISOString(), artifacts, checks: criteria };
     await sameFiles(root, artifacts, 'artifact');
-    await writeOnce(root, `${BASE}/${snapshot.snapshot_id}.snapshot.json`, bytes(snapshot));
+    await recheckWorkflowContext(root, context);
+    await writeOnce(root, `${base}/${snapshot.snapshot_id}.snapshot.json`, bytes(snapshot));
     return { snapshot_id: snapshot.snapshot_id, step };
   } catch { throw error(); }
 }
 
-export async function recordQa(workspaceRoot, step, raw) {
+export async function recordQa(workspaceRoot, step, raw, options = {}) {
   try {
     stepNumber(step);
     const inputCopy = structuredClone(raw);
     const root = await physicalWorkspace(workspaceRoot);
-    const loaded = await snapshotRead(root, step, inputCopy?.snapshot_id);
+    const context = await workflowContext(root, options);
+    require(step <= context.profile.stepCount);
+    const base = evidenceDirectory(BASE, context);
+    const loaded = await snapshotRead(root, step, inputCopy?.snapshot_id, base);
     const snapshot = loaded.value;
     const input = recordInput(inputCopy, snapshot);
     await sameFiles(root, snapshot.artifacts, 'artifact');
@@ -180,33 +189,38 @@ export async function recordQa(workspaceRoot, step, raw) {
     require(data.length <= LIMIT);
     await sameFiles(root, snapshot.artifacts, 'artifact');
     await sameFiles(root, evidence, 'evidence');
-    require((await snapshotRead(root, step, snapshot.snapshot_id)).digest === loaded.digest);
+    require((await snapshotRead(root, step, snapshot.snapshot_id, base)).digest === loaded.digest);
+    await recheckWorkflowContext(root, context);
     const reportDigest = sha256(data);
     // A per-snapshot claim prevents concurrent calls from publishing different assessments.
     // A process crash can leave an unusable claim; take a new snapshot, never silently steal it.
-    await writeOnce(root, `${BASE}/${snapshot.snapshot_id}.recorded.json`, bytes({ report_sha256: reportDigest }));
-    await writeOnce(root, `${BASE}/${reportDigest}.report.json`, data);
-    await writeSafe(root, pointerPath(step), bytes({ schema_version: 1, step, report_sha256: reportDigest }));
+    await writeOnce(root, `${base}/${snapshot.snapshot_id}.recorded.json`, bytes({ report_sha256: reportDigest }));
+    await writeOnce(root, `${base}/${reportDigest}.report.json`, data);
+    await recheckWorkflowContext(root, context);
+    await writeSafe(root, pointerPath(step, base), bytes({ schema_version: 1, step, report_sha256: reportDigest }));
     return { status: 'recorded', step, report_sha256: reportDigest, verdict: report.verdict };
   } catch { throw error(); }
 }
 
-export async function inspectQa(workspaceRoot, step) {
+export async function inspectQa(workspaceRoot, step, options = {}) {
   const empty = status => ({ status, step, verdict: 'INCOMPLETE', preserve: [] });
   try {
     stepNumber(step);
     const root = await physicalWorkspace(workspaceRoot);
+    const context = await workflowContext(root, options);
+    require(step <= context.profile.stepCount);
+    const base = evidenceDirectory(BASE, context);
     let pointer;
-    try { pointer = (await json(root, pointerPath(step))).value; }
+    try { pointer = (await json(root, pointerPath(step, base))).value; }
     catch (failure) { if (failure.code === 'ENOENT') return empty('missing'); throw failure; }
     object(pointer, ['schema_version', 'step', 'report_sha256']);
     require(pointer.schema_version === 1 && pointer.step === step && HASH.test(pointer.report_sha256));
-    const loaded = await json(root, `${BASE}/${pointer.report_sha256}.report.json`);
+    const loaded = await json(root, `${base}/${pointer.report_sha256}.report.json`);
     require(loaded.digest === pointer.report_sha256);
     const report = loaded.value;
-    const snapshot = await snapshotRead(root, step, report.snapshot_id);
+    const snapshot = await snapshotRead(root, step, report.snapshot_id, base);
     reportShape(report, snapshot.value, step, snapshot.digest);
-    const claim = (await json(root, `${BASE}/${report.snapshot_id}.recorded.json`)).value;
+    const claim = (await json(root, `${base}/${report.snapshot_id}.recorded.json`)).value;
     object(claim, ['report_sha256']);
     require(claim.report_sha256 === loaded.digest);
     let current = true;
@@ -217,11 +231,12 @@ export async function inspectQa(workspaceRoot, step) {
       await sameFiles(root, evidence, 'evidence');
       await sameFiles(root, snapshot.value.artifacts, 'artifact');
     } catch { current = false; }
-    require((await json(root, pointerPath(step))).value.report_sha256 === loaded.digest);
-    require((await json(root, `${BASE}/${loaded.digest}.report.json`)).digest === loaded.digest);
-    require((await snapshotRead(root, step, report.snapshot_id)).digest === snapshot.digest);
+    require((await json(root, pointerPath(step, base))).value.report_sha256 === loaded.digest);
+    require((await json(root, `${base}/${loaded.digest}.report.json`)).digest === loaded.digest);
+    require((await snapshotRead(root, step, report.snapshot_id, base)).digest === snapshot.digest);
+    await recheckWorkflowContext(root, context);
     return { status: current ? 'current' : 'stale', step, verdict: current ? report.verdict : 'INCOMPLETE',
       preserve: current ? report.outcomes.filter(outcome => outcome.status === 'pass').map(outcome => outcome.id) : [],
-      report_sha256: loaded.digest, artifacts: snapshot.value.artifacts, report };
+      report_sha256: loaded.digest, report_path: `${base}/${loaded.digest}.report.json`, pointer_path: pointerPath(step, base), artifacts: snapshot.value.artifacts, report };
   } catch { return empty('invalid'); }
 }

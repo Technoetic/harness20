@@ -28,6 +28,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { resolveWorkflowProfile, LEGACY_WORKFLOW_PROFILE } from '../../scripts/lib/workflow-profiles.mjs';
+import { claudeStepBody, checkClaudeProfileBinding } from '../../scripts/lib/claude-profile.mjs';
+
 export const STEP_COUNT = 50;
 export const ACTIVE_STATUSES = Object.freeze(['active', 'running', 'in_progress']);
 export const MAX_PROGRESS_BYTES = 1024 * 1024;
@@ -63,7 +66,7 @@ export const HOOK_GATES = Object.freeze({
 const DEFAULT_GATE = Object.freeze(['active']);
 
 const CODEX_SKIP_LINE = '[HARNESS] webapp trigger skipped: a Codex workflow owns this workspace, so step_archive/TOPIC/TOPIC.md and progress.json were left unchanged. Resume that workflow, or use a separate workspace for a different topic.';
-export const PRECHECK_INVALID_LINE = '[HARNESS] webapp trigger skipped: step_archive/progress.json is unreadable or invalid, so step_archive/TOPIC/TOPIC.md and progress.json were left unchanged. Repair it or run /harness-reset first.';
+export const PRECHECK_INVALID_LINE = '[HARNESS] webapp trigger skipped: step_archive/progress.json is unreadable or invalid, so step_archive/TOPIC/TOPIC.md and progress.json were left unchanged. Restore known consistent workflow metadata and profile binding before retrying /harness-reset.';
 
 // Physical path of candidate; a missing tail is joined onto the physical form of its parent.
 export function physical(candidate) {
@@ -98,25 +101,26 @@ export function classifyProgress(state) {
   if (!state || typeof state !== 'object' || Array.isArray(state)) return { phase: 'invalid' };
   if (('paused' in state && state.paused !== false) || state.status === 'paused') return { phase: 'paused' };
   if ('status' in state && !ACTIVE_STATUSES.includes(state.status)) return { phase: 'stopped' };
-  if (state.total_steps !== STEP_COUNT) return { phase: 'invalid' };
+  let total;
+  try { total = resolveWorkflowProfile(state).stepCount; } catch { return { phase: 'invalid' }; }
   const done = state.completed_steps;
-  if (!Array.isArray(done) || !done.every(step => Number.isInteger(step) && step >= 1 && step <= STEP_COUNT) ||
+  if (!Array.isArray(done) || !done.every(step => Number.isInteger(step) && step >= 1 && step <= total) ||
       new Set(done).size !== done.length) return { phase: 'invalid' };
   const finished = new Set(done);
   let next = null;
-  for (let step = 1; step <= STEP_COUNT; step += 1) {
+  for (let step = 1; step <= total; step += 1) {
     if (!finished.has(step)) { next = step; break; }
   }
   // The final writer keeps the cursor on the last step or moves it one past.
   if (next === null) {
-    return [STEP_COUNT, STEP_COUNT + 1].includes(state.current_step) ? { phase: 'finished', completed: STEP_COUNT } : { phase: 'invalid' };
+    return [total, total + 1].includes(state.current_step) ? { phase: 'finished', completed: total } : { phase: 'invalid' };
   }
   if (state.current_step === next) return { phase: 'running', next, completed: done.length };
   // Only the cursor disagrees (a hand edit of progress.json): 'drift'. The progress writer puts
   // current_step back on the first unfinished step. A cursor that is no step number at all stays
   // invalid.
   const cursor = state.current_step;
-  return Number.isInteger(cursor) && cursor >= 1 && cursor <= STEP_COUNT + 1
+  return Number.isInteger(cursor) && cursor >= 1 && cursor <= total + 1
     ? { phase: 'drift', next, completed: done.length } : { phase: 'invalid' };
 }
 
@@ -148,19 +152,24 @@ export function readRun(root) {
   if (!entry.present) return { phase: 'absent' };
   let state;
   try { state = readProgress(physical(root), entry.file); } catch { return { phase: 'invalid' }; }
+  try {
+    const profile = resolveWorkflowProfile(state);
+    checkClaudeProfileBinding(root, profile);
+    if (profile.id !== LEGACY_WORKFLOW_PROFILE) for (let step = 1; step <= profile.stepCount; step++) claudeStepBody(root, state, step);
+  } catch { return { phase: 'invalid' }; }
   const run = classifyProgress(state);
   if (run.phase === 'paused') return pausedRun(root, state);
   if (run.phase !== 'running' && run.phase !== 'drift') return run;
   // Without the body of the first unfinished step a drift run is as stale as a running one.
-  const body = stepBody(root, run.next);
+  const body = stepBody(root, run.next, state);
   if (!body) return { ...run, phase: 'stale' };
   return run.phase === 'drift' ? run : { ...run, phase: 'active', stepBody: body };
 }
-function stepBody(root, step) {
-  const name = stepName(step);
-  if (regularFile(path.join(root, 'step_archive', 'archived', name))) return 'archived';
-  if (regularFile(path.join(root, 'step_archive', name))) return 'flat';
-  return null;
+function stepBody(root, step, state) {
+  try {
+    const body = claudeStepBody(root, state, step);
+    return body.startsWith('step_archive/archived/') ? 'archived' : body.startsWith('step_archive/profiles/') ? body : 'flat';
+  } catch { return null; }
 }
 // classifyProgress reports 'paused' before any structural check, so judge the same state without
 // the pause: a run that would be active or drift stays 'paused'; anything else keeps that other
@@ -171,7 +180,7 @@ function pausedRun(root, state) {
   if (unpaused.status === 'paused') delete unpaused.status;
   const run = classifyProgress(unpaused);
   if (run.phase !== 'running' && run.phase !== 'drift') return run;
-  return stepBody(root, run.next) ? { phase: 'paused', next: run.next, completed: run.completed } : { ...run, phase: 'stale' };
+  return stepBody(root, run.next, state) ? { phase: 'paused', next: run.next, completed: run.completed } : { ...run, phase: 'stale' };
 }
 export const isActive = root => readRun(root).phase === 'active';
 
@@ -204,11 +213,13 @@ export function webappPrecheck(root) {
     return PRECHECK_INVALID_LINE;
   }
   if (!state || typeof state !== 'object' || Array.isArray(state)) return PRECHECK_INVALID_LINE;
-  if (!('completed_steps' in state)) return 'issue';
+  try { checkClaudeProfileBinding(root, resolveWorkflowProfile(state)); }
+  catch { return PRECHECK_INVALID_LINE; }
+  if (!('completed_steps' in state)) return PRECHECK_INVALID_LINE;
   const done = state.completed_steps;
   if (!Array.isArray(done)) return PRECHECK_INVALID_LINE;
   if (done.length === 0) return 'issue';
-  return `[HARNESS] webapp trigger skipped: step_archive/progress.json already records ${done.length}/${STEP_COUNT} completed steps, so step_archive/TOPIC/TOPIC.md and progress.json were left unchanged. Continue that run (use /harness-resume if it is paused), or run /harness-reset first and then /webapp <topic> for a new topic.`;
+  return `[HARNESS] webapp trigger skipped: step_archive/progress.json already records ${done.length}/${state.total_steps ?? STEP_COUNT} completed steps, so step_archive/TOPIC/TOPIC.md and progress.json were left unchanged. Continue that run (use /harness-resume if it is paused), or run /harness-reset first and then /webapp <topic> for a new topic.`;
 }
 
 function invokedDirectly() {

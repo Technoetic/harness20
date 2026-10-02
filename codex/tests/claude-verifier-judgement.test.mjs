@@ -145,7 +145,7 @@ function assertExclusionJoin(step43, rules, label) {
   assert.match(step43, /^   참고 이미지에는 있지만 설계가 채택하지 않은 요소는 advisory다\. 1번에서 `제외 계약: <id>`로 적은 요소는 advisory로도 적지 않는다\.$/m, label);
   const s11 = /^## 11\. 검증 판정과 finding 형식\n([\s\S]*?)(?=^## |^---$)/m.exec(rules);
   assert.ok(s11, `${label}: harness-rules has no section 11`);
-  assert.match(s11[1], /선택된 디자인 토큰과 제외 목록은 30단계 설계 계약\(`harness50-design-contract`\)이고/, label);
+  assert.match(s11[1], /선택된 디자인 토큰과 제외 목록은 위 표의 프로필별 설계 계약\(`harness50-design-contract`\)이고/, label);
   assert.match(s11[1], /계약 `exclude`에서 `adopted: false`인 항목의 위반은 최소 `Important`다\./, label);
   assert.match(s11[1], /계약이 없는 이전 실행은 §5의 수치를 기준으로 쓴다\./, label);
 }
@@ -157,7 +157,7 @@ test('V7 step 43 keeps design exclusions out of findings and section 11 names th
   const mutations = {
     precedenceFail: [s43.replace('필수 finding이나 advisory로 넣지 않고', 'FAIL 항목에 넣지 않고'), rules],
     advisoryExclusion: [s43.replace(' 1번에서 `제외 계약: <id>`로 적은 요소는 advisory로도 적지 않는다.', ''), rules],
-    noContract: [s43, rules.replace('30단계 설계 계약(`harness50-design-contract`)이고', '헌법 §5 값이고')],
+    noContract: [s43, rules.replace('위 표의 프로필별 설계 계약(`harness50-design-contract`)이고', '헌법 §5 값이고')],
     unadoptedAdvisory: [s43, rules.replace('위반은 최소 `Important`다.', '위반은 `advisory`다.')],
     noFallback: [s43, rules.replace(' 계약이 없는 이전 실행은 §5의 수치를 기준으로 쓴다.', '')]
   };

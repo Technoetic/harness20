@@ -102,8 +102,9 @@ test("Codex substitution executes the selected hook through the native host shel
     recursive: true
   });
   await mkdir(join(pluginRoot, "scripts", "lib"), { recursive: true });
-  await cp(join(checkoutRoot, "scripts", "lib", "workflow-profiles.mjs"),
-    join(pluginRoot, "scripts", "lib", "workflow-profiles.mjs"));
+  for (const name of ["workflow-profiles.mjs", "json-io.mjs", "errors.mjs"]) {
+    await cp(join(checkoutRoot, "scripts", "lib", name), join(pluginRoot, "scripts", "lib", name));
+  }
   assert.match(pluginRoot, /\s/);
   const root = await makeWorkspace();
   const handler = config.hooks.SessionStart[0].hooks[0];

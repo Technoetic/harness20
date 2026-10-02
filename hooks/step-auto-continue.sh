@@ -2,8 +2,10 @@
 case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) exit 0 ;; esac
 command -v python3 >/dev/null 2>&1 || exit 0
 export RAW_STDIN="$(cat || true)"
+export H50_PROFILE_HELPER="$(dirname "${BASH_SOURCE[0]}")/lib/workflow-profile.mjs"
+if command -v cygpath >/dev/null 2>&1; then H50_PROFILE_HELPER="$(cygpath -m "$H50_PROFILE_HELPER")"; export H50_PROFILE_HELPER; fi
 python3 - <<'PY_STOP'
-import json, os, re
+import json, os, re, subprocess
 # The only early stop (harness-rules 2-1). Same string as $namedPause in step-auto-continue.ps1
 # (Python triple quotes keep the inner single quotes).
 NAMED='''Early stop only as a named pause (permission-denied | required-tool-failed | required-input-missing; harness-rules 2-1): save evidence under step_archive/, run node "<plugin-root>/scripts/harness-pause.mjs" pause --workspace "<project-root>" --reason <code> --evidence <step_archive/file> --note '<user action, no quotes>', then end the turn with the pause report.'''
@@ -14,6 +16,9 @@ try:
     # Codex coexistence (mirrors step-auto-continue.ps1): the Codex state manager owns
     # continuation when its state exists. Exit before any read or write.
     if os.path.exists(os.path.join(archive,'.harness50-codex','state.json')): raise SystemExit(0)
+    resolved=subprocess.run(['node',os.environ['H50_PROFILE_HELPER'],'resolve',root],capture_output=True,text=True)
+    if resolved.returncode: raise SystemExit(0)
+    profile=json.loads(resolved.stdout)
     with open(os.path.join(archive,'progress.json'),encoding='utf-8-sig') as f: p=json.load(f)
     # Named pause, same judgement as scripts/lib/pause-state.mjs isPaused: nothing is printed.
     if ('paused' in p and p['paused'] is not False) or p.get('status')=='paused': raise SystemExit(0)
@@ -36,7 +41,8 @@ try:
     os.replace(tmp,state)
     if stall>=3: raise SystemExit(0)
     step=f'step{current:03d}.md'
-    relative='step_archive/archived/'+step if os.path.isfile(os.path.join(archive,'archived',step)) else 'step_archive/'+step
+    relative=profile['step_body']
+    if not relative: raise SystemExit(0)
     # A completion the writer refused (step_archive/progress-refusals.json): name the lowest one still
     # open, so the model knows why the step it reported is asked for again. Mirrors the .ps1.
     note=''

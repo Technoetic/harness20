@@ -15,6 +15,8 @@ async function fixture({ ids = categories, artifacts = ['dist/index.html'], stat
   await mkdir(join(root, 'dist'), { recursive: true });
   await mkdir(join(root, 'step_archive/outputs'), { recursive: true });
   await writeFile(join(root, 'dist/index.html'), '<html><body><button>Continue</button></body></html>');
+  if (step === 36) await writeFile(join(root, 'step_archive/workflow-profile.json'), JSON.stringify({ schema_version: 2, workflow_profile: 'research-free-36-v1', total_steps: 36 }));
+  if (step === 36) await writeFile(join(root, 'step_archive/progress.json'), JSON.stringify({ schema_version: 2, workflow_profile: 'research-free-36-v1', total_steps: 36, completed_steps: [], current_step: 36, run_started_at: '2026-10-02T01:00:00.000Z' }));
   await writeFile(join(root, 'src.js'), 'export const enabled = true;');
   const snapshot = await snapshotQa(root, step, { artifacts,
     checks: ids.map(id => ({ id, requirement: `Rerun the full ${id} matrix on the final candidate.` })) });

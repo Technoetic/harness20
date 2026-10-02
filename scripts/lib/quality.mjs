@@ -2,6 +2,8 @@ import { spawn, execFile } from 'node:child_process';
 import { unlink } from 'node:fs/promises';
 import { physicalWorkspace, safePath, readSafe, writeSafe, sourceFingerprint, sha256 } from './quality-files.mjs';
 
+import { workflowContext, recheckWorkflowContext } from './workflow-context.mjs';
+
 export const REPORT_PATH = 'step_archive/outputs/quality-gate.json';
 const CONFIG_PATH = 'harness50.quality.json';
 const CHECKS = ['test', 'lint', 'typecheck', 'security'];
@@ -70,7 +72,8 @@ function coverageResult(bytes, minimum) {
 export async function runQualityGate(workspaceRoot, { timeoutMs = MAX_TIMEOUT } = {}) {
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_TIMEOUT) throw new Error('Invalid command timeout');
   const root = await physicalWorkspace(workspaceRoot);
-  const report = { schema_version: 1, generated_at: new Date().toISOString(), verdict: 'FAIL', checks: {}, coverage: null };
+  const context = await workflowContext(root);
+  const report = { schema_version: context.generation ? 2 : 1, ...context.binding, generated_at: new Date().toISOString(), verdict: 'FAIL', checks: {}, coverage: null };
   try {
     const configBytes = await readSafe(root, CONFIG_PATH, 65536);
     const config = parseConfig(configBytes);
@@ -92,21 +95,24 @@ export async function runQualityGate(workspaceRoot, { timeoutMs = MAX_TIMEOUT } 
     if (report.coverage && sha256(await readSafe(root, config.coverage.path)) !== report.coverage.sha256) throw new Error('Coverage changed after the test invocation');
     if (!report.error && CHECKS.every(name => commandPass(report.checks[name])) && report.coverage?.pass) report.verdict = 'PASS';
   } catch (error) { report.error = error.message; }
+  await recheckWorkflowContext(root, context);
   await writeSafe(root, REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`);
   return report;
 }
 
-export async function inspectQualityReport(workspaceRoot) {
+export async function inspectQualityReport(workspaceRoot, options = {}) {
   try {
     const root = await physicalWorkspace(workspaceRoot);
+    const context = await workflowContext(root, options);
     const report = JSON.parse((await readSafe(root, REPORT_PATH)).toString('utf8'));
     const configBytes = await readSafe(root, CONFIG_PATH, 65536);
     const config = parseConfig(configBytes);
-    if (report.schema_version !== 1 || report.verdict !== 'PASS' || report.error || report.config_sha256 !== sha256(configBytes) || !Number.isFinite(Date.parse(report.generated_at)) || CHECKS.some(name => !commandPass(report.checks?.[name]) || JSON.stringify(report.checks[name].command) !== JSON.stringify(config.checks[name].command))) throw new Error('Quality report does not contain four successful configured checks');
+    if ((report.schema_version !== (context.generation ? 2 : 1) || (context.generation && (report.workflow_profile !== context.profile.id || report.workflow_generation !== context.generation))) || report.verdict !== 'PASS' || report.error || report.config_sha256 !== sha256(configBytes) || !Number.isFinite(Date.parse(report.generated_at)) || CHECKS.some(name => !commandPass(report.checks?.[name]) || JSON.stringify(report.checks[name].command) !== JSON.stringify(config.checks[name].command))) throw new Error('Quality report does not contain four successful configured checks');
     const current = await sourceFingerprint(root);
     if (current.sha256 !== report.source?.sha256 || current.files !== report.source?.files) throw new Error('Quality report is stale: source fingerprint changed');
     const coverage = coverageResult(await readSafe(root, config.coverage.path), config.coverage.minimum);
     if (!coverage.pass || JSON.stringify(coverage) !== JSON.stringify(report.coverage)) throw new Error('Coverage evidence failed or changed');
+    await recheckWorkflowContext(root, context);
     return report;
   } catch (error) { return { schema_version: 1, verdict: 'INCOMPLETE', error: error.message }; }
 }

@@ -104,6 +104,16 @@ if (Test-Path -LiteralPath (Join-Path (Join-Path $stepArchive ".harness50-codex"
 
 if (-not (Test-Path -LiteralPath $progressFile)) { exit 0 }
 
+# Resolve profile/count/body identity before reading or mutating this run.
+$profileJson = @(& node (Join-Path $PSScriptRoot 'lib/workflow-profile.mjs') resolve (Join-Path $projectRoot '.') 2>$null)
+if ($LASTEXITCODE -ne 0 -or $profileJson.Count -eq 0) {
+    # No evidence was inspected; do not leave an older refusal looking current.
+    Remove-Item -LiteralPath $refusalFile -Force -ErrorAction SilentlyContinue
+    exit 0
+}
+try { $selectedProfile = ($profileJson -join "`n") | ConvertFrom-Json -ErrorAction Stop } catch { exit 0 }
+$selectedArchive = Join-Path $projectRoot $selectedProfile.body_directory
+
 # UTC ticks of an ISO 8601 instant: date, 'T', time, any number of fraction digits (cut to
 # microseconds like step-progress-writer.sh) and 'Z' or a +hh:mm/-hh:mm offset. Anything else is
 # $null. Instants are compared as times, never as text: '01:02:03Z' and '01:02:03.000Z' are equal.
@@ -226,12 +236,12 @@ function Get-ReportedSteps($state) {
     #    (대화 본문 오탐, 테스트 주입 문자열 차단)
     #    경로 견고화: step_archive/stepNNN.md 또는 step_archive/archived/stepNNN.md 둘 중 하나면 인정
     #    (하네스 재가동 시 step 파일이 archived/ 로 이동된 케이스 대응 — 다른 세션 재발 방지)
-    $archivedDirW = Join-Path $stepArchive "archived"
+    $archivedDirW = $selectedArchive
     $reported = New-Object System.Collections.Generic.HashSet[int]
     foreach ($s in $foundSteps) {
         $stepFileFlat = Join-Path $stepArchive ("step{0:D3}.md" -f $s)
         $stepFileArch = Join-Path $archivedDirW ("step{0:D3}.md" -f $s)
-        if ((Test-Path -LiteralPath $stepFileFlat) -or (Test-Path -LiteralPath $stepFileArch)) {
+        if ((($selectedProfile.workflow_profile -eq 'legacy-50-v1') -and (Test-Path -LiteralPath $stepFileFlat)) -or (Test-Path -LiteralPath $stepFileArch)) {
             [void]$reported.Add($s)
         }
     }
@@ -295,6 +305,17 @@ if ($null -eq $progress) {
     exit 0
 }
 
+# Resolve profile/count/body identity before reading or mutating this run.
+$profileJson = @(& node (Join-Path $PSScriptRoot 'lib/workflow-profile.mjs') resolve (Join-Path $projectRoot '.') 2>$null)
+if ($LASTEXITCODE -ne 0 -or $profileJson.Count -eq 0) { try { $mutex.ReleaseMutex() } catch {}; $mutex.Dispose(); exit 0 }
+try { $selectedProfile = ($profileJson -join "`n") | ConvertFrom-Json -ErrorAction Stop } catch { try { $mutex.ReleaseMutex() } catch {}; $mutex.Dispose(); exit 0 }
+$selectedArchive = Join-Path $projectRoot $selectedProfile.body_directory
+
+# The locked record must be the identity the shared helper just validated.
+if ($progress.total_steps -ne $selectedProfile.total -or $progress.run_started_at -cne $selectedProfile.run_started_at -or ($progress.workflow_profile -and $progress.workflow_profile -cne $selectedProfile.workflow_profile)) {
+    try { $mutex.ReleaseMutex() } catch {}; $mutex.Dispose(); exit 0
+}
+
 # 2)+3) 이번 실행의 완료 보고 중 본문이 있는 Step (잠금 후 읽은 progress 기준)
 $totalSteps = [int]$progress.total_steps
 $validSteps = Get-ReportedSteps $progress
@@ -306,7 +327,7 @@ foreach ($s in @($progress.completed_steps)) { [void]$existing.Add([int]$s) }
 $completedNew = @()
 foreach ($s in $validSteps) {
     if (-not $existing.Contains($s)) {
-        if ($totalSteps -eq 50 -and $s -in @(38, 44)) {
+        if ($s -in @($selectedProfile.milestones.quality) -and $s -ne $selectedProfile.milestones.final) {
             # The r1 (step 38) and r2 (step 44) milestones need current measured quality, as on Codex
             # (codex/scripts/lib/acceptance.mjs). The trust5 Stop block cannot enforce them during
             # continuous runs (stop_hook_active). Inspection only: no project commands run here.
@@ -333,7 +354,7 @@ foreach ($s in $validSteps) {
                 continue
             }
         }
-        if ($totalSteps -eq 50 -and $s -in @(39, 40, 43, 46, 47, 48)) {
+        if ($s -in @($selectedProfile.milestones.independentQa)) {
             # Inspect immutable QA evidence only; a completion sentence is not proof.
             $qaPassed = $false
             $qaStatus = 'unavailable'
@@ -358,7 +379,7 @@ foreach ($s in $validSteps) {
                 continue
             }
         }
-        if ($totalSteps -eq 50 -and $s -eq 50) {
+        if ($s -eq $selectedProfile.milestones.final) {
             # New final completion needs current measured evidence. Inspection only:
             # never install a browser or run project commands inside a Stop hook.
             $finalPassed = $false
@@ -378,7 +399,7 @@ foreach ($s in $validSteps) {
                 } catch {}
             }
             if (-not $finalPassed) {
-                Write-WriterLog 'Step 50 remains incomplete: final quality/browser routing evidence missing, failed, or stale.'
+                Write-WriterLog "Step $s remains incomplete: final quality/browser routing evidence missing, failed, or stale."
                 Add-Refusal $s 'final' '' $finalVerdict $finalDetail
                 continue
             }

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readJsonInput, writeOutput } from '../codex/scripts/lib/json-io.mjs';
+import { readJsonInput, writeOutput } from './lib/json-io.mjs';
 
 const COMMANDS = new Set(['snapshot', 'record', 'inspect']);
 const INPUT_LIMIT = 64 * 1024;

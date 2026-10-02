@@ -48,6 +48,8 @@ test("the Claude default exclusion line is identical in /webapp and the step 1 T
   const step001 = await read("assets/steps/step001.md");
   const line = defaultLine(webapp, "commands/webapp.md");
   assert.equal(defaultLine(step001, "assets/steps/step001.md"), line);
+  const newStep001 = await read("assets/profiles/research-free-36-v1/steps/step001.md");
+  assert.equal(defaultLine(newStep001, "new36 step001"), line);
   for (const name of [...HOST_NAMES, ...LEGACY_NAMES]) assert.ok(line.includes(name), name);
   assert.doesNotMatch(webapp, /AI Slop 방지 전역 제약 준수/);
   assert.match(step001, /디자인 제외\(사용자\):/);
@@ -63,7 +65,7 @@ test("the constitution defines the five host styles by role and CSS and puts the
   assert.ok(section.includes("`harness50-design-contract`") && section.includes("`docs/DESIGN-CONTRACT.md`"));
   assert.match(section, /계약의 제외 목록 > Awwwards 참조 충실도/);
   assert.match(section, /`adopted: true`[^]*`exception_reason`[^]*결정\/사유/);
-  assert.match(rules, /^4\. 설계 계약 경로/m);
+  assert.match(rules, /^\| 설계 계약 \| `step_archive\/step018_레이아웃설계_chunk1\.md` \| `step_archive\/step030_레이아웃설계_chunk1\.md` \|$/m);
 });
 
 test("the shared format document lists every item, both host defaults and the fallback", async () => {
