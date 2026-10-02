@@ -1,3 +1,4 @@
+import { inspectQa } from '../../scripts/lib/qa-report.mjs';
 import { prepareSchedulerMilestone } from './helpers/completion-quality.mjs';
 import { readState, writeStateAtomic } from '../scripts/lib/state-store.mjs';
 import { pathsFor } from '../scripts/lib/paths.mjs';
@@ -177,4 +178,31 @@ test('direct explicit-profile acceptance rejects out-of-range contracts and malf
  const evidence=[{acceptance_id:'ok',kind:'check',ok:true,detail:'verified'}];
  await assert.rejects(()=>validateCompletionEvidence({workflowProfile:profile,contract:contract(37),evidence}),{code:'STEP_CONTRACT_INVALID'});
  await assert.rejects(()=>validateCompletionEvidence({workflowProfile:profile,contract:contract(26),evidence,persistedEvidence:{}}),{code:'EVIDENCE_INVALID'});
+});
+
+
+test('new36 completion rejects a current six-matrix same-agent report even with a minimal contract', async () => {
+  const workspaceRoot = await makeWorkspace();
+  await mkdir(join(workspaceRoot, 'dist'), { recursive: true });
+  await writeFile(join(workspaceRoot, 'dist/index.html'), '<html><body>Final fixture</body></html>');
+  await prepareFinalRegression(workspaceRoot, { workflowProfile: profile, verifierMode: 'same-agent' });
+  await prepareQuality(workspaceRoot);
+  const qa = await inspectQa(workspaceRoot, 36);
+  assert.equal(qa.status, 'current');
+  assert.equal(qa.verdict, 'PASS');
+  assert.equal(qa.report.verifier.mode, 'same-agent');
+  assert.equal(qa.report.outcomes.length, 6);
+  const input = {
+    workflowProfile: profile,
+    workspaceRoot,
+    contract: { number: 36, id: 'step036', acceptance: [
+      { id: 'ok', kind: 'check', required: true, description: 'Fixture completion' }
+    ] },
+    evidence: [{ acceptance_id: 'ok', kind: 'check', ok: true, detail: 'Verified fixture' }]
+  };
+  await assert.rejects(() => validateCompletionEvidence(input), { code: 'ACCEPTANCE_FINAL_REGRESSION_INCOMPLETE' });
+  await prepareFinalRegression(workspaceRoot, { workflowProfile: profile });
+  await prepareQuality(workspaceRoot);
+  const accepted = await validateCompletionEvidence(input);
+  assert.ok(accepted.evidence.some(item => item.acceptance_id === 'final-regression-report'));
 });

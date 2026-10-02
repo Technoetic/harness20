@@ -32,7 +32,7 @@ export async function prepareQuality(root, { fail = false } = {}) {
   assert.equal((await runQualityGate(root)).verdict, fail ? 'FAIL' : 'PASS');
 }
 
-export async function prepareFinalRegression(root, { status = 'pass', workflowProfile = LEGACY_WORKFLOW_PROFILE } = {}) {
+export async function prepareFinalRegression(root, { status = 'pass', workflowProfile = LEGACY_WORKFLOW_PROFILE, verifierMode = 'independent' } = {}) {
   const checks = ['e2e', 'screenshot', 'keyboard', 'mouse', 'design', 'console'].map(name => ({
     id: `${name}-regression`, requirement: `Verify final ${name} regression.`
   }));
@@ -40,7 +40,7 @@ export async function prepareFinalRegression(root, { status = 'pass', workflowPr
   await writeFile(join(root, 'step_archive/outputs/final-matrix.json'), '{"checks":"fixture observations"}');
   const snapshot = await snapshotQa(root, getWorkflowProfile(workflowProfile).milestones.final, { artifacts: ['dist/index.html'], checks });
   const result = await recordQa(root, getWorkflowProfile(workflowProfile).milestones.final, {
-    snapshot_id: snapshot.snapshot_id, verifier: { id: 'fixture-independent-reviewer', mode: 'independent' },
+    snapshot_id: snapshot.snapshot_id, verifier: { id: 'fixture-independent-reviewer', mode: verifierMode },
     outcomes: checks.map(({ id }) => ({ id, status, observation: `Observed ${id}.`,
       evidence_paths: ['step_archive/outputs/final-matrix.json'], next_check: status === 'pass' ? '' : 'Repair and rerun.' })),
     next_actions: status === 'pass' ? [] : ['Repair and rerun.']

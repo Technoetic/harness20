@@ -15,6 +15,10 @@ export async function inspectFinalRegression(workspaceRoot, workflowProfile = LE
     if (qa.status !== 'current' || qa.verdict !== 'PASS') {
       throw new Error('Final regression report is missing, failed or stale');
     }
+    // This validates the recorded reviewer mode, not an authenticated identity.
+    if (workflowProfile !== LEGACY_WORKFLOW_PROFILE && qa.report.verifier.mode !== 'independent') {
+      throw new Error('Final regression requires a recorded independent reviewer mode');
+    }
     if (!FINAL_REGRESSION_CHECKS.every(id => qa.report.outcomes.some(outcome =>
       outcome.id === id && outcome.status === 'pass'))) {
       throw new Error('Final regression report must cover all six required matrices');
