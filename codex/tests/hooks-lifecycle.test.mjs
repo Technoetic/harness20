@@ -37,7 +37,7 @@ async function fixture(name, workspaceRoot) {
 }
 
 async function init(root, prefix = "workflow") {
-  return initWorkflow({
+  return initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "Hook lifecycle fixture",
     now,

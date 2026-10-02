@@ -1,6 +1,57 @@
 # Harness50 for Codex
 
-Harness50의 Codex 어댑터는 원본 Claude Code 절차를 50개의 검증 가능한 단계로 실행하되, Codex의 정상 권한 확인과 명시적인 후크 신뢰 절차를 유지합니다. Claude Code 설치와 기존 동작은 [루트 안내서](../README.md)를 참고하세요.
+Harness50의 Codex 어댑터는 새36 절차를 36개의 검증 가능한 단계로 실행하되, Codex의 정상 권한 확인과 명시적인 후크 신뢰 절차를 유지합니다. Claude Code 설치와 기존 동작은 [루트 안내서](../README.md)를 참고하세요.
+
+## Workflow profiles / 새36와 기존50
+
+제품명은 **harness50**입니다. 새 Claude/Codex 시작은 `research-free-36-v1`의 36단계를 사용합니다.
+외부 조사 단계가 제거됐으며 입력은 사용자 요구, TOPIC, 명시적으로 제공된 자료,
+18단계 설계 계약과 현재 측정 출력입니다. 누락된 API 대상·버전·스키마·인증·오류/재시도
+계약은 누락 요구사항으로 남깁니다. 테스트 통과는 외부 사실의 최신성을 검증한 것이 아닙니다.
+
+기존 `legacy-50-v1`과 프로필 없는 schema-v1 이력은 계속 50단계입니다. 진행 중·멈춤·차단·완료,
+Claude 가져오기, archived 본문, 복구와 영수증 replay의 번호·해시·의미를 보존합니다.
+기존 이력을 새 번호로 바꾸거나 새 증거로 취급하지 않습니다. Codex reset은 메타데이터를 보관하고
+비활성화하며 다음 명시적 시작이 새36을 선택합니다. Claude reset은 선택 프로필을 보존하고 새 실행
+경계에서 멈춥니다. 손상된 메타데이터/바인딩은 알려진 일관된 기록을 복원한 뒤 재시도하며,
+reset으로 추정 복구하지 않습니다.
+
+새 본문: Claude `assets/profiles/research-free-36-v1/steps/`,
+Codex `codex/assets/profiles/research-free-36-v1/steps/`; legacy 원본은 `assets/steps/`와
+`codex/assets/steps/`입니다. Codex는 `begin.step_target`을 플러그인 루트 기준으로 읽고,
+Claude는 resolver의 `step_body`와 `body_directory`를 읽습니다. 새 Claude archive는
+`step_archive/profiles/research-free-36-v1/archived/`, 바인딩은 `step_archive/workflow-profile.json`입니다.
+프로필·개수·본문·바인딩 불일치는 실행을 차단합니다. 상태·완료 인계의 분모는 선택된 전체 단계 수입니다.
+
+단계 구간: 1–5 프리플라이트, 6–15 도구, 16–18 기획/설계, 19–26 구현,
+27–30 검토, 31–36 E2E/최종 검증. 품질은 26·30·36, 최종 사전 검토는 35,
+Jev 체크포인트는 17·18·25·31·35입니다.
+
+| New | Original | Role |
+| --- | --- | --- |
+| 1–15 | 1–15 | Startup, tools and baseline |
+| 16 | 21 | Dependency gate |
+| 17 | 25 | Requirements-based planning |
+| 18 | 30 | Integrated design |
+| 19 | 31 | Environment |
+| 20 | 32 | File allocation and index |
+| 21 | 33 | Duplication baseline |
+| 22 | 34 | Unused-code baseline |
+| 23 | 35 | Context policy |
+| 24 | 36 | Encoding policy |
+| 25 | 37 | Implementation |
+| 26 | 38 | Build smoke and quality round 1 |
+| 27 | 39 | Layout verification |
+| 28 | 41 | JavaScript modules |
+| 29 | 42 | CSS separation |
+| 30 | 44 | Routing integration and quality round 2 |
+| 31 | 45 | E2E |
+| 32 | 46 | Screenshot E2E |
+| 33 | 47 | Keyboard visual verification |
+| 34 | 48 | Mouse visual verification |
+| 35 | 49 | Final design verification |
+| 36 | 50 | Console, final build and full regression; quality round 3 |
+
 
 ## Host commands / 호스트 명령
 
@@ -18,7 +69,7 @@ Codex는 설치할 때 Claude Code `commands/*.md`의 일부를 `source-command-
 ## Jev-first direct questions
 
 When requested, Jev-first applies to every eligible typed judgment, including chat
-and arithmetic outside the seven workflow checkpoints. Standing authorization for
+and arithmetic outside the selected workflow checkpoints. Standing authorization for
 selected ordinary nonsecret input is reused without a prompt for every question.
 The webapp skill also activates for a direct Jev question or an authorized standing
 Jev-first preference; no `$webapp` start command or workflow initialization is needed.
@@ -64,7 +115,7 @@ codex plugin remove harness50@harness50
 
 - Normal Codex permission confirmations remain in effect for every command.
 - Harness50 never auto-approves commands and never changes sandbox or approval settings.
-- Each later turn receives at most one 50-step continuation marker; that marker schedules work but grants no permission.
+- Each later turn receives at most one one-step continuation marker; that marker schedules work but grants no permission.
 - Submitted command evidence is validated only as a string and exit status; the Harness50 runtime never executes that submitted command.
 - The guard is a bounded, deny-only defense, not a shell sandbox; benign commands are never approved by the hook and still follow normal Codex permissions.
 

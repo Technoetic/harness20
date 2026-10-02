@@ -9,8 +9,8 @@
 //
 // Model codes (permission-denied, required-tool-failed, required-input-missing) need --evidence;
 // user-request (/harness-pause) does not. reset (/harness-reset) replaces progress.json with a new
-// run at step 1 (run_started_at now) that waits in a user-request pause; it accepts an unreadable
-// progress.json too, and leaves the step bodies, TOPIC.md, specs and outputs alone. stdout is one
+// run at step 1 (a new run_started_at) that waits in a user-request pause, preserving the validated
+// profile. Invalid metadata is refused; step bodies, TOPIC.md, specs and outputs are preserved. stdout is one
 // JSON line; errors are one JSON line on stderr. Exit codes: 0 done, 1 I/O failure, 2 refused by
 // workspace state, 64 usage, 75 the file kept changing. Nothing is created: no step_archive/, no
 // progress.json. A Codex workspace is refused (use Codex $webapp pause/resume or
@@ -23,6 +23,10 @@ import {
   applyPause, applyResume, firstUnfinished, pauseDetails, resetProgress, summary, validateProgress
 } from './lib/pause-state.mjs';
 import { physicalWorkspace, readSafe, sha256, writeSafe } from './lib/quality-files.mjs';
+
+import { resolveWorkflowProfile } from './lib/workflow-profiles.mjs';
+import { archiveDirectory, claudeStepBody } from './lib/claude-profile.mjs';
+import { workflowContext, recheckWorkflowContext } from './lib/workflow-context.mjs';
 
 const PROGRESS = 'step_archive/progress.json';
 const PROGRESS_LIMIT = 1024 * 1024;
@@ -104,7 +108,7 @@ function parseProgress(bytes) {
     throw new PauseError(2, 'PAUSE_STATE_INVALID', 'step_archive/progress.json is not valid JSON');
   }
   if (!validateProgress(progress)) {
-    throw new PauseError(2, 'PAUSE_STATE_INVALID', 'step_archive/progress.json needs total_steps 1..999 and completed_steps as an array of integers');
+    throw new PauseError(2, 'PAUSE_STATE_INVALID', 'step_archive/progress.json needs consistent workflow profile/count and distinct completed steps in range');
   }
   return progress;
 }
@@ -138,13 +142,15 @@ async function main() {
   // computed again from the new content.
   for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
     const bytes = await readProgress(root);
-    // A reset starts over, so its only input is that the file exists as a small, unaliased
-    // regular file: unreadable JSON is replaced too (the /webapp skip line points here for it).
-    const progress = options.command === 'reset' ? null : parseProgress(bytes);
+    // Reset preserves the selected definition, so malformed metadata must be repaired from
+    // known records before any new generation can be published.
+    const progress = parseProgress(bytes);
+    let context;
+    try { context = await workflowContext(root); } catch { throw new PauseError(2, 'PAUSE_STATE_INVALID', 'Invalid workflow identity or generation'); }
     if (options.command === 'status') return { action: 'status', changed: false, ...summary(progress), ...pauseDetails(progress) };
     let result;
     if (options.command === 'reset') {
-      result = { changed: true, next: resetProgress({ now: new Date() }) };
+      result = { changed: true, next: resetProgress({ now: new Date(Math.max(Date.now(), (Date.parse(progress.run_started_at) || 0) + 1)), workflowProfile: context.profile.id }) };
     } else if (options.command === 'pause') {
       if (!firstUnfinished(progress)) throw new PauseError(2, 'PAUSE_COMPLETED', 'Every step is recorded as completed; there is nothing to pause');
       if (options.evidence) await checkEvidence(root, options.evidence);
@@ -152,6 +158,12 @@ async function main() {
     } else {
       result = applyResume(progress, { now: new Date() });
     }
+    const nextStep = firstUnfinished(result.next);
+    let stepBody = null;
+    if (options.command === 'resume' && nextStep) {
+      try { stepBody = claudeStepBody(root, result.next, nextStep); } catch { throw new PauseError(2, 'PAUSE_STATE_INVALID', 'Selected step body is missing or conflicts with profile'); }
+    }
+    await recheckWorkflowContext(root, context);
     if (result.changed) {
       if (sha256(await readProgress(root)) !== sha256(bytes)) continue;
       result.next.last_updated = localStamp(new Date());
@@ -162,6 +174,9 @@ async function main() {
       }
     }
     const output = { action: options.command, changed: result.changed, ...summary(result.next) };
+    output.workflow_profile = context.profile.id;
+    output.body_directory = archiveDirectory(context.profile);
+    output.step_body = stepBody;
     if (options.command === 'resume') output.resumed_from = result.resumedFrom;
     return output;
   }

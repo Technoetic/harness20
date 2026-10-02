@@ -2,9 +2,9 @@
 
 # harness50
 
-### 한 줄 요청 → 50 step 자율주행 → 인터랙티브 웹 튜토리얼 1편
+### 한 줄 요청 → 36 step 자율주행 → 인터랙티브 웹 튜토리얼 1편
 
-**`/webapp 논문 트렌드 분석 대시보드`** 한 줄을 던지면 50단계 완료나 명명된 멈춤 전까지 멈추지 않는 결정론적 절차가 가동된다.<br/>
+**`/webapp 논문 트렌드 분석 대시보드`** 한 줄을 던지면 36단계 완료나 명명된 멈춤 전까지 멈추지 않는 결정론적 절차가 가동된다.<br/>
 모델을 똑똑하게 만드는 대신 **모델이 놓을 트랙을 좁힌다**.
 
 <br/>
@@ -13,7 +13,7 @@
 [![License MIT](https://img.shields.io/badge/License-MIT-A855F7?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows_·_macOS_·_Linux-0EA5E9?style=for-the-badge&logo=windows&logoColor=white)](#-claude-code-설치)
 [![Hooks](https://img.shields.io/badge/Hooks-28_files-F59E0B?style=for-the-badge)](hooks/)
-[![Steps](https://img.shields.io/badge/Steps-50_files-10B981?style=for-the-badge)](assets/steps/)
+[![Steps](https://img.shields.io/badge/Steps-36_default-10B981?style=for-the-badge)](assets/profiles/research-free-36-v1/steps/)
 
 [![Security Tests](https://img.shields.io/badge/Security_Tests-reproducible_·_FAIL%3D0-22C55E?style=for-the-badge)](tests/security-regression.sh)
 [![Dual Shell](https://img.shields.io/badge/Dual_Shell-PS1_+_SH-7C3AED?style=for-the-badge&logo=powershell&logoColor=white)](hooks/)
@@ -29,9 +29,60 @@
 
 ---
 
+## Workflow profiles / 새36와 기존50
+
+제품명은 **harness50**입니다. 새 Claude/Codex 시작은 `research-free-36-v1`의 36단계를 사용합니다.
+외부 조사 단계가 제거됐으며 입력은 사용자 요구, TOPIC, 명시적으로 제공된 자료,
+18단계 설계 계약과 현재 측정 출력입니다. 누락된 API 대상·버전·스키마·인증·오류/재시도
+계약은 누락 요구사항으로 남깁니다. 테스트 통과는 외부 사실의 최신성을 검증한 것이 아닙니다.
+
+기존 `legacy-50-v1`과 프로필 없는 schema-v1 이력은 계속 50단계입니다. 진행 중·멈춤·차단·완료,
+Claude 가져오기, archived 본문, 복구와 영수증 replay의 번호·해시·의미를 보존합니다.
+기존 이력을 새 번호로 바꾸거나 새 증거로 취급하지 않습니다. Codex reset은 메타데이터를 보관하고
+비활성화하며 다음 명시적 시작이 새36을 선택합니다. Claude reset은 선택 프로필을 보존하고 새 실행
+경계에서 멈춥니다. 손상된 메타데이터/바인딩은 알려진 일관된 기록을 복원한 뒤 재시도하며,
+reset으로 추정 복구하지 않습니다.
+
+새 본문: Claude `assets/profiles/research-free-36-v1/steps/`,
+Codex `codex/assets/profiles/research-free-36-v1/steps/`; legacy 원본은 `assets/steps/`와
+`codex/assets/steps/`입니다. Codex는 `begin.step_target`을 플러그인 루트 기준으로 읽고,
+Claude는 resolver의 `step_body`와 `body_directory`를 읽습니다. 새 Claude archive는
+`step_archive/profiles/research-free-36-v1/archived/`, 바인딩은 `step_archive/workflow-profile.json`입니다.
+프로필·개수·본문·바인딩 불일치는 실행을 차단합니다. 상태·완료 인계의 분모는 선택된 전체 단계 수입니다.
+
+단계 구간: 1–5 프리플라이트, 6–15 도구, 16–18 기획/설계, 19–26 구현,
+27–30 검토, 31–36 E2E/최종 검증. 품질은 26·30·36, 최종 사전 검토는 35,
+Jev 체크포인트는 17·18·25·31·35입니다.
+
+| New | Original | Role |
+| --- | --- | --- |
+| 1–15 | 1–15 | Startup, tools and baseline |
+| 16 | 21 | Dependency gate |
+| 17 | 25 | Requirements-based planning |
+| 18 | 30 | Integrated design |
+| 19 | 31 | Environment |
+| 20 | 32 | File allocation and index |
+| 21 | 33 | Duplication baseline |
+| 22 | 34 | Unused-code baseline |
+| 23 | 35 | Context policy |
+| 24 | 36 | Encoding policy |
+| 25 | 37 | Implementation |
+| 26 | 38 | Build smoke and quality round 1 |
+| 27 | 39 | Layout verification |
+| 28 | 41 | JavaScript modules |
+| 29 | 42 | CSS separation |
+| 30 | 44 | Routing integration and quality round 2 |
+| 31 | 45 | E2E |
+| 32 | 46 | Screenshot E2E |
+| 33 | 47 | Keyboard visual verification |
+| 34 | 48 | Mouse visual verification |
+| 35 | 49 | Final design verification |
+| 36 | 50 | Console, final build and full regression; quality round 3 |
+
+
 ## Host commands / 호스트 명령
 
-같은 50단계 절차를 사용하지만 호출 방식과 권한 모델은 호스트별로 다릅니다.
+같은 새36단계 절차를 사용하지만 호출 방식과 권한 모델은 호스트별로 다릅니다.
 
 | Host | Start | Status | Reset |
 |---|---|---|---|
@@ -55,7 +106,7 @@ Stop 후크 없이 동작하며, 전체 완료·사용자 일시정지·실제 �
 ## Jev-first / 지원되는 판단 우선 위임
 
 “가능한 판단은 Jev에 먼저 맡겨”처럼 Jev-first를 요청하면 일반 대화·산술을 포함해
-현재 요청의 지원되는 판단을 먼저 Jev에 보냅니다. 적용 범위는 아래 7단계에 한정되지 않습니다.
+현재 요청의 지원되는 판단을 먼저 Jev에 보냅니다. 적용 범위는 아래 체크포인트에 한정되지 않습니다.
 Codex는 직접 Jev 질문이나 이미 승인된 Jev-first 선호에도 webapp 스킬을 선택하며,
 워크플로 제어 요청이 없으면 직접 답변만 처리합니다. `$webapp` 시작 명령은 필요 없습니다.
 기존 전송 승인 범위는 재사용하며, 파일 없는 질문은 `scripts/jev-ask.mjs`의
@@ -67,10 +118,10 @@ Noul은 참 확률, Choice는 보류 선택지를 갖춘 후보 선택, Score는
 파일 검토의 기존 출처 제한과 모든 테스트·완료 절차는 유지합니다.
 사용 예와 전송 범위는 [Jev-first 직접 질문 안내](docs/jev-first.md)를 참고하세요.
 
-## Jev checkpoints / 7단계 의미 판단
+## Jev checkpoints / 새36의 5개 의미 판단
 
 Jev 사용과 선택 자료의 외부 전송이 승인된 작업에서는 Claude Code와 Codex가
-**16·24·25·30·37·45·49단계**에서 조사 근거, 조사 충분성, 요구사항 반영,
+**17·18·25·31·35단계**에서 요구사항 반영,
 설계 대안의 차이, 설명문, E2E 시나리오, 최종 지적 사항을 자동으로 추가 검토합니다.
 이미 승인한 전송 범위는 재사용하며, 같은 입력의 유효한 결과도 재사용합니다.
 
@@ -82,7 +133,7 @@ Jev 사용과 선택 자료의 외부 전송이 승인된 작업에서는 Claude
 Node.js 22 이상과 `TYPESAFE_API_KEY`를 사용합니다. 키 설정이나 단계 도달만으로
 외부 전송을 승인한 것으로 간주하지 않습니다. 사용법과 공개 가상 예제는
 [Jev 단계별 안내서](docs/jev-checkpoints.md)를 참고하세요.
-기존 [Step25 전용 CLI와 보고서](docs/JEV-REVIEW.md)도 계속 지원합니다.
+명시적 legacy50은 기존 7개(16·24·25·30·37·45·49) 정책과 [Step25 전용 CLI와 보고서](docs/JEV-REVIEW.md)를 유지합니다.
 
 ## Codex installation / 설치
 
@@ -110,7 +161,7 @@ The published repository includes both Claude Code and Codex adapters. 설치 �
 
 - Normal Codex permission confirmations remain in effect for every command.
 - Harness50 never auto-approves commands and never changes sandbox or approval settings.
-- Each later turn receives at most one 50-step continuation marker; that marker schedules work but grants no permission.
+- Each later turn receives at most one one-step continuation marker; that marker schedules work but grants no permission.
 - Submitted command evidence is validated only as a string and exit status; the Harness50 runtime never executes that submitted command.
 - The guard is a bounded, deny-only defense, not a shell sandbox; benign commands are never approved by the hook and still follow normal Codex permissions.
 
@@ -161,26 +212,26 @@ v2.4.0은 Claude·Codex의 제품 QA에 [실패·검증 인계 보고서](docs/Q
 ```text
 사용자 →  /webapp 논문 트렌드 분석 대시보드
                         ↓
-   webapp-trigger.hook  TOPIC.md 자동 작성 + step001~050 부트스트랩
+   webapp-trigger.hook  TOPIC.md 자동 작성 + step001~036 부트스트랩
                         ↓
    step001.md  ───────►  prefill 도구 검증 (Node, npx, 브라우저 백엔드, Biome, …)
    step002.md  ───────►  컨텍스트 전략 청크 작성
-   step016.md  ───────►  웹 조사 병렬 서브에이전트 (haiku × 10)
-   step025.md  ───────►  4단계 카드 스토리보드 기획
-   step030.md  ───────►  통합 설계 (디자인 토큰·제외 계약·SVG·ARIA)
-   step037.md  ───────►  단일 HTML 인터랙티브 튜토리얼 구현
-   step038.md  ───────►  빌드 스모크 게이트 + TRUST 5 r1
-   step044.md  ───────►  클라이언트 사이드 라우팅 + TRUST 5 r2
-   step045.md  ───────►  E2E 테스트 (프로젝트의 npm run e2e, 프리플라이트 흡수)
-   step050.md  ───────►  콘솔 에러 0 + 최종 build 게이트 + TRUST 5 r3
+   step016.md  ───────►  의존성 게이트 (제공된 요구사항·자료 기반)
+   step017.md  ───────►  4단계 카드 스토리보드 기획
+   step018.md  ───────►  통합 설계 (디자인 토큰·제외 계약·SVG·ARIA)
+   step025.md  ───────►  단일 HTML 인터랙티브 튜토리얼 구현
+   step026.md  ───────►  빌드 스모크 게이트 + TRUST 5 r1
+   step030.md  ───────►  클라이언트 사이드 라우팅 + TRUST 5 r2
+   step031.md  ───────►  E2E 테스트 (프로젝트의 npm run e2e, 프리플라이트 흡수)
+   step036.md  ───────►  콘솔 에러 0 + 최종 build 게이트 + TRUST 5 r3
                         ↓
    Stop hook  ────►  진행 미완료면  {"decision":"block"}  →  자동 재개
                         ↓
-            50 step 완주 또는 명명된 멈춤 전까지 컨트롤을 돌려주지 않음
+            36 step 완주 또는 명명된 멈춤 전까지 컨트롤을 돌려주지 않음
 ```
 
 > [!IMPORTANT]
-> 종료 조건은 둘뿐이다: **50단계 완료 기록** 또는 **명명된 멈춤**(권한 거부·필수 도구 3회 실패·필수 외부 입력 부재·사용자 요청). <br/>
+> 종료 조건은 둘뿐이다: **36단계 완료 기록** 또는 **명명된 멈춤**(권한 거부·필수 도구 3회 실패·필수 외부 입력 부재·사용자 요청). <br/>
 > "이만하면 충분"이라는 모델의 자기판단은 위반이다. 멈춤은 사유와 함께 progress.json에 기록되고 `/harness-resume`으로 풀린다.
 
 ---
@@ -201,7 +252,7 @@ v2.4.0은 Claude·Codex의 제품 QA에 [실패·검증 인계 보고서](docs/Q
 
 산출물 = **단일 HTML 파일** (Helvetica Neue / 8 배수 grid / accent 1색 / radius {0,4,8,12,16} / 터치 44pt / ARIA 필수).
 
-**빼고 싶은 디자인은 이름으로 적습니다.** 요청에 `디자인 제외: 그림자 카드, 네온 색`처럼 적으면 30단계 설계 계약의 제외 목록에 더해지고, 구현·참조 비교·최종 디자인 검증이 그 목록을 참조 사례보다 우선합니다(두 호스트 공통). Claude 기본 목록에는 크림·오프화이트 바탕, 제목 속 이탤릭 강조어, 01·02·03 번호 라벨, 코드 밖 모노스페이스 라벨, 알약형 버튼이 더 들어갑니다. 형식과 예외 규칙은 [`docs/DESIGN-CONTRACT.md`](docs/DESIGN-CONTRACT.md).
+**빼고 싶은 디자인은 이름으로 적습니다.** 요청에 `디자인 제외: 그림자 카드, 네온 색`처럼 적으면 18단계 설계 계약의 제외 목록에 더해지고, 구현·계약 대비 출력 비교·최종 디자인 검증이 그 목록을 참조 사례보다 우선합니다(두 호스트 공통). Claude 기본 목록에는 크림·오프화이트 바탕, 제목 속 이탤릭 강조어, 01·02·03 번호 라벨, 코드 밖 모노스페이스 라벨, 알약형 버튼이 더 들어갑니다. 형식과 예외 규칙은 [`docs/DESIGN-CONTRACT.md`](docs/DESIGN-CONTRACT.md).
 
 **독립 화면마다 고유 주소를 갖습니다.** 기본은 `index.html#/orders` 같은 hash
 라우팅이며 HTML 파일은 하나로 유지합니다. 설계에서 화면별 주소를 정하고, 최종
@@ -213,9 +264,9 @@ history 모드에서 지원합니다. HTTP(S)에서는 사용 가능한 Navigati
 전체 화면을 각각 검증합니다. [화면 주소 계약](docs/ROUTING.md)과
 [실행 가능한 단일 파일 예제](examples/routed-single-file.html)를 참고하세요.
 
-**44단계는 ‘클라이언트 사이드 라우팅’입니다.** 30단계에서 설계하고 37단계에서 구현한
+**30단계는 ‘클라이언트 사이드 라우팅’입니다.** 18단계에서 설계하고 25단계에서 구현한
 화면 주소를 JS·CSS 구조 정리 뒤 다시 통합 점검합니다. 같은 HTML의 화면별 영역을
-URL에 따라 표시할 수 있으며, HTML 컴포넌트 추출은 필수가 아닙니다. 전체 흐름은 50단계입니다.
+URL에 따라 표시할 수 있으며, HTML 컴포넌트 추출은 필수가 아닙니다. 새 흐름은 36단계입니다.
 
 ---
 
@@ -290,7 +341,7 @@ flowchart TB
 활성 작업의 프로젝트 내부 파일 편집과 WebSearch만 제한적으로 자동 승인합니다. 셸 명령과 WebFetch는 호스트의 권한 정책을 따르며, 하네스 작업 공간(진행·멈춤·완료된 실행, 커서만 어긋난 실행, Codex 작업 공간)에서는 알려진 위험 명령과 민감 경로를 차단하고 sudo·패키지 설치 같은 명령은 확인을 받습니다.
 
 > [!IMPORTANT]
-> **auto-approve는 유효한 진행 상태에서만 발화합니다.** 완료 단계는 1~50 사이의 중복 없는 정수이고, 현재 단계는 첫 번째 빈 단계이며, `total_steps`는 50이고, 그 단계의 본문 파일(`step_archive/archived/stepNNN.md` 또는 `step_archive/stepNNN.md`)이 있어야 합니다. 파일이 없거나 JSON이 손상됐거나 일시정지·중지·완료 상태라면 정상 권한 흐름을 따릅니다. `.mcp.json`·`CLAUDE.md`·`.husky/`·`package.json`처럼 실행과 연결되는 파일은 진행 중에도 자동 승인에서 빠집니다. 경로는 `..`, 버전이 포함된 플러그인 캐시, 디렉터리 링크를 포함해 검사합니다. 대소문자·8.3 짧은 이름(`GIT~1`)·NTFS 스트림(`::$INDEX_ALLOCATION`, `::$DATA`)·끝 점과 공백도 파일 시스템이 실제로 여는 경로로 풀어 검사합니다. `:`가 평범한 글자인 macOS·Linux에서도 `:` 뒤를 떼어 낸 경로를 함께 보므로 `:`가 든 경로는 권한 창으로 넘어갈 수 있고(거부는 없음), 프로젝트 경로 자체에 `:`가 있으면 자동 승인이 모두 꺼집니다. permission-request-guard의 보호 경로 거부는 입력한 경로로 판정하며, 별칭 철자는 호스트 권한 창에 맡깁니다.
+> **auto-approve는 유효한 진행 상태에서만 발화합니다.** 완료 단계는 선택된 전체 단계 수(새36·legacy50) 안의 중복 없는 정수이고, 현재 단계는 첫 번째 빈 단계이며, 프로필·개수·바인딩과 관리자가 선택한 본문 파일이 일치해야 합니다. 파일이 없거나 JSON이 손상됐거나 일시정지·중지·완료 상태라면 정상 권한 흐름을 따릅니다. `.mcp.json`·`CLAUDE.md`·`.husky/`·`package.json`처럼 실행과 연결되는 파일은 진행 중에도 자동 승인에서 빠집니다. 경로는 `..`, 버전이 포함된 플러그인 캐시, 디렉터리 링크를 포함해 검사합니다. 대소문자·8.3 짧은 이름(`GIT~1`)·NTFS 스트림(`::$INDEX_ALLOCATION`, `::$DATA`)·끝 점과 공백도 파일 시스템이 실제로 여는 경로로 풀어 검사합니다. `:`가 평범한 글자인 macOS·Linux에서도 `:` 뒤를 떼어 낸 경로를 함께 보므로 `:`가 든 경로는 권한 창으로 넘어갈 수 있고(거부는 없음), 프로젝트 경로 자체에 `:`가 있으면 자동 승인이 모두 꺼집니다. permission-request-guard의 보호 경로 거부는 입력한 경로로 판정하며, 별칭 철자는 호스트 권한 창에 맡깁니다.
 >
 > 아래 감사 기록은 이전 버전의 이력입니다. 현재 회귀 검사는 [`tests/security-regression.sh`](tests/security-regression.sh)와 [`codex/tests/claude-security.test.mjs`](codex/tests/claude-security.test.mjs)에서 위험 명령 차단과 확인(ask), 일반 셸 명령의 권한 위임, 비활성 상태와 경로 우회를 확인합니다. 경로 검사는 파일시스템 샌드박스를 대신하지 않습니다.
 
@@ -375,7 +426,7 @@ graph TB
 
     subgraph six["6 기둥"]
         P1["1️⃣ 하네스<br/>엔지니어링"]
-        P2["2️⃣ 절차의<br/>원자화 50step"]
+        P2["2️⃣ 절차의<br/>원자화 36step"]
         P3["3️⃣ 질문 금지<br/>결단하는 AI"]
         P4["4️⃣ 자연 종료<br/>금지"]
         P5["5️⃣ AI Slop<br/>방지"]
@@ -402,8 +453,8 @@ graph TB
 |:---:|:---|:---|
 | 1 | **하네스 엔지니어링** | 모델을 똑똑하게 만들기 전에 트랙·가드·게이트·기록을 깔아라 |
 | 2 | **절차의 원자화** | 한 step은 한 책임. 끝나면 다음 step 즉시 호출 |
-| 3 | **질문 금지** | "진행할까요?"는 위반. 모호하면 결정 + 산출물에 1줄 사유 기록. 예외는 명명된 멈춤 보고와 50단계 요약의 사용자 확인 필요 절뿐 |
-| 4 | **자연 종료 금지** | "이만하면 충분"은 위반. 50단계 완료나 명명된 멈춤 전에는 계속 |
+| 3 | **질문 금지** | "진행할까요?"는 위반. 모호하면 결정 + 산출물에 1줄 사유 기록. 예외는 명명된 멈춤 보고와 36단계 요약의 사용자 확인 필요 절뿐 |
+| 4 | **자연 종료 금지** | "이만하면 충분"은 위반. 36단계 완료나 명명된 멈춤 전에는 계속 |
 | 5 | **AI Slop 방지** | 8 배수 grid · 폰트 4 · accent 1 · radius 5 · 44 pt 터치 · 명명된 제외 목록(설계 계약이 참조보다 우선) |
 | 6 | **MoAI-ADK 정직성** | @MX 4종 태그 · EARS-라이트 SPEC · TRUST 5 게이트 |
 
@@ -463,14 +514,15 @@ harness50/
 │   ├── trust5-validator.{ps1,sh}      ← r1·r2·r3 측정 증거 검사(Verdict)
 │   └── validate-tools.{ps1,sh}        ← 도구 검증 wrapper
 │
-└── assets/steps/                      ← 50개 결정론적 절차
+├── assets/steps/                      ← 보존된 legacy50 본문
+└── assets/profiles/research-free-36-v1/steps/  ← 새36 본문
     ├── step001.md  하네스 프리플라이트
-    ├── step002.md  컨텍스트 전략
-    ├── …
-    ├── step038.md  ⭐ 빌드 스모크 게이트 (TRUST 5 r1)
-    ├── step044.md  ⭐ 클라이언트 사이드 라우팅 (TRUST 5 r2)
-    ├── step045.md  E2E 테스트 (구 step084 프리플라이트 흡수)
-    └── step050.md  ⭐ 콘솔 에러 0 + 최종 게이트 (TRUST 5 r3)
+    ├── step017.md  요구사항 기획
+    ├── step018.md  통합 설계 계약
+    ├── step026.md  ⭐ 빌드 스모크 + 품질 r1
+    ├── step030.md  ⭐ 라우팅 통합 + 품질 r2
+    ├── step031.md  E2E
+    └── step036.md  ⭐ 최종 콘솔·회귀 + 품질 r3
 ```
 
 ---
@@ -481,7 +533,7 @@ harness50/
 
 </div>
 
-이 한 줄이 **50단계 완료나 명명된 멈춤 전까지 멈추지 않는 자율 실행**의 핵심이다.
+이 한 줄이 **36단계 완료나 명명된 멈춤 전까지 멈추지 않는 자율 실행**의 핵심이다.
 
 <div align="center">
 <img src="docs/screenshots/stop-hook-magic.svg" width="90%" alt="Stop hook이 progress.json을 읽고 block JSON을 반환해 다음 step을 자동 재개하는 메커니즘 시각화"/>
@@ -502,24 +554,24 @@ sequenceDiagram
     LLM->>Progress: completed += 1
     LLM->>LLM: step002 실행
     LLM->>Progress: completed += 1
-    Note over LLM: ...37개 step 실행 후 컨텍스트 부담 인지...
+    Note over LLM: ...25개 step 실행 후 컨텍스트 부담 인지...
     LLM-->>Stop: 턴 종료
-    Stop->>Progress: completed = 37 / 50 읽음
+    Stop->>Progress: completed = 25 / 36 읽음
     rect rgb(220, 60, 60)
-    Stop-->>LLM: stdout {"decision":"block","reason":"step038부터 즉시 실행"}
+    Stop-->>LLM: stdout {"decision":"block","reason":"step026부터 즉시 실행"}
     end
     Note over LLM: Stop hook이 block을 반환 → 자동으로 다음 턴 시작
-    LLM->>LLM: step038 즉시 실행
-    LLM->>LLM: step039 실행
-    Note over LLM,Progress: ...completed_steps == 50 도달까지 반복...
+    LLM->>LLM: step026 즉시 실행
+    LLM->>LLM: step027 실행
+    Note over LLM,Progress: ...completed_steps == 36 도달까지 반복...
     LLM-->>Stop: 턴 종료
-    Stop->>Progress: completed = 50 / 50 확인
+    Stop->>Progress: completed = 36 / 36 확인
     rect rgb(60, 180, 80)
     Stop-->>User: 정상 종료 허용 (자율주행 완료)
     end
 ```
 
-Stop 훅은 문구가 아니라 progress.json 상태로 판정한다. 50단계가 기록되지 않았고 명명된 멈춤도 없으면 `[HARNESS] N/50 done.`으로 시작하는 reason으로 첫 미완료 단계를 다시 지시하고, 진전 없는 재지시는 3회에서 멈춘다. Windows 훅은 질문 문구(39개 패턴)를 감지하면 재지시 문구만 바꾼다. 모델이 빠져나갈 길은 50단계 완료와 명명된 멈춤(`scripts/harness-pause.mjs`) 둘뿐이다.
+Stop 훅은 문구가 아니라 progress.json 상태로 판정한다. 선택된 전체 단계가 기록되지 않았고 명명된 멈춤도 없으면 `[HARNESS] N/<total> done.`으로 시작하는 reason으로 첫 미완료 단계를 다시 지시하고, 진전 없는 재지시는 3회에서 멈춘다. Windows 훅은 질문 문구(39개 패턴)를 감지하면 재지시 문구만 바꾼다. 모델이 빠져나갈 길은 선택된 전체 단계 완료와 명명된 멈춤(`scripts/harness-pause.mjs`) 둘뿐이다.
 
 ---
 
@@ -632,7 +684,7 @@ node scripts/verify-output.mjs --probe
 
 step003은 선택한 백엔드를 `node scripts/verify-output.mjs --probe --lock --workspace "<project-root>"`로 프로젝트의 `step_archive/outputs/browser-backend.json`에 고정한다. 이후 `--backend` 없는 브라우저 검증은 고정된 백엔드만 쓰므로 그 백엔드만 설치·복구하고, 다른 백엔드(예: Aside로 고정된 프로젝트의 Playwright·Chromium)는 설치하지 않는다.
 
-step045 E2E는 프로젝트의 `npm run e2e`를 실행한다 — 러너(Playwright test, Aside `repl` 스크립트 등)는 프로젝트가 정하고, step은 결과 전체 PASS만 본다.
+step031 E2E는 프로젝트의 `npm run e2e`를 실행한다 — 러너(Playwright test, Aside `repl` 스크립트 등)는 프로젝트가 정하고, step은 결과 전체 PASS만 본다.
 
 선택: `semgrep` (Trust5 Secured 축에서 9점/4점 분기).
 
@@ -671,18 +723,18 @@ step045 E2E는 프로젝트의 `npm run e2e`를 실행한다 — 러너(Playwrig
 
 ```text
 /harness-status
-→ harness50: 37/50 완료 | current=step038 | r1=- r2=- r3=-
+→ harness50: 25/36 완료 | current=step026 | r1=- r2=- r3=-
 ```
 
 ### 완료 보고
 
-50단계를 마치면 `Step 050/50 완료` 줄 바로 다음에 세 제목의 요약이 붙습니다. 저장된 증거(최종 HTML, 품질·브라우저·회귀 보고서, Jev, TOPIC, `결정/사유` 표지)만 읽는 보고이며 완료 게이트가 아닙니다. 같은 내용이 `step_archive/outputs/final-summary.md`에도 저장됩니다. 상세: [docs/FINAL-SUMMARY.md](docs/FINAL-SUMMARY.md)
+36단계를 마치면 `Step 036/36 완료` 줄 바로 다음에 세 제목의 요약이 붙습니다. 저장된 증거(최종 HTML, 품질·브라우저·회귀 보고서, Jev, TOPIC, `결정/사유` 표지)만 읽는 보고이며 완료 게이트가 아닙니다. 같은 내용이 `step_archive/outputs/final-summary.md`에도 저장됩니다. 상세: [docs/FINAL-SUMMARY.md](docs/FINAL-SUMMARY.md)
 
 ```text
-Step 050/50 완료
+Step 036/36 완료
 ## 사용자 확인 필요
 
-- 배포 검증 대기(pending) `step_archive/step045_e2e테스트결과.md:3`
+- 배포 검증 대기(pending) `step_archive/step031_e2e테스트결과.md:3`
 
 ## 변경
 
@@ -703,22 +755,22 @@ Step 050/50 완료
 → step001부터 새 주제로 실행
 ```
 
-`/harness-reset`은 `scripts/harness-pause.mjs reset`으로 progress.json만 1단계의 새 실행으로 바꾸고 `step_archive/archived/`, `specs/`, `outputs/`, `TOPIC/TOPIC.md`는 보존합니다. 새 실행은 `user-request` 멈춤으로 대기하므로 리셋한 턴의 Stop이 옛 주제로 1단계를 시작하지 않습니다. 이어서 `/webapp <주제>`는 새 주제로 시작하고, `/harness-resume`은 현재 주제를 1단계부터 진행합니다. 리셋과 `/webapp` 부트스트랩은 `run_started_at`(UTC)을 새 실행 경계로 적고, 진행 기록 훅은 그 이전 대화의 `Step NNN/50 완료` 줄을 세지 않습니다(`run_started_at`이 없는 2.9.0 이하의 실행은 전체를 셉니다).
+`/harness-reset`은 `scripts/harness-pause.mjs reset`으로 progress.json만 1단계의 새 실행으로 바꾸고 `step_archive/archived/`, 선택된 프로필 archive와 바인딩, `specs/`, `outputs/`, `TOPIC/TOPIC.md`는 보존합니다. 새 실행은 `user-request` 멈춤으로 대기하므로 리셋한 턴의 Stop이 옛 주제로 1단계를 시작하지 않습니다. 이어서 `/webapp <주제>`는 새 주제로 시작하고, `/harness-resume`은 현재 주제를 1단계부터 진행합니다. 리셋과 `/webapp` 부트스트랩은 `run_started_at`(UTC)을 새 실행 경계로 적고, 진행 기록 훅은 그 이전 대화의 `Step NNN/<total> 완료` 줄을 세지 않습니다(`run_started_at`이 없는 2.9.0 이하의 실행은 전체를 셉니다).
 
 ### 멈춤과 재개
 
 ```text
 /harness-pause 회의로 잠시 중단
-→ harness50 멈춤 — step038에서 자동 진행 중지. 재개: /harness-resume
+→ harness50 멈춤 — step026에서 자동 진행 중지. 재개: /harness-resume
 
 /harness-status
-→ harness50: 37/50 완료 | current=step038 | r1=- r2=- r3=- | 멈춤: user-request @step038 — 회의로 잠시 중단
+→ harness50: 25/36 완료 | current=step026 | r1=- r2=- r3=- | 멈춤: user-request @step026 — 회의로 잠시 중단
 
 /harness-resume
-→ step038부터 이어서 실행
+→ step026부터 이어서 실행
 ```
 
-멈춤은 `step_archive/progress.json`의 `paused`·`pause_*` 필드로 기록되고 진행 기록은 그대로 남습니다. 모델은 권한 거부·필수 도구 3회 실패·필수 외부 입력 부재일 때만 같은 CLI(`scripts/harness-pause.mjs`, 헌법 §2-1)로 멈춥니다. 멈추기 전 같은 턴에 보고한 `Step NNN/50 완료` 줄은 그 턴의 Stop에서 기록되므로, 멈춘 위치와 재개 지점은 첫 미완료 step입니다. 멈춘 동안 Stop 훅은 실행을 다시 지시하지 않고 자동 승인과 품질 게이트도 쉬며, 세션 시작과 프롬프트마다 `[HARNESS] PAUSED at stepNNN/50` 한 줄로 멈춘 위치만 알립니다. `/harness-reset`과 `/webapp <topic>`은 재개 수단이 아닙니다.
+멈춤은 `step_archive/progress.json`의 `paused`·`pause_*` 필드로 기록되고 진행 기록은 그대로 남습니다. 모델은 권한 거부·필수 도구 3회 실패·필수 외부 입력 부재일 때만 같은 CLI(`scripts/harness-pause.mjs`, 헌법 §2-1)로 멈춥니다. 멈추기 전 같은 턴에 보고한 `Step NNN/<total> 완료` 줄은 그 턴의 Stop에서 기록되므로, 멈춘 위치와 재개 지점은 첫 미완료 step입니다. 멈춘 동안 Stop 훅은 실행을 다시 지시하지 않고 자동 승인과 품질 게이트도 쉬며, 세션 시작과 프롬프트마다 `[HARNESS] PAUSED at stepNNN/<total>` 한 줄로 멈춘 위치만 알립니다. `/harness-reset`과 `/webapp <topic>`은 재개 수단이 아닙니다.
 
 ---
 
@@ -730,11 +782,11 @@ Step 050/50 완료
 
 | 마일스톤 | 발화(연속 완료 수) | 검사 | 결과 파일 |
 |:---|:---:|:---|:---|
-| **r1** | 38 | test·lint·typecheck·security 네 명령 exit 0 + 측정 커버리지 ≥ 85% | `step_archive/outputs/trust5_r1.md` |
-| **r2** | 44 | test·lint·typecheck·security 네 명령 exit 0 + 측정 커버리지 ≥ 85% | `step_archive/outputs/trust5_r2.md` |
-| **r3** | 49 이후(최종 Step 050) | r1·r2와 같은 검사 + 현재 HTML의 schema-v3 브라우저 라우팅 증거 + Step 50 회귀 행렬 6종 | `step_archive/outputs/trust5_r3.md` |
+| **r1** | 26 | test·lint·typecheck·security 네 명령 exit 0 + 측정 커버리지 ≥ 85% | `step_archive/outputs/trust5_r1.md` |
+| **r2** | 30 | test·lint·typecheck·security 네 명령 exit 0 + 측정 커버리지 ≥ 85% | `step_archive/outputs/trust5_r2.md` |
+| **r3** | 35 이후(최종 Step 036) | r1·r2와 같은 검사 + 현재 HTML의 schema-v3 브라우저 라우팅 증거 + Step 36 회귀 행렬 6종 | `step_archive/outputs/trust5_r3.md` |
 
-PASS/FAIL/INCOMPLETE 판정이며 점수는 없다. 진행 기록 훅은 새 `Step 038/50 완료`·`Step 044/50 완료`를 `quality-gate.mjs --inspect`가 PASS일 때만, Step 050은 최종 PASS(`--inspect-final`)일 때만 기록하고, 거부한 완료는 다음 이어가기 지시 끝에 이유와 할 일을 짧게 알린다. 검사는 완료를 보고한 순간이 아니라 다음 Stop에서 그때의 소스로 한다(Codex는 완료를 제출할 때 검사). 같은 턴에서 다음 단계가 소스를 바꿨다면 보고서가 낡아 거부되므로 `quality-gate.mjs`를 다시 실행한다. trust5 Stop 훅은 PASS가 아니면 한 번 복구를 요구하지만, 이미 이어가는 Stop 턴은 다시 막지 않는다. 상세: [docs/QUALITY.md](docs/QUALITY.md)
+PASS/FAIL/INCOMPLETE 판정이며 점수는 없다. 진행 기록 훅은 새 `Step 026/36 완료`·`Step 030/36 완료`를 `quality-gate.mjs --inspect`가 PASS일 때만, Step 036은 최종 PASS(`--inspect-final`)일 때만 기록하고, 거부한 완료는 다음 이어가기 지시 끝에 이유와 할 일을 짧게 알린다. 검사는 완료를 보고한 순간이 아니라 다음 Stop에서 그때의 소스로 한다(Codex는 완료를 제출할 때 검사). 같은 턴에서 다음 단계가 소스를 바꿨다면 보고서가 낡아 거부되므로 `quality-gate.mjs`를 다시 실행한다. trust5 Stop 훅은 PASS가 아니면 한 번 복구를 요구하지만, 이미 이어가는 Stop 턴은 다시 막지 않는다. 상세: [docs/QUALITY.md](docs/QUALITY.md)
 
 ---
 
@@ -755,16 +807,16 @@ PASS/FAIL/INCOMPLETE 판정이며 점수는 없다. 진행 기록 훅은 새 `St
 
 `step_archive/.harness50-codex/state.json`이 있는 Codex 작업 공간에서는 step 훅(loader·writer·auto-continue·obedience-guard·webapp-trigger·spec-generator·trust5-validator)이 progress.json과 TOPIC.md를 만들거나 바꾸지 않고 Stop도 막지 않으며, Claude 편집을 자동 승인하지도 않습니다. SessionStart는 `hooks/lib/codex-workflow.mjs`가 읽은 Codex 진행 단계를 한 줄로만 알립니다([마이그레이션과 리셋](#migration-and-reset--마이그레이션과-리셋)). 두 가드는 Codex 작업 공간에서도 Bash 명령을 검사합니다(그 공간의 Claude 세션에는 다른 Harness50 가드가 없음).
 
-**활성 조건.** Claude Code 훅은 `hooks/lib/harness-activity.mjs` 한 곳의 판정을 따릅니다. 다음을 모두 만족할 때만 진행 중인 실행입니다: `step_archive/.harness50-codex/state.json` 항목이 없음, `step_archive/progress.json`이 프로젝트 안의 1MB 이하 일반 파일, `paused`가 없거나 false, `status`가 없거나 active·running·in_progress, `total_steps`가 50, 완료 단계가 1~50의 중복 없는 정수, 현재 단계가 첫 번째 빈 단계, 그 단계의 본문 파일이 있음. `hooks/run-hook.mjs`가 셸을 띄우기 전에 이 판정을 한 번 하므로, 무관한 폴더에서는 훅이 파일을 만들거나 승인·block·지시 주입을 하지 않습니다. Stop의 `stop-advance`는 두 부분을 각자의 판정으로 순서대로 띄웁니다: 진행 기록 훅을 먼저, step-auto-continue는 그 판정이 진행 기록 훅 실행 전과 후에 모두 통과할 때만. 현재 단계만 첫 빈 단계와 어긋난 실행(drift: `current_step`이 1~51의 다른 정수이고 첫 빈 단계의 본문 파일이 있음)은 진행 기록 훅만 돌아 현재 단계를 첫 빈 단계로 되돌리고, 그 뒤부터 다른 훅이 다시 켜집니다. `current_step`은 완료 기록에서 정해지는 값이므로, 커서를 앞으로 옮겨도 단계를 건너뛸 수 없습니다. 어긋남을 발견한 Stop 한 번은 이어가기를 지시하지 않습니다.
+**활성 조건.** Claude Code 훅은 `hooks/lib/harness-activity.mjs` 한 곳의 판정을 따릅니다. 다음을 모두 만족할 때만 진행 중인 실행입니다: `step_archive/.harness50-codex/state.json` 항목이 없음, `step_archive/progress.json`이 프로젝트 안의 1MB 이하 일반 파일, `paused`가 없거나 false, `status`가 없거나 active·running·in_progress, `total_steps`가 선택 프로필의 개수(새36·legacy50), 완료 단계가 그 범위의 중복 없는 정수, 현재 단계가 첫 번째 빈 단계, 그 단계의 본문 파일이 있음. `hooks/run-hook.mjs`가 셸을 띄우기 전에 이 판정을 한 번 하므로, 무관한 폴더에서는 훅이 파일을 만들거나 승인·block·지시 주입을 하지 않습니다. Stop의 `stop-advance`는 두 부분을 각자의 판정으로 순서대로 띄웁니다: 진행 기록 훅을 먼저, step-auto-continue는 그 판정이 진행 기록 훅 실행 전과 후에 모두 통과할 때만. 현재 단계만 첫 빈 단계와 어긋난 실행(drift: `current_step`이 1~(선택된 전체 단계 수+1)의 다른 정수이고 첫 빈 단계의 본문 파일이 있음)은 진행 기록 훅만 돌아 현재 단계를 첫 빈 단계로 되돌리고, 그 뒤부터 다른 훅이 다시 켜집니다. `current_step`은 완료 기록에서 정해지는 값이므로, 커서를 앞으로 옮겨도 단계를 건너뛸 수 없습니다. 어긋남을 발견한 Stop 한 번은 이어가기를 지시하지 않습니다.
 
-- destructive-guard와 permission-request-guard는 하네스 작업 공간(진행 중·멈춘·50단계를 마친 실행, 커서만 어긋난 실행, Codex 작업 공간)에서만 실행됩니다. 진행 기록이 없거나, 옛 로더가 남긴 본문 없는 기록이거나, 중지되었거나 손상된 기록인 폴더에서는 셸을 띄우지 않고 호스트의 정상 권한 확인을 따릅니다(Bash는 원래 자동 승인되지 않음). 판정은 `hooks/lib/command-guard.mjs` 하나가 두 OS에 똑같이 내립니다: 차단(승인 불가, PermissionRequest도 Bash는 같은 집합만 거부)과 확인(승인 가능: sudo·패키지 설치·git hooksPath 설정 등).
+- destructive-guard와 permission-request-guard는 하네스 작업 공간(진행 중·멈춘·선택된 전체 단계를 마친 실행, 커서만 어긋난 실행, Codex 작업 공간)에서만 실행됩니다. 진행 기록이 없거나, 옛 로더가 남긴 본문 없는 기록이거나, 중지되었거나 손상된 기록인 폴더에서는 셸을 띄우지 않고 호스트의 정상 권한 확인을 따릅니다(Bash는 원래 자동 승인되지 않음). 판정은 `hooks/lib/command-guard.mjs` 하나가 두 OS에 똑같이 내립니다: 차단(승인 불가, PermissionRequest도 Bash는 같은 집합만 거부)과 확인(승인 가능: sudo·패키지 설치·git hooksPath 설정 등).
 - webapp-trigger는 첫 줄이 `/webapp <주제>`(또는 `/harness50:webapp <주제>`)일 때만 실행됩니다.
 - step-progress-loader는 진행 중인 실행, 멈춘 실행(멈춘 위치 한 줄), Codex 작업 공간(한 줄 안내)에서 실행됩니다.
 - step-obedience-guard는 진행 중인 실행과 멈춘 실행(멈춘 위치 한 줄)에서 실행됩니다.
 - step-progress-writer는 진행 중인 실행, 멈춘 실행, 커서만 어긋난 실행에서 실행됩니다. Stop에서는 `stop-advance` 안에서 먼저 돌고(출력은 버림, 28초 예산), 보고된 완료를 거부하면 `step_archive/progress-refusals.json`에 남겨 step-auto-continue가 이유와 할 일을 짧게 전합니다(거부할 것이 없으면 지움). 멈춘 실행에서는 멈춘 턴에 보고된 완료 줄만 기록하고, 기록할 줄이 없고 커서도 맞으면 아무것도 쓰지 않습니다. 커서가 어긋난 실행에서는 새로 기록할 줄이 없어도 `current_step`을 첫 빈 단계로 되돌립니다(멈춘 실행의 멈춤 필드는 그대로 둠).
-- trust5-validator는 진행 중일 때와 50단계를 모두 마친 뒤에 실행됩니다.
+- trust5-validator는 진행 중일 때와 선택된 전체 단계를 모두 마친 뒤에 실행됩니다.
 - 나머지 훅(auto-approve·mx-tag-validator·lsp-autofix·spec-generator·step-auto-continue)은 진행 중인 실행에서만 실행됩니다. step-auto-continue는 `stop-advance` 안에서 진행 기록 훅 다음에 돌며, 진행 기록 훅이 시간을 넘겨 멈춰도 답합니다.
-- 진행 중에도 실행과 연결되는 파일은 자동 승인에서 빠집니다. 예: `.mcp.json`, `CLAUDE.md`, `AGENTS.md`, `.husky/`, `.github/workflows/`, `package.json`, lockfile, `harness50.quality.json`, `node_modules/`, `step_archive/tools/`, `step_archive/archived/`와 평면 `step_archive/stepNNN.md`(단계 본문), 홈 폴더를 프로젝트로 연 경우를 막는 `.config/systemd/`·`.config/autostart/`·`.local/bin/`·`.bin/`·`pip.conf`(`pip.ini`). 하위 폴더에 있는 `step_archive/`의 `progress.json`·`.harness50-codex/`·`archived/`·`tools/`도 자동 승인되지 않습니다. `step_archive/TOPIC/TOPIC.md`는 1단계가 직접 쓰므로 자동 승인 대상입니다.
+- 진행 중에도 실행과 연결되는 파일은 자동 승인에서 빠집니다. 예: `.mcp.json`, `CLAUDE.md`, `AGENTS.md`, `.husky/`, `.github/workflows/`, `package.json`, lockfile, `harness50.quality.json`, `node_modules/`, `step_archive/tools/`, `step_archive/archived/`·`step_archive/profiles/`·`step_archive/workflow-profile.json`과 평면 `step_archive/stepNNN.md`(단계 본문), 홈 폴더를 프로젝트로 연 경우를 막는 `.config/systemd/`·`.config/autostart/`·`.local/bin/`·`.bin/`·`pip.conf`(`pip.ini`). 하위 폴더에 있는 `step_archive/`의 `progress.json`·`.harness50-codex/`·`archived/`·`tools/`도 자동 승인되지 않습니다. `step_archive/TOPIC/TOPIC.md`는 1단계가 직접 쓰므로 자동 승인 대상입니다.
 - lsp-autofix는 프로젝트 `node_modules`에 biome·stylelint가 있을 때만 `npx --no-install`로 실행합니다.
 
 ---
@@ -821,7 +873,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests/security-regression.ps
 | [MoAI-ADK](https://github.com/moai-research/MoAI) | @MX 4종 태그 시스템 · TRUST 5 게이트 · EARS SPEC 형식 |
 | [superpowers](https://github.com/obra/superpowers) | brainstorming · TDD · debugging 스킬 구조와 개발 절차를 참고. 적용 범위·승인은 호스트별 규약을 따름 |
 | [Claude Code 공식 hooks](https://docs.claude.com/en/docs/claude-code/hooks) | `{"decision":"block"}` 자동 재개 메커니즘 · PreToolUse `permissionDecision:"allow"` |
-| [Jev / TypeSafe AI — 공식 API](https://docs.typesafe.ai/api) | **실제 연동 서비스** — Noul·Choice·Score 직접 질문과 7단계 선택형 의미 판단. 생성·도구 실행·필수 검증은 호스트가 담당 ([직접 질문](docs/jev-first.md) · [단계별 검토](docs/jev-checkpoints.md)) |
+| [Jev / TypeSafe AI — 공식 API](https://docs.typesafe.ai/api) | **실제 연동 서비스** — Noul·Choice·Score 직접 질문과 새36의 5개/legacy50의 7개 선택형 의미 판단. 생성·도구 실행·필수 검증은 호스트가 담당 ([직접 질문](docs/jev-first.md) · [단계별 검토](docs/jev-checkpoints.md)) |
 | [Aside — 공식 문서](https://docs.aside.com/) | **브라우저 검증 백엔드** — `aside repl`을 통한 화면·상호작용·스크린샷 확인. Playwright 사용이 제한된 환경을 지원하며 사용자 프로필 공유 등 제약을 기록 ([백엔드 안내](docs/BROWSER-TOOLS.md)) |
 | [axe-core (Deque Systems)](https://github.com/dequelabs/axe-core) | **자동 접근성 검사 엔진** — 두 브라우저 백엔드에서 WCAG 2/2.1 A·AA 규칙 검사에 사용. 자동 검사 범위의 결과이며 전체 접근성 준수를 보증하지 않음 |
 | [Playwright (Microsoft)](https://playwright.dev/) | **CI·사용이 허용된 PC의 브라우저 검증 백엔드** — 격리 Chromium 컨텍스트·라우팅·상호작용·스크린샷 검사. 의존성은 별도 `browser-verifier/`에 분리 ([백엔드 안내](docs/BROWSER-TOOLS.md)) |

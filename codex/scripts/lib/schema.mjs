@@ -1,7 +1,6 @@
 import { HarnessError } from "./errors.mjs";
 
-const SCHEMA_VERSION = 1;
-const STEP_COUNT = 50;
+import { DEFAULT_WORKFLOW_PROFILE, LEGACY_WORKFLOW_PROFILE, getWorkflowProfile, resolveWorkflowProfile } from "../../../scripts/lib/workflow-profiles.mjs";
 const STATUSES = new Set(["running", "paused", "blocked", "completed"]);
 const TOPIC_PATH = "step_archive/TOPIC/TOPIC.md";
 const STATE_FIELDS = new Set([
@@ -54,17 +53,17 @@ function requireTimestamp(value, field, { nullable = false } = {}) {
   }
 }
 
-function requireStep(value, field) {
-  if (!Number.isInteger(value) || value < 1 || value > STEP_COUNT) {
-    invalid(`${field} must be an integer from 1 through ${STEP_COUNT}`, { field });
+function requireStep(value, field, count) {
+  if (!Number.isInteger(value) || value < 1 || value > count) {
+    invalid(`${field} must be an integer from 1 through ${count}`, { field });
   }
 }
 
-function validateCompletedSteps(completedSteps) {
+function validateCompletedSteps(completedSteps, count) {
   if (!Array.isArray(completedSteps)) invalid("completed_steps must be an array", { field: "completed_steps" });
   for (let index = 0; index < completedSteps.length; index += 1) {
     const step = completedSteps[index];
-    requireStep(step, "completed_steps");
+    requireStep(step, "completed_steps", count);
     if (step !== index + 1) {
       invalid("completed_steps must be a contiguous prefix beginning with step 1", {
         field: "completed_steps",
@@ -74,12 +73,12 @@ function validateCompletedSteps(completedSteps) {
   }
 }
 
-function validateCurrentAttempt(value, currentStep) {
+function validateCurrentAttempt(value, currentStep, count) {
   if (value === null) return;
   if (!isPlainObject(value)) invalid("current_attempt must be null or an object", { field: "current_attempt" });
   requireExactFields(value, CURRENT_ATTEMPT_FIELDS, "current_attempt");
   requireString(value.id, "current_attempt.id");
-  requireStep(value.step, "current_attempt.step");
+  requireStep(value.step, "current_attempt.step", count);
   if (value.step !== currentStep) invalid("current_attempt.step must match current_step", { field: "current_attempt.step" });
   requireNullableString(value.session_id, "current_attempt.session_id");
   requireTimestamp(value.started_at, "current_attempt.started_at");
@@ -104,8 +103,8 @@ function validateContinuation(value, state) {
   if (value.step !== state.current_step) invalid("continuation.step must match current_step", { field: "continuation.step" });
   requireString(value.nonce, "continuation.nonce");
   requireTimestamp(value.issued_at, "continuation.issued_at");
-  if (!Number.isInteger(value.baseline_receipt_count) || value.baseline_receipt_count < 0 || value.baseline_receipt_count > STEP_COUNT) {
-    invalid("continuation.baseline_receipt_count must be an integer from 0 through 50", { field: "continuation.baseline_receipt_count" });
+  if (!Number.isInteger(value.baseline_receipt_count) || value.baseline_receipt_count < 0 || value.baseline_receipt_count > state.total_steps) {
+    invalid(`continuation.baseline_receipt_count must be an integer from 0 through ${state.total_steps}`, { field: "continuation.baseline_receipt_count" });
   }
   if (value.baseline_receipt_count !== state.completed_steps.length) {
     invalid("continuation.baseline_receipt_count must match completed_steps", { field: "continuation.baseline_receipt_count" });
@@ -140,7 +139,7 @@ function validateStopDelivery(value, state) {
   }
 }
 
-function validateImportedFrom(value, completedStepCount) {
+function validateImportedFrom(value, completedStepCount, count) {
   if (value === null) return;
   if (!isPlainObject(value)) invalid("imported_from must be null or an object", { field: "imported_from" });
   requireExactFields(value, IMPORTED_FROM_FIELDS, "imported_from");
@@ -149,8 +148,8 @@ function validateImportedFrom(value, completedStepCount) {
     invalid("imported_from.source_sha256 must be a SHA-256 digest", { field: "imported_from.source_sha256" });
   }
   requireTimestamp(value.imported_at, "imported_from.imported_at");
-  if (!Number.isInteger(value.prefix_length) || value.prefix_length < 0 || value.prefix_length > STEP_COUNT) {
-    invalid("imported_from.prefix_length must be an integer from 0 through 50", { field: "imported_from.prefix_length" });
+  if (!Number.isInteger(value.prefix_length) || value.prefix_length < 0 || value.prefix_length > count) {
+    invalid(`imported_from.prefix_length must be an integer from 0 through ${count}`, { field: "imported_from.prefix_length" });
   }
   if (value.prefix_length > completedStepCount) {
     invalid("imported_from.prefix_length cannot exceed completed_steps", { field: "imported_from.prefix_length" });
@@ -162,7 +161,7 @@ function validateImportedFrom(value, completedStepCount) {
 
 export function nextIncompleteStep(state) {
   const completed = new Set(state.completed_steps);
-  for (let step = 1; step <= STEP_COUNT; step += 1) {
+  for (let step = 1; step <= state.total_steps; step += 1) {
     if (!completed.has(step)) return step;
   }
   return null;
@@ -170,18 +169,21 @@ export function nextIncompleteStep(state) {
 
 export function validateState(state) {
   if (!isPlainObject(state)) invalid("state must be an object");
+  if (![1, 2].includes(state.schema_version)) invalid("state schema_version must be 1 or 2");
+  if (state.schema_version === 2 && !Object.hasOwn(state, "workflow_profile")) invalid("state schema_version 2 requires workflow_profile");
+  let profile;
+  try { profile = resolveWorkflowProfile(state); } catch (error) { invalid(error.message); }
+  const fields = new Set([...STATE_FIELDS, ...(state.schema_version === 2 ? ["workflow_profile"] : [])]);
   for (const field of Object.keys(state)) {
-    if (!STATE_FIELDS.has(field)) invalid(`state contains an unknown field: ${field}`, { field });
+    if (!fields.has(field)) invalid(`state contains an unknown field: ${field}`, { field });
   }
-  for (const field of STATE_FIELDS) {
+  for (const field of fields) {
     if (!(field in state)) invalid(`state is missing required field: ${field}`, { field });
   }
 
-  if (state.schema_version !== SCHEMA_VERSION) invalid("state schema_version must be 1", { field: "schema_version" });
   requireString(state.workflow_id, "workflow_id");
   if (!STATUSES.has(state.status)) invalid("state status is invalid", { field: "status" });
-  if (state.total_steps !== STEP_COUNT) invalid("state total_steps must be 50", { field: "total_steps" });
-  validateCompletedSteps(state.completed_steps);
+  validateCompletedSteps(state.completed_steps, profile.stepCount);
   if (state.topic_path !== TOPIC_PATH) invalid(`topic_path must be ${TOPIC_PATH}`, { field: "topic_path" });
   if (!/^[a-f0-9]{64}$/.test(state.topic_sha256 ?? "")) {
     invalid("topic_sha256 must be a SHA-256 digest", { field: "topic_sha256" });
@@ -197,14 +199,14 @@ export function validateState(state) {
   }
   requireNullableString(state.last_stop_turn_id, "last_stop_turn_id");
   validateOwner(state.owner);
-  validateImportedFrom(state.imported_from, state.completed_steps.length);
+  validateImportedFrom(state.imported_from, state.completed_steps.length, profile.stepCount);
 
-  const expectedCurrentStep = state.completed_steps.length === STEP_COUNT
+  const expectedCurrentStep = state.completed_steps.length === profile.stepCount
     ? null
     : state.completed_steps.length + 1;
   if (state.status === "completed") {
-    if (state.completed_steps.length !== STEP_COUNT || state.current_step !== null) {
-      invalid("completed state requires all 50 completed steps and current_step=null", { field: "status" });
+    if (state.completed_steps.length !== profile.stepCount || state.current_step !== null) {
+      invalid(`completed state requires all ${profile.stepCount} completed steps and current_step=null`, { field: "status" });
     }
     if (state.current_attempt !== null || state.continuation !== null) {
       invalid("completed state cannot have an active attempt or continuation", { field: "status" });
@@ -213,14 +215,14 @@ export function validateState(state) {
     if (state.current_step !== expectedCurrentStep) {
       invalid("current_step must be the first incomplete step", { field: "current_step" });
     }
-    requireStep(state.current_step, "current_step");
+    requireStep(state.current_step, "current_step", profile.stepCount);
   }
   if (state.status === "blocked") {
     requireString(state.blocked_reason, "blocked_reason");
   } else if (state.blocked_reason !== null) {
     invalid("blocked_reason must be null unless status is blocked", { field: "blocked_reason" });
   }
-  validateCurrentAttempt(state.current_attempt, state.current_step);
+  validateCurrentAttempt(state.current_attempt, state.current_step, profile.stepCount);
   validateContinuation(state.continuation, state);
   validateStopDelivery(state.stop_delivery, state);
   return state;
@@ -240,18 +242,20 @@ export function parseState(raw) {
   }
 }
 
-export function createInitialState({ workflowId, workspaceRoot, topicSha256, now } = {}) {
+export function createInitialState({ workflowId, workspaceRoot, topicSha256, now, workflowProfile = DEFAULT_WORKFLOW_PROFILE } = {}) {
   requireString(workflowId, "workflowId");
   requireString(workspaceRoot, "workspaceRoot");
   if (!/^[a-f0-9]{64}$/.test(topicSha256 ?? "")) {
     invalid("topicSha256 must be a SHA-256 digest", { field: "topicSha256" });
   }
   requireTimestamp(now, "now");
+  const profile = getWorkflowProfile(workflowProfile);
   return validateState({
-    schema_version: SCHEMA_VERSION,
+    schema_version: profile.id === LEGACY_WORKFLOW_PROFILE ? 1 : 2,
+    ...(profile.id === LEGACY_WORKFLOW_PROFILE ? {} : { workflow_profile: profile.id }),
     workflow_id: workflowId,
     status: "running",
-    total_steps: STEP_COUNT,
+    total_steps: profile.stepCount,
     current_step: 1,
     completed_steps: [],
     topic_path: TOPIC_PATH,

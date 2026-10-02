@@ -1,6 +1,7 @@
+import { resolveWorkflowProfile, getWorkflowProfile, LEGACY_WORKFLOW_PROFILE } from './workflow-profiles.mjs';
 // Pure rules of the Claude named pause (harness-rules 2-1). scripts/harness-pause.mjs is the only
 // writer of paused and pause_* in step_archive/progress.json. The hooks cannot import this module
-// (they run without scripts/), so they carry copies of isPaused, PAUSE_REASONS, NAMED_PAUSE and
+// directly, so they carry copies of isPaused, PAUSE_REASONS, NAMED_PAUSE and
 // PAUSED_TEMPLATE; codex/tests/claude-named-pause.test.mjs keeps the copies equal to this file.
 export const MODEL_PAUSE_REASONS = Object.freeze(['permission-denied', 'required-tool-failed', 'required-input-missing']);
 export const PAUSE_REASONS = Object.freeze([...MODEL_PAUSE_REASONS, 'user-request']);
@@ -27,11 +28,13 @@ export function isPaused(progress) {
   return plain(progress) && ((Object.hasOwn(progress, 'paused') && progress.paused !== false) || progress.status === 'paused');
 }
 
-// A progress.json the pause CLI may change: a plain object, total_steps an integer 1..999 and
-// completed_steps an array of integers.
+// A progress.json the pause CLI may change: a known profile with its exact total, and
+// completed_steps a distinct array of in-range integers.
 export function validateProgress(progress) {
-  return plain(progress) && Number.isInteger(progress.total_steps) && progress.total_steps >= 1 && progress.total_steps <= 999 &&
-    Array.isArray(progress.completed_steps) && progress.completed_steps.every(step => Number.isInteger(step));
+  try {
+    const profile = resolveWorkflowProfile(progress);
+    return Array.isArray(progress.completed_steps) && progress.completed_steps.every(step => Number.isInteger(step) && step >= 1 && step <= profile.stepCount) && new Set(progress.completed_steps).size === progress.completed_steps.length;
+  } catch { return false; }
 }
 
 // First step of 1..total_steps that is not completed, or 0 when every step is.
@@ -103,13 +106,14 @@ export function applyResume(progress, { now = new Date() } = {}) {
 // step) and '/harness-resume' runs the kept topic from step 1.
 export const RESET_TOTAL = 50;
 export const RESET_NOTE = '리셋 후 대기 — /webapp <주제>로 새 실행, /harness-resume으로 현재 주제를 1단계부터';
-export function resetProgress({ now = new Date() } = {}) {
+export function resetProgress({ now = new Date(), workflowProfile = LEGACY_WORKFLOW_PROFILE } = {}) {
   const fresh = {
     current_step: 1,
     completed_steps: [],
     skipped_steps: [],
     failed_steps: [],
-    total_steps: RESET_TOTAL,
+    ...(workflowProfile === LEGACY_WORKFLOW_PROFILE ? {} : { schema_version: 2, workflow_profile: workflowProfile }),
+    total_steps: getWorkflowProfile(workflowProfile).stepCount,
     metrics: { total_duration_minutes: 0, total_sessions: 0, steps_per_session_avg: 0 },
     session_history: [],
     run_started_at: now.toISOString()

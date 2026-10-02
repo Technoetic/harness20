@@ -359,3 +359,11 @@ test('edit content never makes permission-request-guard deny', t => {
   assert.equal(run(root, 'auto-approve', { tool_name: 'MultiEdit', tool_input: { file_path: 'README.md', edits: [{ old_string: 'a', new_string: 'b' }, { old_string: 'c', new_string: 'rm -rf /' }] } }).output, '');
   assert.match(run(root, 'auto-approve', edit('const a = 1')).output, /"permissionDecision":"allow"/);
 });
+
+test('profile archived bodies receive no automatic approval like legacy archived bodies', t => {
+  const root = fixture(t);
+  for (const target of ['step_archive/profiles/research-free-36-v1/archived/step017.md', 'step_archive/archived/step017.md']) {
+    assert.equal(run(root, 'auto-approve', write(target)).output, '');
+    assert.equal(run(root, 'permission-request-guard', write(target)).output, '');
+  }
+});

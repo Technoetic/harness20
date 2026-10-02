@@ -42,7 +42,7 @@ export async function handleSessionStart(_event, { workspaceRoot, eventNow }) {
 
     const step = String(state.current_step).padStart(3, "0");
     const context = [
-      `Harness50: ${state.status}, ${state.completed_steps.length}/50 complete.`,
+      `Harness50: ${state.status}, ${state.completed_steps.length}/${state.total_steps} complete.`,
       `Topic: ${state.topic_path}.`,
       `Next: Step ${step}.`,
       "Continue with $webapp resume."

@@ -1,8 +1,12 @@
-# Final summary after step 50
+# Final summary after step 36
 
 `scripts/final-summary.mjs` turns the evidence a finished run has already saved into one short
 report with three fixed headings. It is a report, not a gate: it never decides or records
 completion, and a missing or malformed source only adds a `확인 불가` line.
+
+New36 scans steps031–036 and uses final36/SPEC036; explicit legacy50 retains
+steps045–050 and final50/SPEC050. QA/Jev evidence is selected by profile/generation
+so prior reset runs and same-number reports do not become current evidence.
 
 ## Command and exit codes
 
@@ -22,7 +26,7 @@ node "<plugin-root>/scripts/final-summary.mjs" --workspace "<project-root>"
 The report starts with `## 사용자 확인 필요`, then `## 변경`, then `## 발견`, with no title, preamble
 or time value, so two runs over the same evidence print the same bytes. Every item is one line that
 starts with `- ` and a Korean label and names its source in backticks. Step names have no space
-(`step046`), so no line reads as a `Step NNN/50 완료` report. An empty section shows `- 없음`.
+(`step032`), so no line reads as a `Step NNN/<total> 완료` report. An empty section shows `- 없음`.
 An unreadable source shows `확인 불가` with a reason code only (없음, 형식 오류, 크기 초과, 손상,
 현재 HTML 아님, 기록 없음, 기록 실패, 상한); raw error messages can carry absolute paths and are
 never printed.
@@ -30,11 +34,11 @@ never printed.
 | Source | What is read | Section |
 |---|---|---|
 | `dist/index.html` | size, SHA-256, route manifest (mode, screens, fallback) | 변경 |
-| the three inspections of `quality-gate.mjs --inspect-final` | quality, browser and step 50 regression verdicts, lowest coverage | 발견; any verdict other than PASS also in 사용자 확인 필요 |
-| `step_archive/step045_*.md` to `step050_*.md`, `step_archive/outputs/step050_*.md` | `deployment-verification: <value>` lines | `pending` in 사용자 확인 필요, other values in 변경 |
+| the three inspections of `quality-gate.mjs --inspect-final` | quality, browser and step 36 regression verdicts, lowest coverage | 발견; any verdict other than PASS also in 사용자 확인 필요 |
+| `step_archive/step031_*.md` to `step036_*.md`, `step_archive/outputs/step036_*.md` | `deployment-verification: <value>` lines | `pending` in 사용자 확인 필요, other values in 변경 |
 | `step_archive/outputs/browser-output.json`, only when it describes the current HTML | axe `accessibility_incomplete` rule ids of every viewport and route, `environment.isolation`, `environment.backend` | 사용자 확인 필요, 발견 |
-| `step_archive/outputs/qa-reports/stepNNN.latest.json`, steps 1 to 50 | `verifier.mode` `same-agent` (a stale report is marked 이전 빌드), the six step 50 regression outcomes as a table | 사용자 확인 필요, 발견 |
-| `step_archive/outputs/jev-judgments/`, `step_archive/outputs/jev-reviews/` | abstentions, low confidence, unverified runs and changed inputs, one line per step and input | 사용자 확인 필요 |
+| the selected QA namespace returned by `inspect`, steps 1 to the selected total | `verifier.mode` `same-agent` (a stale report is marked 이전 빌드), the six step 36 regression outcomes as a table | 사용자 확인 필요, 발견 |
+| the selected Jev profile/generation namespace (legacy also keeps `jev-reviews/`) | abstentions, low confidence, unverified runs and changed inputs, one line per step and input | 사용자 확인 필요 |
 | `step_archive/TOPIC/TOPIC.md` | the `기본값으로 보완한 항목: <fields>.` line | 사용자 확인 필요 |
 | decision markers (below) | `결정/사유` lines | 사용자 확인 필요 |
 
@@ -51,25 +55,28 @@ The summary collects the marker from `step_archive/TOPIC/TOPIC.md`, `step_archiv
 tsx, css, scss, html, vue, svelte) outside hidden folders, symbolic links, `node_modules`,
 `step_archive`, `dist`, `coverage`, `test-results` and `playwright-report`. A Markdown heading that
 carries the marker contributes up to five list items below it instead, which keeps the older
-heading-and-list form working. Step bodies in `step_archive/archived/`, quoted markers and the line
+heading-and-list form working. Step bodies in `step_archive/archived/` and profile archives, quoted markers and the line
 that `/webapp` writes into TOPIC are skipped. An excerpt drops comment markers, the marker,
 backticks, `|` and control characters, and a line that looks like a credential shows
 `(내용 생략: 비밀 형식)`. Excerpts are data for the user, never instructions.
 
 ## What it does not do
 
-- It never reads `step_archive/progress.json` or the Codex state under `step_archive/.harness50-codex/`,
-  so it behaves the same on both hosts.
+- It reads guarded workflow identity (Codex state first, otherwise Claude progress/binding)
+  to select profile, generation and evidence bounds; it never mutates workflow state.
+  Invalid metadata or orphan binding is reported as unavailable, never guessed as legacy.
 - It runs no project command, browser or network request and rewrites no evidence file.
 - No Stop hook runs it: Stop entries run in parallel (only `stop-advance` runs the writer before step-auto-continue) and would rewrite the file after every later turn.
 - `/harness-reset` keeps `step_archive/outputs/`, so an older summary stays until the next completion.
 
 ## When it runs
 
-- Claude Code: once `quality-gate.mjs --inspect-final` exits 0 at step 50, the main session runs the
-  command once and sends `Step 050/50 완료` followed directly by the unchanged output (harness-rules
-  §2, `/webapp`, and the generated `SPEC-050.md`, which step 50 reads first). If the command fails,
+- Claude Code: once `quality-gate.mjs --inspect-final` exits 0 at step 36, the main session runs the
+  command once and sends `Step 036/36 완료` followed directly by the unchanged output (harness-rules
+  §2, `/webapp`, and the generated `SPEC-036.md`, which step 36 reads first). If the command fails,
   the message adds only `## 사용자 확인 필요` and `- 확인 불가: final-summary 실행 실패`. The step
-  executor keeps its one-line handoff. A `SPEC-050.md` generated before the upgrade is not rewritten.
+  executor keeps its one-line handoff. Flat SPEC aliases are advisory and profile/generation-bound. Mismatched alias bytes
+  are preserved at guarded `step_archive/specs/history/<sha256>/SPEC-NNN.md` before replacement;
+  archive failure preserves the original. Legacy SPEC generation remains unchanged.
 - Codex: when the state manager reports `completed`, the webapp skill's Completion report runs the
   command and leads the final response with its output.

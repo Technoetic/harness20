@@ -35,30 +35,35 @@ function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function isStep(value) {
-  return Number.isInteger(value) && value >= 1 && value <= STEP_COUNT;
+function isStep(value, count) {
+  return Number.isInteger(value) && value >= 1 && value <= count;
 }
 
 // Returns { kind: 'absent' } | { kind: 'invalid' } |
 // { kind: 'valid', workflowId, status, step, completed }.
 export function summarizeState(state) {
   if (!isPlainObject(state)) return { kind: 'invalid' };
-  if (state.schema_version !== SCHEMA_VERSION) return { kind: 'invalid' };
+  let count;
+  if (state.schema_version === 1 && !Object.hasOwn(state, 'workflow_profile') && state.total_steps === 50) count = 50;
+  else if (state.schema_version === 2 && state.workflow_profile === 'research-free-36-v1' && state.total_steps === 36) count = 36;
+  else if (state.schema_version === 2 && state.workflow_profile === 'legacy-50-v1' && state.total_steps === 50) count = 50;
+  else return { kind: 'invalid' };
   if (typeof state.workflow_id !== 'string' || !WORKFLOW_ID.test(state.workflow_id)) return { kind: 'invalid' };
   if (!STATUSES.includes(state.status)) return { kind: 'invalid' };
   const done = state.completed_steps;
-  if (!Array.isArray(done) || done.length > STEP_COUNT || !done.every((step, index) => step === index + 1)) {
+  if (!Array.isArray(done) || done.length > count || !done.every((step, index) => step === index + 1)) {
     return { kind: 'invalid' };
   }
   let step;
   if (state.status === 'completed') {
-    if (done.length !== STEP_COUNT || state.current_step !== null) return { kind: 'invalid' };
-    step = STEP_COUNT;
+    if (done.length !== count || state.current_step !== null) return { kind: 'invalid' };
+    step = count;
   } else {
-    if (!isStep(state.current_step) || state.current_step !== done.length + 1) return { kind: 'invalid' };
+    if (!isStep(state.current_step, count) || state.current_step !== done.length + 1) return { kind: 'invalid' };
     step = state.current_step;
   }
-  return { kind: 'valid', workflowId: state.workflow_id, status: state.status, step, completed: done.length };
+  return { kind: 'valid', workflowId: state.workflow_id, status: state.status, step, completed: done.length,
+    ...(state.schema_version === 2 ? { total: count, workflowProfile: state.workflow_profile } : {}) };
 }
 
 export function probe(projectRoot) {
@@ -77,7 +82,7 @@ export function probe(projectRoot) {
     // libuv opens with full share flags on Windows, so Codex's atomic rename is never blocked.
     const bytes = fs.readFileSync(file);
     if (bytes.length > MAX_STATE_BYTES) return { kind: 'invalid' };
-    return summarizeState(JSON.parse(bytes.toString('utf8').replace(/^﻿/, '')));
+    return summarizeState(JSON.parse(bytes.toString('utf8').replace(/^\uFEFF/, '')));
   } catch {
     return { kind: 'invalid' };
   }
@@ -86,8 +91,8 @@ export function probe(projectRoot) {
 export function contextLine(result) {
   if (result?.kind === 'absent') return '';
   if (result?.kind !== 'valid') return WARNING_LINE;
-  const where = `[HARNESS] Codex workflow ${result.workflowId} is ${result.status} at step ${result.step}/${STEP_COUNT} ` +
-    `(${result.completed}/${STEP_COUNT} complete)`;
+  const where = `[HARNESS] Codex workflow ${result.workflowId} is ${result.status} at step ${result.step}/${result.total ?? STEP_COUNT} ` +
+    `(${result.completed}/${result.total ?? STEP_COUNT} complete)`;
   if (result.status === 'completed') {
     return `${where} - nothing to continue; inspect it with ${MANAGER} show. ` +
       'Claude progress.json is not authoritative here.';

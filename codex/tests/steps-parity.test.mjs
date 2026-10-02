@@ -25,6 +25,9 @@ async function fixtureRoot(t, { includeCli = false } = {}) {
     recursive: true
   });
   if (includeCli) {
+    await mkdir(join(root, "scripts", "lib"), { recursive: true });
+    await cp(join(repoRoot, "scripts", "lib", "workflow-profiles.mjs"), join(root, "scripts", "lib", "workflow-profiles.mjs"));
+    await cp(join(repoRoot, "scripts", "lib", "errors.mjs"), join(root, "scripts", "lib", "errors.mjs"));
     await mkdir(join(root, "codex", "scripts", "lib"), { recursive: true });
     await cp(validatorPath, join(root, "codex", "scripts", "validate-steps.mjs"));
     await cp(

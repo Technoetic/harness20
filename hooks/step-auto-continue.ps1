@@ -50,6 +50,12 @@ if (-not (Test-Path -LiteralPath $progressFile)) {
     exit 0
 }
 
+# Resolve profile/count/body identity before reading or mutating this run.
+$profileJson = @(& node (Join-Path $PSScriptRoot 'lib/workflow-profile.mjs') resolve (Join-Path $projectRoot '.') 2>$null)
+if ($LASTEXITCODE -ne 0 -or $profileJson.Count -eq 0) { exit 0 }
+try { $selectedProfile = ($profileJson -join "`n") | ConvertFrom-Json -ErrorAction Stop } catch { exit 0 }
+$selectedArchive = Join-Path $projectRoot $selectedProfile.body_directory
+
 try {
     $progress = Get-Content -LiteralPath $progressFile -Raw -Encoding UTF8 | ConvertFrom-Json
 } catch {
@@ -187,14 +193,8 @@ foreach ($p in $questionPatterns) {
 $nextStep = $current
 $nextStepStr = "{0:D3}" -f $nextStep
 # step 파일 실제 경로 해석: archived/ 우선, 없으면 flat (재가동 시 archived/ 이동 대응)
-$stepFile = "step_archive/step$nextStepStr.md"
-$archivedCandidate = Join-Path $projectRoot "step_archive\archived\step$nextStepStr.md"
-$flatCandidate = Join-Path $projectRoot "step_archive\step$nextStepStr.md"
-if (Test-Path -LiteralPath $archivedCandidate) {
-    $stepFile = "step_archive/archived/step$nextStepStr.md"
-} elseif (Test-Path -LiteralPath $flatCandidate) {
-    $stepFile = "step_archive/step$nextStepStr.md"
-}
+$stepFile = $selectedProfile.step_body
+if (-not $stepFile) { exit 0 }
 
 # 출력은 1~2줄로 최소화한다 (긴 reason 주입이 컨텍스트를 키워 tool-call 직렬화 오류를 유발).
 # B-FIX(2026-06-05): 멈춤의 근본 원인은 검증 스킬(evaluator/verify/check)의 긴 본문을

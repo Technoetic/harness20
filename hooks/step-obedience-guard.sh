@@ -16,6 +16,11 @@ ARCHIVED_DIR="$PROJECT_ROOT/step_archive/archived"
 # Codex state manager owns this workspace.
 if [ -e "$PROJECT_ROOT/step_archive/.harness50-codex/state.json" ]; then exit 0; fi
 [ -f "$PROGRESS_FILE" ] || exit 0
+# Shared profile/archive identity; invalid metadata never activates a mixed archive.
+H50_PROFILE="$(node "$(dirname "${BASH_SOURCE[0]}")/lib/workflow-profile.mjs" resolve "$PROJECT_ROOT" 2>/dev/null)" || exit 0
+export H50_PROFILE
+ARCHIVED_DIR="$PROJECT_ROOT/$(printf '%s' "$H50_PROFILE" | python3 -c 'import json,sys; print(json.load(sys.stdin)["body_directory"])' | tr -d '\r')"
+
 
 # Parse progress without jq. Without python3 the state is unknown, so say nothing rather than
 # invent one. tr drops the CR that a Windows python prints, which would break the numbers below.
@@ -83,7 +88,7 @@ fi
 # archived/ first, then the flat step_archive/ copy (mirrors step-obedience-guard.ps1).
 NEXT_FMT="$(printf 'step%03d' "$NEXT")"
 if [ -f "$ARCHIVED_DIR/$NEXT_FMT.md" ]; then
-  NEXT_REL="step_archive/archived/$NEXT_FMT.md"
+  NEXT_REL="$(printf '%s' "$H50_PROFILE" | python3 -c 'import json,sys; print(json.load(sys.stdin)["step_body"])' | tr -d '\r')"
 elif [ -f "$PROJECT_ROOT/step_archive/$NEXT_FMT.md" ]; then
   NEXT_REL="step_archive/$NEXT_FMT.md"
 else

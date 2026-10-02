@@ -37,6 +37,16 @@ $specDir = Join-Path $projectRoot "step_archive\specs"
 if (Test-Path -LiteralPath (Join-Path $projectRoot "step_archive\.harness50-codex\state.json")) { exit 0 }
 if (-not (Test-Path -LiteralPath $progressFile)) { exit 0 }
 
+# Resolve profile/count/body identity before reading or mutating this run.
+$profileJson = @(& node (Join-Path $PSScriptRoot 'lib/workflow-profile.mjs') resolve (Join-Path $projectRoot '.') 2>$null)
+if ($LASTEXITCODE -ne 0 -or $profileJson.Count -eq 0) { exit 0 }
+try { $selectedProfile = ($profileJson -join "`n") | ConvertFrom-Json -ErrorAction Stop } catch { exit 0 }
+$selectedArchive = Join-Path $projectRoot $selectedProfile.body_directory
+if ($selectedProfile.workflow_profile -eq 'research-free-36-v1') {
+    & node (Join-Path $PSScriptRoot 'lib/workflow-profile.mjs') spec (Join-Path $projectRoot '.') 2>$null
+    exit 0
+}
+
 try {
     $progress = Get-Content -LiteralPath $progressFile -Raw -Encoding UTF8 | ConvertFrom-Json
 } catch {
@@ -68,8 +78,11 @@ foreach ($t in $targets) {
     $specFile = Join-Path $specDir "SPEC-$stepNum.md"
     if (Test-Path -LiteralPath $specFile) { continue }  # 멱등: 기존 SPEC 보존
 
-    $stepFile = Join-Path $projectRoot "step_archive\archived\step$stepNum.md"
+    $stepRelative = "$($selectedProfile.body_directory)/step$stepNum.md"
+    $stepFile = Join-Path $projectRoot $stepRelative
     if (-not (Test-Path -LiteralPath $stepFile)) {
+        if ($selectedProfile.workflow_profile -ne 'legacy-50-v1') { continue }
+        $stepRelative = "step_archive/step$stepNum.md"
         $stepFile = Join-Path $projectRoot "step_archive\step$stepNum.md"
         if (-not (Test-Path -LiteralPath $stepFile)) {
             Write-SpecLog "step$stepNum.md not found"
@@ -95,12 +108,14 @@ foreach ($t in $targets) {
     $prevStepStr = "{0:D3}" -f ($t - 1)
     # Step 50 SPEC only (mirrors spec-generator.sh FINAL_SUMMARY_LINE): the completion report route.
     # CRLF like the lines of the here-string below, which keeps this file's line endings.
-    $finalLine = if ($t -eq 50 -and $totalSteps -eq 50) { "`r`n" + '- 50단계 마무리: quality-gate.mjs --inspect-final 종료 코드 0 뒤 node "<plugin-root>/scripts/final-summary.mjs" --workspace "<project-root>"를 1회 실행하고, 완료 줄 바로 다음에 그 출력의 세 제목(사용자 확인 필요 / 변경 / 발견)만 그대로 붙인다 (harness-rules §2)' } else { '' }
+    $finalLine = if ($t -eq $selectedProfile.milestones.final) { "`r`n" + '- 50단계 마무리: quality-gate.mjs --inspect-final 종료 코드 0 뒤 node "<plugin-root>/scripts/final-summary.mjs" --workspace "<project-root>"를 1회 실행하고, 완료 줄 바로 다음에 그 출력의 세 제목(사용자 확인 필요 / 변경 / 발견)만 그대로 붙인다 (harness-rules §2)' } else { '' }
+    $finalLine = $finalLine.Replace('50단계', "$totalSteps" + '단계')
+    $quality1 = $selectedProfile.milestones.quality[0]; $quality2 = $selectedProfile.milestones.quality[1]; $beforeFinal = $totalSteps - 1; $finalNumber = '{0:D3}' -f $totalSteps
     $spec = @"
 # SPEC-$stepNum — $title
 
 자동 생성: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
-원본: step_archive/archived/step$stepNum.md
+원본: $stepRelative
 
 ---
 
@@ -120,8 +135,8 @@ step$stepNum 의 본문 추출 — 다음 Step 진행에 필요한 결과물을 
 ## ACCEPTANCE (수락 기준)
 
 - 해당 Step의 자체 Self-Calibration 통과
-- 결과 파일: step_archive/archived/step$stepNum.md 본문 절차가 지정한 경로 (머리말 Sync 줄과 다르면 본문 절차를 따른다)
-- 품질 마일스톤(scripts/quality-gate.mjs): 완료 38단계 → trust5_r1, 완료 44단계 → trust5_r2, 완료 49단계 이후(최종 Step 050) → trust5_r3. Stop 훅(trust5-validator)이 step_archive/outputs/trust5_rN.md에 Verdict(PASS/FAIL/INCOMPLETE)를 기록하고, PASS가 아니면 복구를 요구한다.$finalLine
+- 결과 파일: $stepRelative 본문 절차가 지정한 경로 (머리말 Sync 줄과 다르면 본문 절차를 따른다)
+- 품질 마일스톤(scripts/quality-gate.mjs): 완료 ${quality1}단계 → trust5_r1, 완료 ${quality2}단계 → trust5_r2, 완료 ${beforeFinal}단계 이후(최종 Step $finalNumber) → trust5_r3. Stop 훅(trust5-validator)이 step_archive/outputs/trust5_rN.md에 Verdict(PASS/FAIL/INCOMPLETE)를 기록하고, PASS가 아니면 복구를 요구한다.$finalLine
 
 ## REFERENCE (원본 본문 발췌)
 
@@ -131,7 +146,7 @@ $fence
 
 ## RUN-COMMAND
 
-Read step_archive/archived/step$stepNum.md → 본문 실행
+Read $stepRelative → 본문 실행
 "@
 
     # specs/ appears only when a SPEC is actually written.

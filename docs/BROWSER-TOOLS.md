@@ -11,7 +11,7 @@ dispatcher with two interchangeable backends:
 
 Both backends produce the same schema-v3 `step_archive/outputs/browser-output.json`
 and the same four screenshots. The gate (`scripts/lib/browser-report.mjs`) reads named
-report fields only, so a passing report from either backend satisfies Steps 44–50. CI
+report fields only, so a passing report from either backend satisfies Steps 30–36. CI
 keeps Playwright; the Aside backend exists so that a workstation without Playwright can
 still finish the curriculum with measured evidence.
 
@@ -127,7 +127,7 @@ other than `playwright`/`aside`, a non-string `tool_version`, an unparseable
 - **Changing backends is deliberate.** Rerun the Step 3 command with
   `--backend <name> --lock`. The same command repairs an invalid lock. A project started
   before the lock existed can record the backend named in
-  `step_archive/step003_playwright_test.md` this way (Claude Step 31 does so).
+  `step_archive/step003_playwright_test.md` this way (Claude Step 19 does so).
 - The lock prevents accidental switches. It is not a security boundary: deleting the
   file or passing an explicit backend bypasses it.
 
@@ -239,7 +239,7 @@ scheme, language, DPR and installed extensions**, and a reviewer must not treat 
 dark-scheme ko-KR shared-profile screenshot as equivalent to a light-scheme fresh-context
 capture. When both backends are available at Step 3, `auto` selects and locks
 `playwright`. Once a project is locked, keep the locked backend for all evidence,
-including the final Step 50 report, and do not install the other backend to replace it.
+including the final Step 36 report, and do not install the other backend to replace it.
 
 ## 요약 (한국어)
 

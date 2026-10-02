@@ -1,3 +1,5 @@
+import { DEFAULT_WORKFLOW_PROFILE, getWorkflowProfile, resolveWorkflowProfile } from "../../../scripts/lib/workflow-profiles.mjs";
+import { receiptMatchesState, receiptProfile } from "./receipts.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import {
   link,
@@ -115,9 +117,9 @@ function nextId(idFactory, label) {
   return value;
 }
 
-function requireStep(step) {
-  if (!Number.isInteger(step) || step < 1 || step > STEP_COUNT) {
-    fail("STEP_RANGE", `step must be an integer from 1 through ${STEP_COUNT}`, { step });
+function requireStep(step, count = STEP_COUNT) {
+  if (!Number.isInteger(step) || step < 1 || step > count) {
+    fail("STEP_RANGE", `step must be an integer from 1 through ${count}`, { step });
   }
   return step;
 }
@@ -810,10 +812,12 @@ export async function repairTopicWorkflow({ workspaceRoot, now = () => new Date(
 
 export async function initWorkflow({
   workspaceRoot,
+  workflowProfile = DEFAULT_WORKFLOW_PROFILE,
   topic,
   now = () => new Date(),
   idFactory = randomUUID
 } = {}) {
+  getWorkflowProfile(workflowProfile);
   requireText(topic, "topic", "TOPIC_INVALID");
   const preparedTopic = prepareTopicContract(topic);
   requireFactory(idFactory);
@@ -833,6 +837,7 @@ export async function initWorkflow({
       () => writeTopicExclusive(paths.workspaceRoot, preparedTopic)
     );
     let state = createInitialState({
+      workflowProfile,
       workflowId,
       workspaceRoot: paths.workspaceRoot,
       topicSha256: createdTopic.sha256,
@@ -887,6 +892,7 @@ export async function beginStep({
   requireFactory(idFactory);
   return withMutation(workspaceRoot, now, async (paths, clock, guard) => {
     let state = assertMonotonicClock(await requireState(paths.workspaceRoot, guard), clock);
+    requireStep(step, state.total_steps);
     if (state.status !== "running") fail("WORKFLOW_STATE", "begin requires a running workflow");
     if (state.current_step !== step) {
       fail("STEP_MISMATCH", "begin step must match the current step", {
@@ -954,7 +960,8 @@ export async function beginStep({
       ...(requestedSession === null ? {} : { session_id: requestedSession }),
       baseline_receipt_count: state.completed_steps.length
     }], clock, guard);
-    return { state, attempt: state.current_attempt };
+    return { state, attempt: state.current_attempt,
+      step_target: `${resolveWorkflowProfile(state).targetDirectory}/step${String(step).padStart(3, "0")}.md` };
   });
 }
 
@@ -966,7 +973,8 @@ function receiptForCompletion(state, {
   completedAt
 }) {
   return parseReceipt({
-    schema_version: 1,
+    schema_version: state.schema_version,
+    ...(state.schema_version === 2 ? { workflow_profile: state.workflow_profile } : {}),
     workflow_id: state.workflow_id,
     step,
     attempt_id: attemptId,
@@ -979,6 +987,7 @@ function receiptForCompletion(state, {
 
 function sameCompletion(existing, expected) {
   return existing.workflow_id === expected.workflow_id &&
+    receiptProfile(existing) === receiptProfile(expected) &&
     existing.step === expected.step &&
     existing.attempt_id === expected.attempt_id &&
     existing.provenance === "codex-verified" &&
@@ -987,6 +996,7 @@ function sameCompletion(existing, expected) {
 }
 
 function assertAttempt(state, step, attemptId) {
+  requireStep(step, state.total_steps);
   if (state.current_step !== step) {
     fail("STEP_MISMATCH", "operation step must match the current step", {
       expected_step: state.current_step,
@@ -1019,16 +1029,20 @@ export async function completeStep({
   requireText(attemptId, "attemptId", "ATTEMPT_INVALID");
   requireText(summary, "summary", "RECEIPT_INVALID");
   return withMutation(workspaceRoot, now, async (paths, clock, guard) => {
-    const contract = await loadStepContract(pluginRoot, step);
-    await assertMutationGuard(guard);
     let state = assertMonotonicClock(await requireState(paths.workspaceRoot, guard), clock);
+    requireStep(step, state.total_steps);
+    const workflowProfile = resolveWorkflowProfile(state).id;
+    const contract = await loadStepContract(pluginRoot, step, workflowProfile);
+    await assertMutationGuard(guard);
     const receipts = await guardedReadReceipts(paths.workspaceRoot, guard);
     const existing = receipts.find(receipt => receipt.step === step);
+    if (existing && !receiptMatchesState(existing, state)) fail("RECEIPT_PROFILE_MISMATCH", "receipt does not match the active workflow definition");
     let canonicalEvidence;
     if (existing) {
       try {
         canonicalEvidence = (await validateCompletionEvidence({
           contract,
+          workflowProfile,
           evidence,
           workspaceRoot: paths.workspaceRoot,
           persistedEvidence: existing.evidence
@@ -1047,6 +1061,7 @@ export async function completeStep({
     } else {
       canonicalEvidence = (await validateCompletionEvidence({
         contract,
+        workflowProfile,
         evidence,
         workspaceRoot: paths.workspaceRoot
       })).evidence;
@@ -1092,7 +1107,7 @@ export async function completeStep({
     }
 
     const completedSteps = [...state.completed_steps, step];
-    const completed = step === STEP_COUNT;
+    const completed = step === state.total_steps;
     state = validateState({
       ...state,
       status: completed ? "completed" : "running",
@@ -1618,6 +1633,7 @@ function authoritativeReceiptPrefix(state, receipts) {
         preserveAttempt: receipt.step === state.current_step && state.current_attempt !== null
       };
     }
+    if (!receiptMatchesState(receipt, state)) return { prefix, code: "RECEIPT_PROFILE_MISMATCH", preserveAttempt: false };
     const code = receiptAuthorityCode(state, receipt);
     if (code !== null) {
       return {
@@ -1641,7 +1657,7 @@ async function trustedReceiptPrefix(workspaceRoot, state, guard) {
   ));
   const names = new Set(entries.filter(entry => entry.isFile()).map(entry => entry.name));
   const prefix = [];
-  for (let step = 1; step <= STEP_COUNT; step += 1) {
+  for (let step = 1; step <= state.total_steps; step += 1) {
     const name = `step${String(step).padStart(3, "0")}.json`;
     if (!names.has(name)) break;
     let receipt;
@@ -1656,7 +1672,7 @@ async function trustedReceiptPrefix(workspaceRoot, state, guard) {
       if (!receiptValidationError(error)) throw error;
       break;
     }
-    if (receipt.step !== step || receipt.workflow_id !== state.workflow_id) break;
+    if (receipt.step !== step || !receiptMatchesState(receipt, state)) break;
     if (receiptAuthorityCode(state, receipt) !== null) break;
     prefix.push(receipt);
   }
@@ -1664,7 +1680,7 @@ async function trustedReceiptPrefix(workspaceRoot, state, guard) {
 }
 
 function blockForReceiptError(state, code, prefixReceipts = [], { preserveAttempt = false } = {}) {
-  const trustworthyPrefix = prefixReceipts.slice(0, STEP_COUNT - 1);
+  const trustworthyPrefix = prefixReceipts.slice(0, state.total_steps - 1);
   const completedSteps = trustworthyPrefix.map(receipt => receipt.step);
   let importedPrefix = 0;
   for (const receipt of trustworthyPrefix) {
@@ -1782,7 +1798,7 @@ export async function showWorkflow({ workspaceRoot } = {}) {
   validateState(state);
   const receipts = await readReceipts(paths.workspaceRoot);
   const reconciliation = reconcileReceipts(state, receipts);
-  const matching = receipts.filter(receipt => receipt.workflow_id === state.workflow_id);
+  const matching = receipts.filter(receipt => receiptMatchesState(receipt, state));
   const imported = matching.filter(receipt => receipt.provenance === "claude-progress-import").length;
   const codexVerified = matching.filter(receipt => receipt.provenance === "codex-verified").length;
   return {
@@ -1791,6 +1807,8 @@ export async function showWorkflow({ workspaceRoot } = {}) {
     workflow_id: state.workflow_id,
     status: state.status,
     total_steps: state.total_steps,
+    workflow_profile: resolveWorkflowProfile(state).id,
+    step_target: state.current_step === null ? null : `${resolveWorkflowProfile(state).targetDirectory}/step${String(state.current_step).padStart(3, "0")}.md`,
     current_step: state.current_step,
     completed_count: state.completed_steps.length,
     topic_path: state.topic_path,

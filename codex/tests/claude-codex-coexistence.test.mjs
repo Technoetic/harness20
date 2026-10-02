@@ -122,6 +122,7 @@ function fixture(t, { name = 'Codex 작업 [30]' } = {}) {
   const plugin = join(root, 'cache', 'plugin', '2.2');
   cpSync(join(repo, 'hooks'), join(plugin, 'hooks'), { recursive: true });
   cpSync(join(repo, 'assets'), join(plugin, 'assets'), { recursive: true });
+  cpSync(join(repo, 'scripts'), join(plugin, 'scripts'), { recursive: true });
   const project = join(root, name);
   const other = join(root, 'other');
   mkdirSync(project);
@@ -142,7 +143,7 @@ function fixture(t, { name = 'Codex 작업 [30]' } = {}) {
       mkdirSync(join(archive, 'archived'), { recursive: true });
       for (let step = 1; step <= 3; step += 1) writeFileSync(join(archive, 'archived', `step00${step}.md`), '# Test\n## Task\n');
       writeFileSync(progressFile, JSON.stringify({
-        last_updated: '', total_steps: 3, current_step: 1, completed_steps: [], failed_steps: [],
+        last_updated: '', total_steps: 50, current_step: 1, completed_steps: [], failed_steps: [],
         metrics: { total_sessions: 0 }, session_history: []
       }));
     },
@@ -270,7 +271,7 @@ test('the probe stays aligned with the Codex state schema and path', t => {
   const root = tempRoot(t, 'h50-probe-');
   assert.equal(pathsFor(root).statePath, join(root, ...CODEX_STATE_RELATIVE.split('/')));
 
-  const initial = createInitialState({ workflowId: randomUUID(), workspaceRoot: root, topicSha256: sha256(TOPIC), now: AT });
+  const initial = createInitialState({ workflowProfile: "legacy-50-v1", workflowId: randomUUID(), workspaceRoot: root, topicSha256: sha256(TOPIC), now: AT });
   assert.equal(initial.schema_version, SCHEMA_VERSION);
   assert.equal(initial.total_steps, STEP_COUNT);
   assert.deepEqual(summarizeState(initial), {
@@ -326,7 +327,7 @@ testEachName('a stale Claude progress.json next to Codex state is never rewritte
   const loader = f.run('step-progress-loader');
   assert.match(loader, /^\[HARNESS\] Codex workflow wf-incident is running at step 4\/50 \(3\/50 complete\)/);
   assert.doesNotMatch(loader, /Current step|Progress:|OBEDIENCE/);
-  assert.equal(f.run('step-progress-writer', { last_assistant_message: 'Step 001/3 완료' }), '');
+  assert.equal(f.run('step-progress-writer', { last_assistant_message: 'Step 001/50 완료' }), '');
   assert.equal(f.run('step-auto-continue', { session_id: 's2' }), '');
   assert.equal(f.run('step-obedience-guard', { prompt: 'continue' }), '');
   assert.equal(f.run('spec-generator'), '');
@@ -405,7 +406,7 @@ test('without state.json (fresh or after a Codex reset) the Claude step hooks be
   const completeStepOne = f => {
     let output;
     for (let attempt = 1; attempt <= 5; attempt += 1) {
-      output = f.run('step-progress-writer', { last_assistant_message: 'Step 001/3 완료' });
+      output = f.run('step-progress-writer', { last_assistant_message: 'Step 001/50 완료' });
       if (readProgress(f).completed_steps?.includes(1)) break;
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500 * attempt);
     }
@@ -430,7 +431,7 @@ test('without state.json (fresh or after a Codex reset) the Claude step hooks be
     assert.equal(JSON.parse(observed.stopAfter).decision, 'block', name);
     assert.match(JSON.parse(observed.stopAfter).reason, /step002/, name);
     assert.match(observed.guard, /step002/, name);
-    assert.deepEqual(observed.progress, { total_steps: 3, current_step: 2, completed_steps: [1], failed_steps: [] }, name);
+    assert.deepEqual(observed.progress, { total_steps: 50, current_step: 2, completed_steps: [1], failed_steps: [] }, name);
   }
   // Hook output does not depend on whether a contended write landed, so both fixtures match exactly.
   assert.deepEqual(afterReset, legacy);

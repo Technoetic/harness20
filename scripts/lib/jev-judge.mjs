@@ -1,6 +1,9 @@
 import { open } from 'node:fs/promises';
 import { readSafe, physicalWorkspace, safePath, sha256 } from './quality-files.mjs';
 
+import { workflowContext, recheckWorkflowContext, evidenceDirectory } from './workflow-context.mjs';
+import { getWorkflowProfile, DEFAULT_WORKFLOW_PROFILE } from './workflow-profiles.mjs';
+
 const MODEL = 'jev-1.13.0';
 const ENDPOINT = 'https://api.typesafe.ai/v1/systemone';
 const STEPS = [16, 24, 25, 30, 37, 45, 49];
@@ -23,6 +26,7 @@ const POLICY = Object.freeze({
   mandatory_abstention: true, probability_sum_tolerance: 1e-6, response_schema: 'exact-fields-v1',
 });
 const POLICY_HASH = sha256(JSON.stringify(POLICY));
+const PROFILE_POLICY_HASH = sha256(JSON.stringify({ ...POLICY, version: 2, workflow_profile: DEFAULT_WORKFLOW_PROFILE, steps: getWorkflowProfile(DEFAULT_WORKFLOW_PROFILE).milestones.jev }));
 
 function fail(code = 'invalid_input') {
   const error = new Error(code === 'invalid_input' ? 'Invalid Jev judgment input.' : 'Jev judgment could not be completed.');
@@ -75,10 +79,10 @@ function sourcePath(value) {
     && !['jev-reviews', 'jev-judgments'].includes(part.toLowerCase()));
 }
 
-function canonicalInput(input) {
+function canonicalInput(input, context) {
   const fields = ['schema_version', 'step', 'sources', 'questions'];
   if (record(input) && Object.hasOwn(input, 'min_confidence')) fields.push('min_confidence');
-  if (!exact(input, fields) || input.schema_version !== 1 || !STEPS.includes(input.step)
+  if (!exact(input, fields) || input.schema_version !== 1 || !context.profile.milestones.jev.includes(input.step)
       || !Array.isArray(input.sources) || input.sources.length < 1 || input.sources.length > 4
       || !Array.isArray(input.questions) || input.questions.length < 1 || input.questions.length > 12
       || (Object.hasOwn(input, 'min_confidence') && !probability(input.min_confidence))) fail();
@@ -120,8 +124,9 @@ async function sourceSnapshot(root, selections) {
 
 async function bind(workspaceRoot, input) {
   try {
-    const selected = canonicalInput(input);
     const root = await physicalWorkspace(workspaceRoot);
+    const context = await workflowContext(root);
+    const selected = canonicalInput(input, context);
     const sources = await sourceSnapshot(root, selected.sources);
     const questions = Object.fromEntries(selected.questions.map(question => [question.id, {
       type: 'choice', instructions: `${INSTRUCTIONS}When evidence is insufficient, choose ${JSON.stringify(question.abstain)}. ${question.instructions}`,
@@ -130,14 +135,14 @@ async function bind(workspaceRoot, input) {
     const request = JSON.stringify({ state: { step: selected.step,
       sources: selected.sources.map(source => source.excerpt) }, model: MODEL, questions });
     if (Buffer.byteLength(request) > BODY_LIMIT) fail();
-    return { root, selected, request, step: selected.step, min_confidence: selected.min_confidence,
+    return { root, context, selected, request, step: selected.step, min_confidence: selected.min_confidence,
       sources, input_hash: sha256(JSON.stringify(selected)), request_hash: sha256(request),
       questions: selected.questions.map(question => ({ id: question.id, choices: Object.keys(question.choices), abstain: question.abstain })) };
   } catch { fail(); }
 }
 
 function summary(bound, status) {
-  return { status, role: 'advisory', step: bound.step, model: MODEL, policy_hash: POLICY_HASH,
+  return { status, role: 'advisory', step: bound.step, model: MODEL, policy_hash: bound.context?.generation ? PROFILE_POLICY_HASH : POLICY_HASH, ...bound.context?.binding,
     input_hash: bound.input_hash, request_hash: bound.request_hash, sources: bound.sources,
     question_count: bound.questions.length, questions: bound.questions, min_confidence: bound.min_confidence };
 }
@@ -148,6 +153,7 @@ export async function prepareJevJudgment(workspaceRoot, input) {
 
 async function unchanged(bound) {
   try {
+    if (bound.context) await recheckWorkflowContext(bound.root, bound.context);
     const current = await sourceSnapshot(bound.root, bound.selected?.sources ?? bound.sources);
     return JSON.stringify(current) === JSON.stringify(bound.sources);
   } catch { return false; }
@@ -235,11 +241,12 @@ async function send(bound, { apiKey, fetchImpl, timeoutMs }) {
   } finally { clearTimeout(timer); }
 }
 
-async function persist(root, report) {
+async function persist(root, report, context) {
   try {
     const bytes = Buffer.from(JSON.stringify(report, null, 2) + '\n');
     if (bytes.length > BODY_LIMIT) fail('report_write_failed');
-    const reportPath = `${REPORT_PREFIX}${sha256(bytes)}.json`;
+    await recheckWorkflowContext(root, context);
+    const reportPath = `${evidenceDirectory(REPORT_PREFIX.slice(0, -1), context)}/${sha256(bytes)}.json`;
     const target = await safePath(root, reportPath, { createParents: true });
     let handle;
     try { handle = await open(target, 'wx', 0o600); }
@@ -279,17 +286,18 @@ export async function runJevJudgment(workspaceRoot, input, options = {}) {
     if (!await unchanged(bound)) outcome = { error_code: 'input_changed' };
   }
   const status = outcome.error_code ? 'unverified' : reviewStatus(outcome.results, bound.questions, bound.min_confidence);
-  const report = { schema_version: 1, ...summary(bound, status), created_at: new Date().toISOString(),
+  const report = { schema_version: bound.context.generation ? 2 : 1, ...summary(bound, status), created_at: new Date().toISOString(),
     results: outcome.results ?? [], usage: outcome.usage ?? null, error_code: outcome.error_code ?? null };
-  const report_path = await persist(bound.root, report);
+  const report_path = await persist(bound.root, report, bound.context);
   return { ...summary(bound, status), report_path, results: report.results, usage: report.usage, error_code: report.error_code };
 }
 
-function validateReport(report) {
+function validateReport(report, context) {
   const fields = ['schema_version', 'status', 'role', 'step', 'model', 'policy_hash', 'input_hash', 'request_hash',
     'sources', 'question_count', 'questions', 'min_confidence', 'created_at', 'results', 'usage', 'error_code'];
-  if (!exact(report, fields) || report.schema_version !== 1 || report.role !== 'advisory' || !STEPS.includes(report.step)
-      || report.model !== MODEL || report.policy_hash !== POLICY_HASH || !['reviewed', 'needs_review', 'unverified'].includes(report.status)
+  if (context.generation) fields.push('workflow_profile', 'workflow_generation');
+  if (!exact(report, fields) || report.schema_version !== (context.generation ? 2 : 1) || (context.generation && (report.workflow_profile !== context.profile.id || report.workflow_generation !== context.generation)) || report.role !== 'advisory' || !context.profile.milestones.jev.includes(report.step)
+      || report.model !== MODEL || report.policy_hash !== (context.generation ? PROFILE_POLICY_HASH : POLICY_HASH) || !['reviewed', 'needs_review', 'unverified'].includes(report.status)
       || ![report.input_hash, report.request_hash].every(hash => typeof hash === 'string' && HASH.test(hash))
       || !probability(report.min_confidence) || typeof report.created_at !== 'string' || !Number.isFinite(Date.parse(report.created_at))
       || new Date(report.created_at).toISOString() !== report.created_at || !Array.isArray(report.questions)
@@ -329,14 +337,16 @@ function validateReport(report) {
 export async function inspectJevJudgment(workspaceRoot, reportPath) {
   const invalid = { status: 'invalid', role: 'advisory', error_code: 'invalid_report' };
   try {
-    if (typeof reportPath !== 'string' || !/^step_archive\/outputs\/jev-judgments\/[a-f0-9]{64}\.json$/.test(reportPath)) return invalid;
     const root = await physicalWorkspace(workspaceRoot);
+    const context = await workflowContext(root);
+    const prefix = `${evidenceDirectory(REPORT_PREFIX.slice(0, -1), context)}/`;
+    if (typeof reportPath !== 'string' || !reportPath.startsWith(prefix) || !/^[a-f0-9]{64}\.json$/.test(reportPath.slice(prefix.length))) return invalid;
     const bytes = await readSafe(root, reportPath, BODY_LIMIT);
-    if (reportPath !== `${REPORT_PREFIX}${sha256(bytes)}.json`) return invalid;
+    if (reportPath !== `${prefix}${sha256(bytes)}.json`) return invalid;
     const report = JSON.parse(utf8(bytes));
-    validateReport(report);
-    const current = await unchanged({ root, sources: report.sources });
-    return { ...summary(report, current ? 'current' : 'stale'), report_path: reportPath,
+    validateReport(report, context);
+    const current = await unchanged({ root, context, sources: report.sources });
+    return { ...summary({ ...report, context }, current ? 'current' : 'stale'), report_path: reportPath,
       review_status: report.status, results: report.results, usage: report.usage,
       error_code: current ? report.error_code : 'input_changed' };
   } catch { return invalid; }

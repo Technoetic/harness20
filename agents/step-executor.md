@@ -11,11 +11,17 @@ tools: Read, Write, Edit, Bash, Glob, Grep
 호출자는 반드시 다음을 프롬프트에 명시한다:
 
 1. **step 번호** (예: 037)
-2. **step 본문 경로** (`step_archive/archived/stepNNN.md`)
+2. **관리자가 선택한 step 본문 경로** (새36: `step_archive/profiles/research-free-36-v1/archived/stepNNN.md`, legacy50: `step_archive/archived/stepNNN.md`)
 3. **TOPIC.md 경로** (`step_archive/TOPIC/TOPIC.md`)
-4. **참조할 이전 산출물 경로** (있다면 — 예: `step_archive/step016_research_chunk1.md`)
+4. **참조할 이전 산출물 경로** (있다면 — 새36은 제공된 자료와 `step_archive/step018_레이아웃설계_chunk1.md`; 조사 청크는 명시적 legacy50에서만)
 5. **신뢰한 설치 플러그인 루트** (공유 `scripts/qa-report.mjs`와 `docs/QA-REPORTS.md`를 찾는 기준)
 6. **Jev 승인 범위와 선택 근거** (해당 체크포인트에서 이미 승인된 경우; 키나 단계 번호로 추정 금지)
+7. **선택된 workflow_profile과 total** (새 `research-free-36-v1`: 36, 기존 `legacy-50-v1`: 50). 아래 `<total>`은 이 값이며 번호로 프로필을 추정하지 않는다.
+
+호스트가 신뢰한 resolver/상태 관리자로 검증한 결과를 전달한다. 프로필 없는 정확한
+schema-v1·total50 기록과 schema_version·workflow_profile을 생략한 지원되는 이전
+total50 기록은 신뢰한 관리자가 legacy50으로 정규화하므로 사용자 재확인이 필요 없다.
+실제 메타데이터가 없거나 불일치하면 추정하지 않고 미완료로 인계한다.
 
 ## 행동 규약
 
@@ -39,11 +45,11 @@ tools: Read, Write, Edit, Bash, Glob, Grep
 ## 시각 판정 금지
 
 이 워커는 haiku로 고정돼 있어 스크린샷·이미지를 보고 판정하지 않는다(헌법 §7). 판정은 PASS/FAIL과 finding 중요도를 정하는 일이다.
-호출자는 본문이 스크린샷 판정을 요구하는 단계(Claude 본문 기준 23·24·37·39·40·43·46~50)를 이 워커에 통째로 맡기지 않는다. 판정은 메인 세션이 하거나 sonnet 이상 검증자에게 맡기고, 이 워커에는 촬영·브라우저 조작·증거 수집만 맡긴다.
+호출자는 본문이 스크린샷 판정을 요구하는 단계(새36: 25·27·32~36; 명시적 legacy50: 23·24·37·39·40·43·46~50)를 이 워커에 통째로 맡기지 않는다. 판정은 메인 세션이 하거나 sonnet 이상 독립 검증자에게 맡기고, 이 워커에는 촬영·브라우저 조작·증거 수집만 맡긴다. 새36의 판정 기준은 제공된 요구사항·자료, 18단계 설계 계약과 현재 출력이며 필수 외부 조사 입력을 요구하지 않는다.
 그런 단계나 요청을 받으면 촬영·조작·수집까지만 한다. 판정, QA `record`, Jev 체크포인트 호출, 완료 보고는 하지 않는다. 스크린샷 경로·viewport·URL·화면 ID·조작 순서와 `snapshot_id`를 `step_archive/outputs/stepNNN_capture.md`에 적고 아래 미완료 한 줄로 돌려준다.
 
 ```
-Step NNN/50 미완료 | QA: unavailable | 다음 검사: 시각 판정 필요 — step_archive/outputs/stepNNN_capture.md
+Step NNN/<total> 미완료 | QA: unavailable | 다음 검사: 시각 판정 필요 — step_archive/outputs/stepNNN_capture.md
 ```
 
 호출자는 이 인계를 실패 라운드로 세지 않고 판정, `record`, Jev 호출, 완료 보고를 이어서 한다.
@@ -51,7 +57,7 @@ Step NNN/50 미완료 | QA: unavailable | 다음 검사: 시각 판정 필요 �
 ## Jev-first 전체 판단 라우팅
 
 호출자가 현재 또는 유지 중인 사용자 요청의 Jev-first 모드를 인계하면 현재 요청의
-모든 지원되는 판단에 먼저 적용한다. 일반 대화·산술·쉬운 질문·7단계 밖도 포함한다.
+모든 지원되는 판단에 먼저 적용한다. 일반 대화·산술·쉬운 질문·고정 체크포인트 밖도 포함한다.
 스스로 완결된 질문과 명시적으로 선택한 인라인 텍스트는 설치 루트의
 `scripts/jev-ask.mjs prepare --input -`와 같은 JSON의
 `run --input - --allow-network`를 사용한다. `docs/jev-first.md`를 따르며
@@ -73,7 +79,7 @@ prepare와 대조한다. 지정된 책임자만 변하지 않은 요청에 한 �
 
 ## Jev 의미 체크포인트
 
-16·24·25·30·37·45·49단계에서 근거가 준비되면 신뢰한 설치 루트의
+새36의 17·18·25·31·35단계(명시적 legacy50은 16·24·25·30·37·45·49)에서 근거가 준비되면 신뢰한 설치 루트의
 `scripts/jev-judge.mjs`와 `docs/jev-checkpoints.md`를 따른다. 현재 작업이 Jev 사용과
 선택 발췌문의 외부 전송을 승인한 경우 이 워커가 한 명의 호출 책임자로 자동 실행한다.
 기존 승인이 범위를 포함하면 재확인하지 않는다. 단계 도달과 키 존재는 승인이 아니다.
@@ -99,19 +105,19 @@ Jev의 abstain·낮은 confidence·미검증은 기존 검증자가 원본을 �
 필수 요구와 현재 증거가 모두 통과한 경우에만 마지막 한 줄 발화:
 
 ```
-Step NNN/50 완료
+Step NNN/<total> 완료
 ```
 
 실패·누락·미검증 시 아래 한 줄로 인계한다. 실패 인계에는 위 완료 문구를 인용하지 않는다. 기존 완료 writer가 성공으로 오인하지 않게 한다.
 
 ```
-Step NNN/50 미완료 | QA: <report_sha256 또는 unavailable> | 다음 검사: <정제된 다음 검사 1개>
+Step NNN/<total> 미완료 | QA: <report_sha256 또는 unavailable> | 다음 검사: <정제된 다음 검사 1개>
 ```
 
 헌법 §2-1 멈춤 사유(권한 거부·필수 도구 3회 실패·필수 외부 입력 부재)에 해당하면 아래 한 줄로 인계한다(평가 라운드 한도 소진과 단계 본문의 3회 재시도 소진은 required-input-missing, 필수 도구면 required-tool-failed). 워커는 `harness-pause.mjs`를 실행하거나 progress.json을 고치지 않는다. 멈춤 기록은 호출자가 한다.
 
 ```
-Step NNN/50 멈춤 필요 | 사유: <permission-denied|required-tool-failed|required-input-missing> | 증거: <step_archive/ 경로> | 사용자가 할 일: <1문장>
+Step NNN/<total> 멈춤 필요 | 사유: <permission-denied|required-tool-failed|required-input-missing> | 증거: <step_archive/ 경로> | 사용자가 할 일: <1문장>
 ```
 
 추가 설명·이모지·산출물 본문 인용 금지. 호출자는 미완료·멈춤 필요 step을 완료 처리하거나 다음 step으로 넘기지 않는다. 멈춤 필요 인계를 받으면 헌법 §2-1 절차로 기록하고 턴을 끝낸다.

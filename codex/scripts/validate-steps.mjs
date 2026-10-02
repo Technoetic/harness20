@@ -6,7 +6,24 @@ import { fileURLToPath } from "node:url";
 
 import { HarnessError } from "./lib/errors.mjs";
 
-const STEP_COUNT = 50;
+import {
+  DEFAULT_WORKFLOW_PROFILE, LEGACY_WORKFLOW_PROFILE, getWorkflowProfile,
+  originalStepNumber, resolveWorkflowProfile, stepPhase
+} from "../../scripts/lib/workflow-profiles.mjs";
+
+function indexProfile(index, selected) {
+  if (!isPlainObject(index) || ![1, 2].includes(index.schema_version)) {
+    fail("index.schema_version must be 1 or 2");
+  }
+  // The frozen legacy index deliberately keeps its original schema and bytes.
+  const profile = index?.schema_version === 1 && !Object.hasOwn(index, "workflow_profile")
+    ? getWorkflowProfile(LEGACY_WORKFLOW_PROFILE)
+    : resolveWorkflowProfile(index);
+  if (selected !== undefined && profile.id !== getWorkflowProfile(selected).id) {
+    fail("Index workflow profile does not match selected profile");
+  }
+  return profile;
+}
 const PHASES = new Set([
   "preflight", "tooling", "research", "planning", "implementation", "review", "e2e"
 ]);
@@ -52,16 +69,6 @@ function requireUniqueStrings(values, label) {
     if (seen.has(value)) fail(`${label} contains a duplicate: ${value}`);
     seen.add(value);
   }
-}
-
-function expectedPhase(number) {
-  if (number <= 5) return "preflight";
-  if (number <= 15) return "tooling";
-  if (number <= 24) return "research";
-  if (number <= 30) return "planning";
-  if (number <= 38) return "implementation";
-  if (number <= 44) return "review";
-  return "e2e";
 }
 
 function requireString(value, label) {
@@ -243,11 +250,12 @@ function validateStrictAcceptance(entry) {
   }
 }
 
-function validateStrictSchema(index) {
-  exactKeys(index, TOP_LEVEL_KEYS, "index top-level");
-  if (index.schema_version !== 1) fail("index.schema_version must be 1");
-  if (!Array.isArray(index.steps) || index.steps.length !== STEP_COUNT) {
-    fail(`index must contain exactly ${STEP_COUNT} steps`);
+function validateStrictSchema(index, profile) {
+  exactKeys(index, profile.id === LEGACY_WORKFLOW_PROFILE ? TOP_LEVEL_KEYS
+    : [...TOP_LEVEL_KEYS, "workflow_profile", "total_steps"], "index top-level");
+  if (index.schema_version !== (profile.id === LEGACY_WORKFLOW_PROFILE ? 1 : 2)) fail("invalid index.schema_version");
+  if (!Array.isArray(index.steps) || index.steps.length !== profile.stepCount) {
+    fail(`index must contain exactly ${profile.stepCount} steps`);
   }
   for (let offset = 0; offset < index.steps.length; offset += 1) {
     const number = offset + 1;
@@ -257,12 +265,12 @@ function validateStrictSchema(index) {
     if (entry.number !== number) fail(`${id} row is out of order at position ${number}`);
     if (entry.id !== id) fail(`step ${number} has a non-canonical id`);
     requireString(entry.title, `${id}.title`);
-    const phase = expectedPhase(number);
+    const phase = stepPhase(profile.id, number);
     if (entry.phase !== phase) fail(`${id}.phase must be ${phase}`);
-    if (entry.source !== `assets/steps/${id}.md`) fail(`${id}.source is not canonical`);
-    if (entry.target !== `codex/assets/steps/${id}.md`) fail(`${id}.target is not canonical`);
+    if (entry.source !== `${profile.sourceDirectory}/${id}.md`) fail(`${id}.source is not canonical`);
+    if (entry.target !== `${profile.targetDirectory}/${id}.md`) fail(`${id}.target is not canonical`);
     if (!/^[a-f0-9]{64}$/.test(entry.source_sha256)) fail(`${id}.source_sha256 is invalid`);
-    const expectedNext = number === STEP_COUNT ? null : canonicalId(number + 1);
+    const expectedNext = number === profile.stepCount ? null : canonicalId(number + 1);
     if (entry.next !== expectedNext) fail(`${id}.next must be ${expectedNext ?? "null"}`);
     if (entry.ported !== true) fail(`${id}.ported must be true for repository parity`);
     for (const field of ["inputs", "outputs", "requires", "optional_requires"]) {
@@ -274,7 +282,7 @@ function validateStrictSchema(index) {
   }
 }
 
-async function validateStepDirectory(repoRoot, relativeDirectory, allowedAuxiliary = new Set()) {
+async function validateStepDirectory(repoRoot, relativeDirectory, profile, allowedAuxiliary = new Set()) {
   const directory = resolve(repoRoot, relativeDirectory);
   let entries;
   try {
@@ -283,7 +291,7 @@ async function validateStepDirectory(repoRoot, relativeDirectory, allowedAuxilia
     fail(`missing step directory: ${relativeDirectory}`);
   }
   const expected = new Set(
-    Array.from({ length: STEP_COUNT }, (_, offset) => `${canonicalId(offset + 1)}.md`)
+    Array.from({ length: profile.stepCount }, (_, offset) => `${canonicalId(offset + 1)}.md`)
   );
   const allowed = new Set([...expected, ...allowedAuxiliary]);
   const unexpected = entries.map((entry) => entry.name).filter((name) => !allowed.has(name)).sort();
@@ -352,7 +360,7 @@ function validateTargetDocument(entry, content) {
   }
 }
 
-function validatePathAndGraphParity(index) {
+function validatePathAndGraphParity(index, profile) {
   const observedSpellings = new Map();
   const registerPath = (value, label) => {
     validatePortablePath(value, label);
@@ -382,8 +390,8 @@ function validatePathAndGraphParity(index) {
     const required = new Set(entry.requires);
     const optional = new Set(entry.optional_requires);
     for (const dependency of [...entry.requires, ...entry.optional_requires]) {
-      if (!/^step(?:00[1-9]|0[1-4][0-9]|050)$/.test(dependency)) {
-        fail(`${entry.id} dependency must be a canonical step001 through step050 id`);
+      if (!/^step\d{3}$/.test(dependency) || Number(dependency.slice(4)) < 1 || Number(dependency.slice(4)) > profile.stepCount) {
+        fail(`${entry.id} dependency must be a canonical step001 through ${canonicalId(profile.stepCount)} id`);
       }
       const dependencyNumber = Number(dependency.slice(4));
       const label = optional.has(dependency) ? "optional_requires" : "requires";
@@ -418,9 +426,9 @@ function validatePathAndGraphParity(index) {
   }
 }
 
-function validateVisualParity(index) {
+function validateVisualParity(index, profile) {
   for (const entry of index.steps) {
-    const expected = VISUAL_STEPS.has(entry.number);
+    const expected = VISUAL_STEPS.has(originalStepNumber(profile.id, entry.number));
     if (entry.visual_review !== expected) {
       fail(`${entry.id}.visual_review must match the exact visual step set`);
     }
@@ -440,8 +448,8 @@ function validateVisualParity(index) {
   }
 }
 
-export async function loadIndex(repoRoot) {
-  const indexPath = resolve(repoRoot, "codex", "assets", "steps", "index.json");
+export async function loadIndex(repoRoot, profileId = LEGACY_WORKFLOW_PROFILE) {
+  const indexPath = resolve(repoRoot, getWorkflowProfile(profileId).indexPath);
   return JSON.parse(await readFile(indexPath, "utf8"));
 }
 
@@ -475,22 +483,23 @@ export async function recordSourceHashes(repoRoot, entries) {
   return hashes;
 }
 
-export function validateIndex(index, { repoRoot, requirePorted = false } = {}) {
-  if (!isPlainObject(index) || index.schema_version !== 1 || !Array.isArray(index.steps)) {
-    fail("index must have schema_version 1 and a steps array");
+export function validateIndex(index, { repoRoot, requirePorted = false, profileId } = {}) {
+  if (!isPlainObject(index) || ![1,2].includes(index.schema_version) || !Array.isArray(index.steps)) {
+    fail("index must have schema_version 1 or 2 and a steps array");
   }
+  const profile = indexProfile(index, profileId);
   if (typeof repoRoot !== "string" || repoRoot === "") fail("repoRoot is required");
-  if (index.steps.length !== STEP_COUNT) fail(`index must contain exactly ${STEP_COUNT} steps`);
+  if (index.steps.length !== profile.stepCount) fail(`index must contain exactly ${profile.stepCount} steps`);
 
   const numbers = new Set();
   for (const entry of index.steps) {
     if (!isPlainObject(entry)) fail("step entry must be an object");
-    if (!Number.isInteger(entry.number) || entry.number < 1 || entry.number > STEP_COUNT) {
-      fail("step numbers must be integers from 1 through 50");
+    if (!Number.isInteger(entry.number) || entry.number < 1 || entry.number > profile.stepCount) {
+      fail(`step numbers must be integers from 1 through ${profile.stepCount}`);
     }
     numbers.add(entry.number);
   }
-  for (let number = 1; number <= STEP_COUNT; number += 1) {
+  for (let number = 1; number <= profile.stepCount; number += 1) {
     if (!numbers.has(number)) fail(`index has a gap at step ${number}`);
   }
 
@@ -501,8 +510,8 @@ export function validateIndex(index, { repoRoot, requirePorted = false } = {}) {
     ids.add(entry.id);
     requireString(entry.title, `${id}.title`);
     if (!PHASES.has(entry.phase)) fail(`${id}.phase is invalid`);
-    if (entry.source !== `assets/steps/${id}.md`) fail(`${id}.source is not canonical`);
-    if (entry.target !== `codex/assets/steps/${id}.md`) fail(`${id}.target is not canonical`);
+    if (entry.source !== `${profile.sourceDirectory}/${id}.md`) fail(`${id}.source is not canonical`);
+    if (entry.target !== `${profile.targetDirectory}/${id}.md`) fail(`${id}.target is not canonical`);
     const sourcePath = workspacePath(repoRoot, entry.source, `${id}.source`);
     if (!existsSync(sourcePath)) fail(`missing Claude source step: ${entry.source}`);
     if (!/^[a-f0-9]{64}$/.test(entry.source_sha256 ?? "")) fail(`${id}.source_sha256 is invalid`);
@@ -514,7 +523,7 @@ export function validateIndex(index, { repoRoot, requirePorted = false } = {}) {
         { source: entry.source, expected: entry.source_sha256, actual: actualHash }
       );
     }
-    const expectedNext = entry.number === STEP_COUNT ? null : canonicalId(entry.number + 1);
+    const expectedNext = entry.number === profile.stepCount ? null : canonicalId(entry.number + 1);
     if (entry.next !== expectedNext) fail(`${id}.next must be ${expectedNext ?? "null"}`);
     if (entry.ported !== false && entry.ported !== true) fail(`${id}.ported must be boolean`);
     if (entry.ported || requirePorted) validatePortedEntry(entry, repoRoot);
@@ -522,33 +531,40 @@ export function validateIndex(index, { repoRoot, requirePorted = false } = {}) {
   return { steps: index.steps };
 }
 
-export async function validateRepositoryParity(repoRoot) {
+export async function validateRepositoryParity(repoRoot, profileId = LEGACY_WORKFLOW_PROFILE) {
   if (typeof repoRoot !== "string" || repoRoot === "") fail("repoRoot is required");
-  const index = await loadIndex(repoRoot);
-  validateStrictSchema(index);
-  await validateStepDirectory(repoRoot, "assets/steps");
-  await validateStepDirectory(repoRoot, "codex/assets/steps", TARGET_AUXILIARY_FILES);
-  const report = validateIndex(index, { repoRoot, requirePorted: true });
-  validatePathAndGraphParity(index);
-  validateVisualParity(index);
+  const index = await loadIndex(repoRoot, profileId);
+  const profile = indexProfile(index, profileId);
+  validateStrictSchema(index, profile);
+  await validateStepDirectory(repoRoot, profile.sourceDirectory, profile);
+  await validateStepDirectory(repoRoot, profile.targetDirectory, profile, TARGET_AUXILIARY_FILES);
+  const report = validateIndex(index, { repoRoot, requirePorted: true, profileId });
+  validatePathAndGraphParity(index, profile);
+  validateVisualParity(index, profile);
   for (const entry of index.steps) {
     validateTargetDocument(entry, await readFile(resolve(repoRoot, entry.target), "utf8"));
   }
   return report;
 }
 
-export async function validateStepBatch(repoRoot, numbers) {
+export async function validateStepBatch(repoRoot, numbers, profileId = LEGACY_WORKFLOW_PROFILE) {
   if (!Array.isArray(numbers) || numbers.length === 0) fail("numbers must be a non-empty array");
-  const index = await loadIndex(repoRoot);
-  const report = validateIndex(index, { repoRoot, requirePorted: false });
+  const index = await loadIndex(repoRoot, profileId);
+  const profile = indexProfile(index, profileId);
+  const report = validateIndex(index, { repoRoot, requirePorted: false, profileId });
   const selected = [];
   for (const number of numbers) {
-    if (!Number.isInteger(number) || number < 1 || number > STEP_COUNT) fail("batch step numbers must be 1 through 50");
+    if (!Number.isInteger(number) || number < 1 || number > profile.stepCount) fail(`batch step numbers must be 1 through ${profile.stepCount}`);
     const entry = report.steps[number - 1];
     validatePortedEntry(entry, repoRoot);
     selected.push(entry);
   }
   return { steps: selected };
+}
+
+export async function validateAllProfiles(repoRoot) {
+  return Promise.all([LEGACY_WORKFLOW_PROFILE, DEFAULT_WORKFLOW_PROFILE]
+    .map(profileId => validateRepositoryParity(repoRoot, profileId)));
 }
 
 function parseRange(value) {
@@ -563,13 +579,23 @@ function parseRange(value) {
 async function main() {
   const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
   const args = process.argv.slice(2);
+  let profileId = LEGACY_WORKFLOW_PROFILE;
+  if (args[0] === "--all-profiles" && args.length === 1) {
+    const reports = await validateAllProfiles(repoRoot);
+    process.stdout.write(`validated ${reports.reduce((count, report) => count + report.steps.length, 0)} indexed step(s) across ${reports.length} profiles\n`);
+    return;
+  }
+  if (args[0] === "--profile") {
+    profileId = getWorkflowProfile(args[1]).id;
+    args.splice(0, 2);
+  }
   let report;
   if (args.length === 0) {
-    report = await validateRepositoryParity(repoRoot);
+    report = await validateRepositoryParity(repoRoot, profileId);
   } else if (args.length === 2 && args[0] === "--range") {
-    report = await validateStepBatch(repoRoot, parseRange(args[1]));
+    report = await validateStepBatch(repoRoot, parseRange(args[1]), profileId);
   } else {
-    fail("invalid arguments; usage: validate-steps.mjs [--range start:end]");
+    fail("invalid arguments; usage: validate-steps.mjs [--profile id] [--range start:end] | --all-profiles");
   }
   process.stdout.write(`validated ${report.steps.length} indexed step(s)\n`);
 }

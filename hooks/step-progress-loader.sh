@@ -30,6 +30,11 @@ if [ -e "$STEP_ARCHIVE/.harness50-codex/state.json" ]; then
 fi
 
 [ -f "$PROGRESS_FILE" ] || exit 0
+# Shared profile/archive identity; invalid metadata never activates a mixed archive.
+H50_PROFILE="$(node "$(dirname "${BASH_SOURCE[0]}")/lib/workflow-profile.mjs" resolve "$PROJECT_ROOT" 2>/dev/null)" || exit 0
+export H50_PROFILE
+ARCHIVED_DIR="$PROJECT_ROOT/$(printf '%s' "$H50_PROFILE" | python3 -c 'import json,sys; print(json.load(sys.stdin)["body_directory"])' | tr -d '\r')"
+
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "=== harness50: Step Progress Loader (python3 missing — silent) ==="
@@ -41,6 +46,7 @@ python3 - <<'PY'
 import json, os, datetime, re
 p_path=os.environ.get("PROGRESS_FILE")
 a_dir=os.environ.get("ARCHIVED_DIR")
+profile=json.loads(os.environ["H50_PROFILE"])
 # Same string as step-progress-loader.ps1 and step-obedience-guard (scripts/lib/pause-state.mjs).
 # Python triple quotes keep the inner single quotes of NAMED.
 CODES=('permission-denied','required-tool-failed','required-input-missing','user-request')
@@ -100,7 +106,7 @@ if done<total:
     if nxt:
         next_fmt=f"step{nxt:03d}"
         path=os.path.join(a_dir,f"{next_fmt}.md")
-        rel=f"step_archive/archived/{next_fmt}.md"
+        rel=profile["body_directory"]+f"/{next_fmt}.md"
         if not os.path.isfile(path):
             path=os.path.join(os.path.dirname(a_dir),f"{next_fmt}.md")
             rel=f"step_archive/{next_fmt}.md"

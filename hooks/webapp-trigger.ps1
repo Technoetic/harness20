@@ -91,18 +91,12 @@ if ($preLine -ne 'issue') {
   exit 0
 }
 
-# 1) step_archive 부트스트랩
-if (-not (Test-Path -LiteralPath $stepArchive)) { New-Item -ItemType Directory -Path $stepArchive -Force | Out-Null }
-if (-not (Test-Path -LiteralPath $archivedDir)) { New-Item -ItemType Directory -Path $archivedDir -Force | Out-Null }
-if (-not (Test-Path -LiteralPath $topicDir))    { New-Item -ItemType Directory -Path $topicDir -Force | Out-Null }
-
-# step001~050 복사 (없는 것만)
-if (Test-Path -LiteralPath $assetSteps) {
-  Get-ChildItem -LiteralPath $assetSteps -Filter "step*.md" | ForEach-Object {
-    $dst = Join-Path $archivedDir $_.Name
-    if (-not (Test-Path -LiteralPath $dst)) { Copy-Item -LiteralPath $_.FullName -Destination $dst -Force }
-  }
-}
+# Only allowlisted profile bodies are copied by the guarded shared helper.
+$profileJson = @(& node (Join-Path $PSScriptRoot 'lib/workflow-profile.mjs') bootstrap (Join-Path $projectRoot '.') 2>$null)
+if ($LASTEXITCODE -ne 0 -or $profileJson.Count -eq 0) { Write-Output '[HARNESS] Profile bootstrap failed; nothing was initialized.'; exit 0 }
+$selectedProfile = ($profileJson -join "`n") | ConvertFrom-Json
+$archivedDir = Join-Path $projectRoot $selectedProfile.body_directory
+if (-not (Test-Path -LiteralPath $topicDir)) { New-Item -ItemType Directory -Path $topicDir -Force | Out-Null }
 
 # H4 수정: html-bundler를 프로젝트로 복사해 step038에서 실행 가능하게 한다.
 # (플러그인 hooks/는 ${CLAUDE_PLUGIN_ROOT} 밖이라 step 본문의 상대경로로 도달 불가)
@@ -151,7 +145,9 @@ $progress = @{
   completed_steps = @()
   skipped_steps = @()
   failed_steps = @()
-  total_steps = 50
+  schema_version = 2
+  workflow_profile = $selectedProfile.workflow_profile
+  total_steps = $selectedProfile.total
   metrics = @{ total_duration_minutes = 0; total_sessions = 0; steps_per_session_avg = 0 }
   session_history = @()
   last_updated = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss")
@@ -170,18 +166,18 @@ Write-Output ""
 Write-Output "Bootstrap complete:"
 Write-Output "  - step_archive/ ready"
 Write-Output "  - step_archive/TOPIC/TOPIC.md written with the user prompt"
-Write-Output "  - step_archive/progress.json initialized (current_step=1, total=50)"
-Write-Output "  - step_archive/archived/step001.md ~ step050.md available"
+Write-Output "  - step_archive/progress.json initialized (current_step=1, total=36)"
+Write-Output "  - step_archive/profiles/research-free-36-v1/archived/step001.md ~ step036.md available"
 Write-Output ""
 Write-Output "ABSOLUTE OVERRIDE:"
 Write-Output "  Before addressing anything else, IMMEDIATELY:"
-Write-Output "    1. Read step_archive/archived/step001.md"
+Write-Output "    1. Read step_archive/profiles/research-free-36-v1/archived/step001.md"
 Write-Output "    2. Execute its instructions in full (including TOPIC pickup from TOPIC.md)"
-Write-Output "    3. On completion report 'Step 001/50 완료' and Read step002.md"
-Write-Output "    4. Continue without user confirmation through step050"
+Write-Output "    3. On completion report 'Step 001/36 완료' and Read step002.md"
+Write-Output "    4. Continue without user confirmation through step036"
 Write-Output ""
 Write-Output "Do NOT ask the user any clarifying questions."
 Write-Output "Do NOT pause for confirmation."
-Write-Output "Do NOT end the turn before step050 except by a named pause (harness-rules 2-1)."
+Write-Output "Do NOT end the turn before step036 except by a named pause (harness-rules 2-1)."
 Write-Output "</harness50-trigger>"
 exit 0

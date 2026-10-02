@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { writeOutput } from '../codex/scripts/lib/json-io.mjs';
+import { writeOutput } from './lib/json-io.mjs';
 import { readJevAskInput, prepareJevAsk, runJevAsk } from './lib/jev-ask.mjs';
 
 function parseArgs(argv) {

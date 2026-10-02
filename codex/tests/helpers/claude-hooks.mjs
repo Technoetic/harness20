@@ -37,7 +37,7 @@ export function tempRoot(t, prefix) {
 // write into the copy, never into the repository.
 export function installPlugin(root, dirs = ['hooks', 'assets', 'scripts']) {
   const plugin = join(root, 'cache', 'plugin', '2.2');
-  for (const dir of dirs) cpSync(join(repo, dir), join(plugin, dir), { recursive: true });
+  for (const dir of [...new Set([...dirs, 'scripts'])]) cpSync(join(repo, dir), join(plugin, dir), { recursive: true });
   return plugin;
 }
 

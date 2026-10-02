@@ -292,7 +292,7 @@ test('HOOK_GATES names exactly the hooks registered in hooks/hooks.json, with ea
 test('webappPrecheck issues only where no completed step would be lost', t => {
   assert.equal(webappPrecheck(project(t, 'none')), 'issue');
   assert.equal(webappPrecheck(project(t, 'empty [30]', { progress: run() })), 'issue');
-  assert.equal(webappPrecheck(project(t, 'no field', { progress: { current_step: 1 } })), 'issue');
+  assert.match(webappPrecheck(project(t, 'no field', { progress: { current_step: 1 } })), /unreadable or invalid/);
   // Paused, stopped and body-less runs without completed steps may start a new topic.
   assert.equal(webappPrecheck(project(t, 'paused', { progress: run([], 1, { paused: true }) })), 'issue');
   const lines = {

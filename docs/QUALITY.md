@@ -2,6 +2,8 @@
 
 Harness50 2.2 replaces the old Trust5 directory-presence score with measured checks. Missing tools, nonzero exits, timeouts, missing coverage and changed source never earn partial credit or PASS. These checks do not measure teaching effectiveness or visual taste.
 
+New36 quality gates are 26/30/36, with prefinal inspection after 35; explicit legacy50 retains 38/44/50 and prefinal 49. New reports bind workflow_profile and workflow_generation (schema2); legacy schema1 reports keep their old meaning. Reset leftovers cannot satisfy the current run.
+
 ## Project checks
 
 Create `harness50.quality.json` in the generated project. Each command is an executable/argument array, run without shell expansion from the project root. Configure already installed tools. On Windows use Node entry points instead of `.cmd` wrappers.
@@ -32,7 +34,7 @@ node "<plugin-root>/scripts/quality-gate.mjs" --inspect --workspace "<project-ro
 
 Each command is bounded to two minutes and 1 MiB output. The report records exit codes without storing raw command output that could contain secrets. Diagnose failures in a normal foreground invocation. Source fingerprints exclude dependencies, Git metadata, coverage and `step_archive`; they include project configuration and final dist files. Changes require another run. Reports go to `step_archive/outputs/quality-gate.json`.
 
-Claude's progress writer records a new Step 38 or 44 only when `quality-gate.mjs --inspect` reports PASS, and a new Step 50 only on the final PASS (`--inspect-final`); a refused completion is named in the next continue instruction. Unlike the Codex state manager, which inspects when a completion is submitted, the writer inspects at the next Stop against the sources as they are then: when a later step in the same turn changed them, the report is stale and `quality-gate.mjs` must run again. Claude Stop hooks also inspect saved evidence once 38, 44 and 49 contiguous steps are complete and write `trust5_r1.md`, `trust5_r2.md` and `trust5_r3.md`. They neither execute configured commands nor download tools. Missing or failed evidence requests a repair once; an already active Stop turn is not recursively blocked. Incomplete gates must not be presented as product completion. Codex steps explicitly run the same checks through normal permissions, and the state manager independently inspects current measured quality before accepting a new completion at 38, 44 or 50. It records the validated report digest; missing, failed or stale quality cannot create a new completion receipt. Older receipts retain their historical recovery meaning.
+Claude's progress writer records a new Step 26 or 30 only when `quality-gate.mjs --inspect` reports PASS, and a new Step 36 only on the final PASS (`--inspect-final`); a refused completion is named in the next continue instruction. Unlike the Codex state manager, which inspects when a completion is submitted, the writer inspects at the next Stop against the sources as they are then: when a later step in the same turn changed them, the report is stale and `quality-gate.mjs` must run again. Claude Stop hooks also inspect saved evidence once 26, 30 and 35 contiguous steps are complete and write `trust5_r1.md`, `trust5_r2.md` and `trust5_r3.md`. They neither execute configured commands nor download tools. Missing or failed evidence requests a repair once; an already active Stop turn is not recursively blocked. Incomplete gates must not be presented as product completion. Codex steps explicitly run the same checks through normal permissions, and the state manager independently inspects current measured quality before accepting a new completion at 26, 30 or 36. It records the validated report digest; missing, failed or stale quality cannot create a new completion receipt. Older receipts retain their historical recovery meaning.
 
 ## Final browser output
 
@@ -99,12 +101,15 @@ fallback inside the verifier does not establish that a deployment server has rew
 
 Fresh completion requires version 3 evidence with both scenarios, from either backend
 (the gate reads named report fields only and ignores `environment`). Both hosts also
-require a current [final regression report](QA-REPORTS.md#final-candidate-regression-at-step-50)
+require a current [final regression report](QA-REPORTS.md#final-candidate-regression-at-step-36)
 covering E2E, screenshots, keyboard, mouse, design and console on the same final HTML.
+New36 final regression also requires a recorded independent verifier; a same-agent
+report remains diagnostic and cannot satisfy that completion gate. Legacy50 keeps
+its original evidence and recovery semantics.
 Run these complete matrices after the last repair and build. Any subsequent
 candidate change invalidates that assessment and requires rerunning the matrices.
 Claude's writer inspects current quality, browser and regression evidence before
-recording a new Step 50; its final Stop quality report covers all three.
+recording a new Step 36; its final Stop quality report covers all three.
 `quality-gate.mjs --inspect-final --workspace "<project-root>"`
 performs the same read-only inspection without launching browsers or project commands.
 Historical completed records and Codex receipts retain their recovery semantics.
@@ -119,7 +124,7 @@ step's report before a relevant retry, snapshot explicit candidate files after
 the build and before QA, then record that round before completion or failure
 handoff. Changed candidate or evidence files make prior success claims stale.
 The report does not run checks, discover product-specific requirements, change workflow
-state or replace measured quality/browser evidence. Step 50 enforces the six final
+state or replace measured quality/browser evidence. Step 36 enforces the six final
 regression categories and their final HTML binding. Failed, missing and
 unexecuted required checks remain incomplete even when a retry limit is reached.
 
@@ -148,11 +153,11 @@ permission or replace deterministic tests, independent review or completion writ
 ## Advisory semantic checkpoints
 
 The [Jev checkpoint protocol](jev-checkpoints.md) adds bounded text judgments at
-steps 16, 24, 25, 30, 37, 45 and 49. Hosts call it automatically only when the active
+new36 steps 17, 18, 25, 31 and 35 (legacy50 retains 16, 24, 25, 30, 37, 45 and 49). Hosts call it automatically only when the active
 task authorizes Jev and sending the selected excerpts, reusing existing authorization.
-It evaluates claim support, research sufficiency, requirements, distinct alternatives,
+It evaluates requirements, distinct alternatives,
 explanation text, scenario coverage and finding classification. It does not execute
-tests or inspect images. Step 37 persists selected implementation prose as evidence
+tests or inspect images. Step 25 persists selected implementation prose as evidence
 first; the judgment concerns that text, not executable correctness.
 
 Before reusing a report, compare current prepare metadata with inspect: request,

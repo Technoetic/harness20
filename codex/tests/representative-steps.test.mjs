@@ -193,7 +193,7 @@ test("Step 50 browser binding survives evidence reordering and rejects a replace
 
 async function beginRepresentativeStep() {
   const root = await makeWorkspace();
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "Representative acceptance topic",
     now: plus(0),

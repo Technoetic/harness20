@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.13.0 - 2026-10-03
+
+- New Claude and Codex workflows default to the versioned `research-free-36-v1` definition. Remove original research stages 16–20, 22–24, 26–29, 40 and 43; preserve the surviving order, independent reviews, measured quality gates and final regression. Planning uses supplied requirements/materials, design declares a contract, and verification checks current implementation/output. Missing external/API facts remain missing.
+- Preserve existing `legacy-50-v1` source bodies, hashes, receipts, import/recovery, archived instructions and evidence policies. Existing running/paused/blocked/completed workflows keep their original 50 meanings; no automatic renumber/reset/migration. Codex reset archives its metadata before a subsequent explicit fresh initialization; Claude reset retains its selected definition and starts a new generation.
+- New state/receipts explicitly bind the profile. New QA, quality and Jev evidence bind the profile and generation; invalid metadata, orphan bindings, mismatched counts and cross-profile receipts fail closed. New final 36 requires recorded independent verification and all six current-HTML regression matrices. New Jev checkpoints 17/18/25/31/35 preserve the seven legacy checkpoint policies for existing 50 runs.
+- Profile-aware Windows/POSIX Claude hooks select and protect the matching archived bodies. Generated new SPEC aliases bind identity and preserve mismatched original bytes in immutable history before replacement. Shared runtime packaging includes both definitions and exact unchanged JSON/error utilities.
+- Update current guides, evaluator/executor routing, default TOPIC wording and package/preflight checks. Install smoke derives synchronized manifest versions and validates 86 indexed definitions plus shared dependencies. Existing workflows, old caches and hook trust must be preserved on upgrade; changed hook trust remains a manual host review.
+- Validation: the reviewed implementation passed 1,658 of 1,662 local tests (zero failures; four platform/privilege skips), both-profile definition validation, native Windows and GitBash scenarios, and independent whole-branch/scoped review. See `docs/verification/2026-10-02-research-free-36.md`. Release CI and installation evidence are recorded separately.
+
 ## 2.12.0 - 2026-10-01
 
 - Behaviour changes on upgrade: Claude records new completions of steps 38 (r1) and 44 (r2) only with current measured quality, so a run that relied on a prose completion there now stops until `quality-gate.mjs` passes. Unlike Codex, which inspects when a completion is submitted, the writer inspects at the next Stop against the current sources, so a report made stale by a later step in the same turn needs another `quality-gate.mjs` run. The Stop event runs the writer and then step-auto-continue in one `stop-advance` entry. A refused completion is named in the next block reason.

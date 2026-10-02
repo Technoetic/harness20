@@ -24,4 +24,4 @@ argument-hint: [사유 한 줄]
 4. 이 턴에서는 step을 진행하지 않는다. 추가 출력·확인 질문 금지.
 
 멈춤 규칙 전문은 harness-rules 헌법 §2-1이다. 멈춘 동안 Stop 훅은 실행을 다시 지시하지 않고(진행 기록 훅은 멈춘 턴에
-보고된 완료 줄만 기록한다), 세션 시작과 프롬프트마다 `[HARNESS] PAUSED at stepNNN/50` 한 줄로 멈춘 위치만 알린다.
+보고된 완료 줄만 기록한다), 세션 시작과 프롬프트마다 `[HARNESS] PAUSED at stepNNN/<total>` 한 줄로 멈춘 위치만 알린다. `<total>`은 CLI/resolver의 `total`(새36·legacy50)이며 프로필을 추정하지 않는다.

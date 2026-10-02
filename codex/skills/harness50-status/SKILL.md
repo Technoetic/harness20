@@ -11,6 +11,9 @@ Status is a single observation. It never repairs, imports, resumes, resets, or a
 
 Resolve `../../scripts/harness-state.mjs` relative to this SKILL.md, not from the current working directory. Pass the current project directory as the workspace.
 
+Report the manager-selected `workflow_profile` and `total_steps`; fresh36 and legacy50
+keep distinct denominators. Never infer them from a step number.
+
 ## Status operation
 
 For `$harness50-status`, Call only `show` through the state manager. Treat the result as strictly read-only and report it without a follow-up state operation.

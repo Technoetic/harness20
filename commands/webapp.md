@@ -1,5 +1,5 @@
 ---
-description: 웹앱 인터랙티브 튜토리얼 1회 입력 → step001~050 자율주행 완주. /webapp <주제>
+description: 웹앱 인터랙티브 튜토리얼 1회 입력 → 새36단계 자율주행, 기존50단계 호환. /webapp <주제>
 argument-hint: <주제 한 줄>
 ---
 
@@ -26,51 +26,27 @@ Codex 단계부터 harness50 플러그인의 `codex/scripts/harness-state.mjs`(`
 1. **harness-rules skill 로드** — 본 세션의 절대 헌법.
    `Skill` 도구로 `harness50:harness-rules` 호출.
 
-2. **TOPIC.md 작성** — `step_archive/TOPIC/TOPIC.md`에 다음 형식으로 쓴다.
-   `webapp-trigger` hook이 자동 처리하지 않은 경우의 폴백.
-   훅 출력에 `webapp trigger skipped` 줄이 있으면 TOPIC.md·progress.json을 쓰지 않고 그 줄의
-   안내만 전한 뒤 끝낸다. 이 대체 작성은 `step_archive/TOPIC/TOPIC.md`가 없을 때만 한다.
+2. **선택된 실행 확인** — 명시적인 `/webapp <주제>`의 `webapp-trigger`가 새 실행에 schema2·`research-free-36-v1`·total36을 만들고 원문 prompt를 TOPIC에 보존한다. `webapp trigger skipped`가 있으면 TOPIC·progress를 덮어쓰지 않고 안내만 전한다. 훅 실패로 진행 기록이 없으면 필수 도구 실패로 보고하고 가짜 progress를 직접 만들지 않는다.
 
-   ```markdown
-   ---
-   created: <오늘 날짜>
-   session_prompt: |
-     $ARGUMENTS
-
-     "$ARGUMENTS" 튜토리얼을 생성한다.
-     인터랙티브는 필수다.
-     웹으로,
-     초보자 학습용으로,
-     대중 앱 사례를 참고,
-     직관적으로 이해할 수 있게
-     생성한다.
-
-     @step_archive/archived/step001.md 절대 복종한다.
-   ---
-
-   # 튜토리얼 주제
-
-   - topic: $ARGUMENTS
-   - audience: 초보자 학습용
-   - interactive: 필수
-   - real_world_apps: 대중 앱 사례 참고
-   - constraints:
-     - 단일 HTML 인터랙티브 웹 튜토리얼
-     - 독립 화면마다 고유 URL 부여, 기본 hash 라우팅, 지원 HTTP(S)에서는 Navigation API 우선 및 호환 backend 제공, docs/ROUTING.md 계약 준수
-     - 파일 직접 열기를 지원하려면 hash manifest 선택, history manifest는 HTTP(S) 필요, 실행 환경에 따른 mode 암묵 변환 금지
-     - 디자인 제외(하네스 기본, 설계가 채택 사유를 기록하면 예외): 크림·오프화이트 페이지 바탕 / 제목 속 이탤릭 강조어 / 01·02·03 장식 번호 섹션 라벨 / 코드 밖 모노스페이스 라벨 / 알약형 버튼 / 맹목적 Inter·Roboto·Arial / 보라 계열 그라데이션 배경 / 무조건 중앙정렬 카드 / 과도한 border-radius / 획일적 단색 배경
-     - 한국어 본문 + 기술 용어 영문 병기
+   ```
+   node "<plugin-root>/hooks/lib/workflow-profile.mjs" resolve "<project-root>"
    ```
 
-3. **step001.md Read** — `step_archive/archived/step001.md` 1회 읽기.
+   성공 출력의 `workflow_profile`, `total`, `step_body`, `body_directory`, `milestones`를 사용한다. 실패하면 경로·프로필·총수를 추측하지 않는다. 기존 legacy50은 원래50 본문과 번호를 유지한다.
 
-4. **연속 실행** — 본문 지시대로 실행 → "Step 001/50 완료" 보고 → 즉시 step002.md Read → … → step050.md까지 진행한다. 50단계 전 종료는 헌법 §2-1 명명된 멈춤뿐이다. 50단계의 `quality-gate.mjs --inspect-final`이 종료 코드 0이면 헌법 §2 예외대로 `node "<plugin-root>/scripts/final-summary.mjs" --workspace "<project-root>"`를 1회 실행하고, `Step 050/50 완료` 줄 바로 다음에 그 출력의 세 제목만 그대로 붙인다.
+3. **본문 Read** — 반환된 `step_body`를 읽는다. 새36의 경로는 `step_archive/profiles/research-free-36-v1/archived/stepNNN.md`다. legacy50은 검증된 archived/ 또는 flat 경로다. 새 본문을 legacy 경로에 복사하지 않는다.
+
+   TOPIC의 constraints에는 두 프로필 모두 다음 기본 줄을 그대로 유지한다. 사용자 제외는 별도 줄에 원문으로 보존하며, 채택 예외는 선택된 설계 단계(new18 / legacy30)가 계약에 근거를 기록한다.
+
+   - 디자인 제외(하네스 기본, 설계가 채택 사유를 기록하면 예외): 크림·오프화이트 페이지 바탕 / 제목 속 이탤릭 강조어 / 01·02·03 장식 번호 섹션 라벨 / 코드 밖 모노스페이스 라벨 / 알약형 버튼 / 맹목적 Inter·Roboto·Arial / 보라 계열 그라데이션 배경 / 무조건 중앙정렬 카드 / 과도한 border-radius / 획일적 단색 배경
+
+4. **연속 실행** — 본문 지시대로 실행 → `Step NNN/<total> 완료` 보고 → 같은 프로필의 다음 본문을 Read한다. 새36은 `Step 001/36 완료`부터 `Step 036/36 완료`, 기존50은 원래 `/50`을 사용한다. 선택된 최종 단계 전에 종료하려면 헌법 §2-1 명명된 멈춤을 기록한다. 최종 `quality-gate.mjs --inspect-final` 종료 코드0을 확인한 뒤 `node "<plugin-root>/scripts/final-summary.mjs" --workspace "<project-root>"`를1회 실행하고 완료 줄 뒤에 출력의 세 제목만 붙인다.
 
 ## Jev-first 요청 라우팅
 
 사용자가 Jev-first 또는 가능한 판단을 Jev에 먼저 맡기도록 요청하면, 유지 중인
 선호·승인 범위를 포함해 **현재 요청의 모든 지원되는 판단**에 먼저 적용한다.
-쉽거나 명백한 질문, 산술, 일반 대화, 아래 7단계 밖이라는 이유로 생략하지 않는다.
+쉽거나 명백한 질문, 산술, 일반 대화, 선택된 체크포인트 밖이라는 이유로 생략하지 않는다.
 독립 질문·명시적으로 선택한 인라인 텍스트는 설치 플러그인의 `scripts/jev-ask.mjs`
 `prepare --input -` 다음 `run --input - --allow-network`로 처리한다.
 워크스페이스나 가짜 근거 파일을 만들지 않는다. 입력·타입·결과 계약은
@@ -95,7 +71,7 @@ Score는 순서 있는 2–10개 기준의 가중 평점이다. Noul에 제공�
 
 ## Jev 체크포인트 라우팅
 
-16·24·25·30·37·45·49단계의 선택 근거가 준비되면 신뢰한 설치 플러그인의
+new36은17·18·25·31·35단계, legacy50은16·24·25·30·37·45·49단계의 선택 근거가 준비되면 신뢰한 설치 플러그인의
 `scripts/jev-judge.mjs`와 `docs/jev-checkpoints.md`를 따른다. 현재 작업에서 Jev 사용과
 해당 발췌문의 외부 전송이 승인된 경우 자동 호출한다. 기존 승인이 범위를 포함하면
 재확인하지 않는다. 단계 도달이나 키 존재, workflow 시작 자체는 전송 승인이 아니다.
@@ -111,11 +87,11 @@ Jev 결과로 기존 필수 Acceptance·시각 검사·E2E·독립 검증·완�
 
 ## 절대 준수
 
-- 사용자에게 질문하지 마라. 예외는 헌법 §2-1 명명된 멈춤 보고 한 줄과 §2 50단계 최종 요약의 `## 사용자 확인 필요` 절뿐이다
+- 사용자에게 질문하지 마라. 예외는 헌법 §2-1 명명된 멈춤 보고 한 줄과 §2 선택된 최종 단계 요약의 `## 사용자 확인 필요` 절뿐이다
 - "진행할까요" / "어떻게 할까요" / "다음 턴에서 재개" 모두 금지
 - 토큰 한도 직전까지 한 턴 안에서 가능한 한 많은 step 실행
-- Stop hook이 자동 재개를 처리하므로 인위적으로 턴을 끊지 마라. 50단계 전에 끝낼 수 있는 길은 `permission-denied`·`required-tool-failed`·`required-input-missing` 멈춤을 `scripts/harness-pause.mjs pause`로 기록하는 것뿐이다
-- 각 step 완료는 1줄 보고 ("Step NNN/50 완료")만. 단 50단계는 완료 줄 다음에 `final-summary.mjs` 출력의 세 제목(`## 사용자 확인 필요` / `## 변경` / `## 발견`)만 덧붙인다 (헌법 §2 예외)
+- Stop hook이 자동 재개를 처리하므로 인위적으로 턴을 끊지 마라. 선택된 최종 단계 전에 끝낼 수 있는 길은 `permission-denied`·`required-tool-failed`·`required-input-missing` 멈춤을 `scripts/harness-pause.mjs pause`로 기록하는 것뿐이다
+- 각 step 완료는 1줄 보고 ("Step NNN/<total> 완료")만. 단 선택된 최종 단계는 완료 줄 다음에 `final-summary.mjs` 출력의 세 제목(`## 사용자 확인 필요` / `## 변경` / `## 발견`)만 덧붙인다 (헌법 §2 예외)
 - 멈춘 작업은 이 명령으로 재개하지 않는다(재개는 `/harness-resume`). `/webapp <주제>`는 완료 기록이 있는 진행을 건드리지 않고 건너뛴다. 새 주제는 `/harness-reset` 후 `/webapp <주제>`
 
 ## 다음 행동

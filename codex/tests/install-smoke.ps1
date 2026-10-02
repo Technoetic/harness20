@@ -40,6 +40,8 @@ $script:Report = [ordered]@{
   }
   skill_count = 0
   step_count = 0
+  workflow_profiles = [ordered]@{}
+  shared_dependencies_verified = $false
   hook_source = $null
   hook_source_sha256 = $null
   hook_bundle_sha256 = $null
@@ -657,7 +659,8 @@ function Assert-ManifestAndVersions {
   }
   if (
     $manifest.name -cne "harness50" -or
-    $manifest.version -cne "2.1.0" -or
+    $manifest.version -isnot [string] -or
+    $manifest.version -cnotmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:\+[a-z0-9.-]+)?$' -or
     $manifest.skills -cne "./codex/skills/" -or
     $manifest.hooks -cne "./codex/hooks/hooks.json"
   ) {
@@ -714,57 +717,62 @@ function Assert-Skills {
 function Assert-Steps {
   param([Parameter(Mandatory = $true)][string]$Root)
 
-  $stepsRoot = Resolve-SafeDirectory $Root "codex/assets/steps" "Codex steps directory"
-  $expectedNames = @("index.json", "PORTING.md")
-  for ($step = 1; $step -le 50; $step += 1) {
-    $expectedNames += "step{0:d3}.md" -f $step
-  }
-  $entries = @(Get-ChildItem -Force -LiteralPath $stepsRoot -ErrorAction Stop)
-  Assert-ExactNames -Items $entries -Expected $expectedNames -Label "Codex steps directory"
-  foreach ($entry in $entries) {
-    if ($entry.PSIsContainer -or (Test-IsReparsePoint $entry)) {
-      Stop-Smoke "STEP_PACKAGE_INVALID" "Every Codex step resource must be a physical regular file."
+  foreach ($profile in @(
+    @{ id = "legacy-50-v1"; count = 50; directory = "codex/assets/steps"; source = "assets/steps" },
+    @{ id = "research-free-36-v1"; count = 36; directory = "codex/assets/profiles/research-free-36-v1/steps"; source = "assets/profiles/research-free-36-v1/steps" }
+  )) {
+    $stepsRoot = Resolve-SafeDirectory $Root $profile.directory "Codex profile steps directory"
+    $expectedNames = @("index.json")
+    if ($profile.id -ceq "legacy-50-v1") { $expectedNames += "PORTING.md" }
+    for ($step = 1; $step -le $profile.count; $step += 1) { $expectedNames += "step{0:d3}.md" -f $step }
+    $entries = @(Get-ChildItem -Force -LiteralPath $stepsRoot -ErrorAction Stop)
+    Assert-ExactNames -Items $entries -Expected $expectedNames -Label "Codex profile steps directory"
+    foreach ($entry in $entries) {
+      if ($entry.PSIsContainer -or (Test-IsReparsePoint $entry)) {
+        Stop-Smoke "STEP_PACKAGE_INVALID" "Every profile step resource must be a physical regular file."
+      }
     }
+    $index = Read-StrictJson (Resolve-SafeFile $stepsRoot "index.json" "Codex profile index") "Codex profile index" 8388608
+    if ($profile.id -ceq "legacy-50-v1") {
+      Assert-ExactProperties $index @("schema_version", "steps") @() "Legacy Codex index"
+      if ($index.schema_version -ne 1) { Stop-Smoke "STEP_PACKAGE_INVALID" "The legacy index schema is unexpected." }
+    } else {
+      Assert-ExactProperties $index @("schema_version", "workflow_profile", "total_steps", "steps") @() "New Codex index"
+      if ($index.schema_version -ne 2 -or $index.workflow_profile -cne $profile.id -or $index.total_steps -ne $profile.count) {
+        Stop-Smoke "STEP_PACKAGE_INVALID" "The new profile index binding is invalid."
+      }
+    }
+    $rows = @($index.steps)
+    if ($rows.Count -ne $profile.count) { Stop-Smoke "STEP_PACKAGE_INVALID" "The profile index count is invalid." }
+    for ($offset = 0; $offset -lt $profile.count; $offset += 1) {
+      $number = $offset + 1
+      $id = "step{0:d3}" -f $number
+      $row = $rows[$offset]
+      if ($row.number -ne $number -or $row.id -cne $id -or $row.target -cne ($profile.directory + "/$id.md") -or $row.ported -isnot [bool] -or -not $row.ported) {
+        Stop-Smoke "STEP_PACKAGE_INVALID" "The profile index is not its exact ported sequence."
+      }
+      [void](Resolve-SafeFile $stepsRoot "$id.md" "Codex profile step")
+      [void](Resolve-SafeFile $Root ($profile.source + "/$id.md") "Claude profile source step")
+    }
+    $script:Report.workflow_profiles[$profile.id] = $profile.count
   }
 
-  $indexPath = Resolve-SafeFile $stepsRoot "index.json" "Codex step index"
-  $index = Read-StrictJson $indexPath "Codex step index" 8388608
-  Assert-ExactProperties $index @("schema_version", "steps") @() "Codex step index"
-  if ($index.schema_version -ne 1) {
-    Stop-Smoke "STEP_PACKAGE_INVALID" "The Codex step index schema is unexpected."
-  }
-  $rows = @($index.steps)
-  if ($rows.Count -ne 50) {
-    Stop-Smoke "STEP_PACKAGE_INVALID" "The Codex step index must contain exactly 50 rows."
-  }
-  for ($offset = 0; $offset -lt 50; $offset += 1) {
-    $number = $offset + 1
-    $id = "step{0:d3}" -f $number
-    $row = $rows[$offset]
-    if (
-      $row.number -ne $number -or
-      $row.id -cne $id -or
-      $row.target -cne "codex/assets/steps/$id.md" -or
-      $row.ported -isnot [bool] -or
-      -not $row.ported
-    ) {
-      Stop-Smoke "STEP_PACKAGE_INVALID" "The Codex step index is not the exact ported 1-through-50 sequence."
-    }
-    [void](Resolve-SafeFile $stepsRoot "$id.md" "Codex step resource")
-  }
-
+  foreach ($dependency in @(
+    "scripts/lib/workflow-profiles.mjs", "scripts/lib/workflow-context.mjs",
+    "scripts/lib/claude-profile.mjs", "scripts/lib/claude-spec.mjs",
+    "scripts/lib/json-io.mjs", "scripts/lib/errors.mjs", "scripts/lib/quality-files.mjs",
+    "scripts/lib/quality.mjs", "scripts/lib/qa-report.mjs", "scripts/lib/final-regression.mjs",
+    "scripts/lib/final-summary.mjs", "scripts/lib/jev-judge.mjs", "hooks/lib/workflow-profile.mjs"
+  )) { [void](Resolve-SafeFile $Root $dependency "Shared profile dependency") }
   $node = Get-Application @("node.exe", "node") "Node.js"
   $validator = Resolve-SafeFile $Root "codex/scripts/validate-steps.mjs" "Codex step validator"
-  $validatorOutput = Invoke-CheckedApplication `
-    -Executable $node `
-    -Arguments @($validator) `
-    -WorkingDirectory $Root `
-    -FailureCode "STEP_VALIDATION_FAILED" `
-    -FailureMessage "The complete Codex step validation failed."
-  if ($validatorOutput -cne "validated 50 indexed step(s)") {
-    Stop-Smoke "STEP_VALIDATION_FAILED" "The complete Codex step validator returned an unexpected result."
+  $validatorOutput = Invoke-CheckedApplication -Executable $node -Arguments @($validator, "--all-profiles") -WorkingDirectory $Root -FailureCode "STEP_VALIDATION_FAILED" -FailureMessage "The complete profile validation failed."
+  if ($validatorOutput -cne "validated 86 indexed step(s) across 2 profiles") {
+    Stop-Smoke "STEP_VALIDATION_FAILED" "The profile validator returned an unexpected result."
   }
-  $script:Report.step_count = 50
+  [void](Invoke-CheckedApplication -Executable $node -Arguments @("--input-type=module", "-e", "await Promise.all(['quality','qa-report','final-regression','final-summary','jev-judge','claude-spec','json-io','errors'].map(name => import('./scripts/lib/' + name + '.mjs')))") -WorkingDirectory $Root -FailureCode "SHARED_DEPENDENCY_INVALID" -FailureMessage "Shared CLI dependencies could not be loaded.")
+  $script:Report.shared_dependencies_verified = $true
+  $script:Report.step_count = 36
 }
 
 function Assert-Hooks {
@@ -922,7 +930,7 @@ function Get-InstalledPluginRoot {
     $plugin.pluginId -cne "harness50@personal" -or
     $plugin.name -cne "harness50" -or
     $plugin.marketplaceName -cne "personal" -or
-    $plugin.version -cne "2.1.0" -or
+    $plugin.version -cne $script:Report.manifest.version -or
     $plugin.installed -isnot [bool] -or -not $plugin.installed -or
     $plugin.enabled -isnot [bool] -or -not $plugin.enabled -or
     $plugin.installPolicy -cne "AVAILABLE" -or
@@ -954,7 +962,7 @@ function Get-InstalledPluginRoot {
   $sourceIdentity = Read-StrictJson $sourceManifest "Installed harness50 source manifest"
   if (
     $sourceIdentity.name -cne "harness50" -or
-    $sourceIdentity.version -cne "2.1.0" -or
+    $sourceIdentity.version -cne $script:Report.manifest.version -or
     $sourceIdentity.skills -cne "./codex/skills/" -or
     $sourceIdentity.hooks -cne "./codex/hooks/hooks.json" -or
     (Get-Sha256 $sourceManifest) -cne (Get-Sha256 $installedManifest)
@@ -969,7 +977,7 @@ function Get-InstalledPluginRoot {
   }
   $codexHome = Resolve-PhysicalDirectory $codexHomeInput "Codex home"
   $expectedRoot = Resolve-PhysicalDirectory (
-    Join-Path $codexHome "plugins/cache/personal/harness50/2.1.0"
+    Join-Path $codexHome ("plugins/cache/personal/harness50/" + $script:Report.manifest.version)
   ) "Active harness50 plugin root"
   if (-not (Test-PathEqual $RequestedRoot $expectedRoot)) {
     Stop-Smoke "PLUGIN_IDENTITY_FAILED" "PluginRoot is not the active Codex harness50 installation."
@@ -1180,14 +1188,21 @@ function Assert-State {
     "stop_delivery", "imported_from", "last_stop_turn_id", "created_at",
     "updated_at", "completed_at"
   )
+  $isNew = $State.schema_version -eq 2
+  if ($isNew) { $stateFields += "workflow_profile" }
   Assert-ExactProperties $State $stateFields @() "$Label state"
+  $expectedTotal = 50
+  if ($isNew) {
+    if ($State.workflow_profile -cne "research-free-36-v1") { Stop-Smoke "STATE_INVALID" "$Label workflow profile is invalid." }
+    $expectedTotal = 36
+  }
   if (
     -not (Test-Integer $State.schema_version) -or
-    $State.schema_version -ne 1 -or
+    @(1, 2) -notcontains $State.schema_version -or
     -not (Test-SafeIdentifier $State.workflow_id) -or
     @("running", "paused", "blocked", "completed") -cnotcontains $State.status -or
     -not (Test-Integer $State.total_steps) -or
-    $State.total_steps -ne 50 -or
+    $State.total_steps -ne $expectedTotal -or
     $State.topic_path -cne "step_archive/TOPIC/TOPIC.md" -or
     $State.topic_sha256 -notmatch '^[a-f0-9]{64}$' -or
     -not (Test-Integer $State.consecutive_failures) -or
@@ -1213,10 +1228,10 @@ function Assert-State {
       Stop-Smoke "STATE_INVALID" "$Label completed steps are not a contiguous prefix."
     }
   }
-  if ($completed.Count -gt 50) {
+  if ($completed.Count -gt $expectedTotal) {
     Stop-Smoke "STATE_INVALID" "$Label state contains too many completed steps."
   }
-  $expectedCurrent = if ($completed.Count -eq 50) { $null } else { $completed.Count + 1 }
+  $expectedCurrent = if ($completed.Count -eq $expectedTotal) { $null } else { $completed.Count + 1 }
   if (
     ($null -ne $State.current_step -and -not (Test-Integer $State.current_step)) -or
     $State.current_step -ne $expectedCurrent
@@ -1225,7 +1240,7 @@ function Assert-State {
   }
   if (
     $State.status -ceq "completed" -and
-    ($completed.Count -ne 50 -or $null -ne $State.current_attempt -or $null -ne $State.continuation)
+    ($completed.Count -ne $expectedTotal -or $null -ne $State.current_attempt -or $null -ne $State.continuation)
   ) {
     Stop-Smoke "STATE_INVALID" "$Label completed state retains live work."
   }
@@ -1271,7 +1286,7 @@ function Assert-State {
       -not (Test-IsoTimestamp $State.continuation.issued_at) -or
       -not (Test-Integer $State.continuation.baseline_receipt_count) -or
       $State.continuation.baseline_receipt_count -lt 0 -or
-      $State.continuation.baseline_receipt_count -gt 50 -or
+      $State.continuation.baseline_receipt_count -gt $expectedTotal -or
       $State.continuation.baseline_receipt_count -ne $completed.Count
     ) {
       Stop-Smoke "STATE_INVALID" "$Label continuation is invalid."
@@ -1326,9 +1341,13 @@ function Read-Receipts {
   param(
     [Parameter(Mandatory = $true)][string]$WorkspaceRoot,
     [Parameter(Mandatory = $true)][string]$WorkflowId,
-    [Parameter(Mandatory = $true)][string]$Label
+    [Parameter(Mandatory = $true)][string]$Label,
+    [string]$WorkflowProfile = "legacy-50-v1"
   )
 
+  $isNew = $WorkflowProfile -ceq "research-free-36-v1"
+  $total = if ($isNew) { 36 } else { 50 }
+  $schemaVersion = if ($isNew) { 2 } else { 1 }
   $receiptsRoot = Resolve-SafeDirectory $WorkspaceRoot "step_archive/.harness50-codex/receipts" "$Label receipts directory"
   $entries = @(Get-ChildItem -Force -LiteralPath $receiptsRoot -ErrorAction Stop)
   $receipts = @()
@@ -1337,18 +1356,20 @@ function Read-Receipts {
       Stop-Smoke "RECEIPT_INVALID" "$Label receipts directory contains an unexpected entry."
     }
     $pathStep = [int]$Matches[1]
-    if ($pathStep -lt 1 -or $pathStep -gt 50) {
+    if ($pathStep -lt 1 -or $pathStep -gt $total) {
       Stop-Smoke "RECEIPT_INVALID" "$Label receipt filename has an invalid step."
     }
     $path = Resolve-SafeFile $receiptsRoot $entry.Name "$Label receipt"
     $receipt = Read-StrictJson $path "$Label receipt" 1048576
-    Assert-ExactProperties $receipt @(
+    $profileFields = if ($isNew) { @("workflow_profile") } else { @() }
+    Assert-ExactProperties $receipt (@(
       "schema_version", "workflow_id", "step", "attempt_id", "provenance",
       "completed_at", "summary", "evidence"
-    ) @("source_sha256") "$Label receipt"
+    ) + $profileFields) @("source_sha256") "$Label receipt"
     if (
       -not (Test-Integer $receipt.schema_version) -or
-      $receipt.schema_version -ne 1 -or
+      $receipt.schema_version -ne $schemaVersion -or
+      ($isNew -and $receipt.workflow_profile -cne $WorkflowProfile) -or
       $receipt.workflow_id -cne $WorkflowId -or
       -not (Test-Integer $receipt.step) -or
       $receipt.step -ne $pathStep -or
@@ -1423,7 +1444,8 @@ function Read-Events {
   param(
     [Parameter(Mandatory = $true)][string]$WorkspaceRoot,
     [Parameter(Mandatory = $true)][string]$WorkflowId,
-    [Parameter(Mandatory = $true)][string]$Label
+    [Parameter(Mandatory = $true)][string]$Label,
+    [int]$Total = 50
   )
 
   $eventPath = Resolve-SafeFile $WorkspaceRoot "step_archive/.harness50-codex/events.jsonl" "$Label event log"
@@ -1496,13 +1518,13 @@ function Read-Events {
       }
     }
     if ($fieldNames -contains "step" -and (
-      -not (Test-Integer $event.step) -or $event.step -lt 1 -or $event.step -gt 50
+      -not (Test-Integer $event.step) -or $event.step -lt 1 -or $event.step -gt $Total
     )) {
       Stop-Smoke "EVENT_INVALID" "$Label event contains an invalid step."
     }
     foreach ($countField in @("selected_step", "baseline_receipt_count", "completed_count", "failure_count", "consecutive_failures", "imported_prefix_count")) {
       if ($fieldNames -contains $countField -and (
-        -not (Test-Integer $event.$countField) -or $event.$countField -lt 0 -or $event.$countField -gt 50
+        -not (Test-Integer $event.$countField) -or $event.$countField -lt 0 -or $event.$countField -gt $Total
       )) {
         Stop-Smoke "EVENT_INVALID" "$Label event contains an invalid count."
       }
@@ -1552,12 +1574,15 @@ function Get-FirstEventIndex {
 function Get-NativeStepContract {
   param(
     [Parameter(Mandatory = $true)][string]$PluginRoot,
-    [Parameter(Mandatory = $true)][int]$Step
+    [Parameter(Mandatory = $true)][int]$Step,
+    [string]$WorkflowProfile = "legacy-50-v1"
   )
 
-  $indexPath = Resolve-SafeFile $PluginRoot "codex/assets/steps/index.json" "Codex step index"
+  $total = if ($WorkflowProfile -ceq "research-free-36-v1") { 36 } else { 50 }
+  $relativeIndex = if ($total -eq 36) { "codex/assets/profiles/research-free-36-v1/steps/index.json" } else { "codex/assets/steps/index.json" }
+  $indexPath = Resolve-SafeFile $PluginRoot $relativeIndex "Selected Codex step index"
   $index = Read-StrictJson $indexPath "Codex step index" 8388608
-  if ($index.steps -isnot [Array] -or @($index.steps).Count -ne 50) {
+  if ($index.steps -isnot [Array] -or @($index.steps).Count -ne $total) {
     Stop-Smoke "STEP_PACKAGE_INVALID" "The Codex step index is not canonical."
   }
   $contract = @($index.steps)[$Step - 1]
@@ -1647,17 +1672,18 @@ function Assert-NativeEvidence {
   $statePath = Resolve-SafeFile $WorkspaceRoot "step_archive/.harness50-codex/state.json" "Native state"
   $state = Read-StrictJson $statePath "Native state" 1048576
   $completed = @(Assert-State $state $WorkspaceRoot "Native")
+  $profile = if ($state.schema_version -eq 2) { $state.workflow_profile } else { "legacy-50-v1" }
   if (
     $state.imported_from -ne $null -or
     $state.status -cne "paused" -or
     $state.continuation -ne $null -or
     $state.stop_delivery -ne $null -or
     $completed.Count -lt 1 -or
-    $completed.Count -ge 50
+    $completed.Count -ge $state.total_steps
   ) {
     Stop-Smoke "NATIVE_STATE_INVALID" "Native smoke state must be a paused, incomplete, Codex-native workflow with completed work."
   }
-  $receipts = @(Read-Receipts $WorkspaceRoot $state.workflow_id "Native")
+  $receipts = @(Read-Receipts $WorkspaceRoot $state.workflow_id "Native" $profile)
   if ($receipts.Count -ne $completed.Count) {
     Stop-Smoke "NATIVE_RECEIPTS_INVALID" "Native receipts do not match completed state."
   }
@@ -1665,11 +1691,11 @@ function Assert-NativeEvidence {
     if ($receipts[$offset].step -ne ($offset + 1) -or $receipts[$offset].provenance -cne "codex-verified") {
       Stop-Smoke "NATIVE_RECEIPTS_INVALID" "Native smoke receipts must be a Codex-verified prefix."
     }
-    $contract = Get-NativeStepContract $PluginRoot $receipts[$offset].step
+    $contract = Get-NativeStepContract $PluginRoot $receipts[$offset].step $profile
     Assert-NativeReceiptEvidence $receipts[$offset] $contract $WorkspaceRoot
   }
 
-  $events = @(Read-Events $WorkspaceRoot $state.workflow_id "Native")
+  $events = @(Read-Events $WorkspaceRoot $state.workflow_id "Native" $state.total_steps)
   foreach ($forbidden in @("step_failed", "workflow_blocked", "claude_imported")) {
     if (@($events | Where-Object { $_.kind -ceq $forbidden }).Count -ne 0) {
       Stop-Smoke "NATIVE_EVENTS_INVALID" "Native smoke events contain a failed, blocked, or imported transition."
@@ -1921,6 +1947,8 @@ function Assert-ImportEvidence {
   $state = Read-StrictJson $statePath "Import state" 1048576
   $completed = @(Assert-State $state $WorkspaceRoot "Import")
   if (
+    $state.schema_version -ne 1 -or
+    $state.total_steps -ne 50 -or
     $state.status -cne "paused" -or
     $state.current_step -ne 18 -or
     $state.current_attempt -ne $null -or

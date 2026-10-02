@@ -16,7 +16,7 @@ import { readRouteManifestBytes, validateRouteManifest } from "../../../scripts/
 import { inspectQualityReport, REPORT_PATH as QUALITY_REPORT_PATH } from "../../../scripts/lib/quality.mjs";
 import { inspectFinalRegression } from "../../../scripts/lib/final-regression.mjs";
 
-const STEP_COUNT = 50;
+import { LEGACY_WORKFLOW_PROFILE, getWorkflowProfile, stepPhase } from "../../../scripts/lib/workflow-profiles.mjs";
 const SHA256 = /^[a-f0-9]{64}$/;
 const STEP_KEYS = new Set([
   "number", "id", "title", "phase", "source", "target", "source_sha256", "inputs",
@@ -54,25 +54,15 @@ function canonicalStepId(step) {
   return `step${String(step).padStart(3, "0")}`;
 }
 
-function expectedPhase(step) {
-  if (step <= 5) return "preflight";
-  if (step <= 15) return "tooling";
-  if (step <= 24) return "research";
-  if (step <= 30) return "planning";
-  if (step <= 38) return "implementation";
-  if (step <= 44) return "review";
-  return "e2e";
-}
-
 function uniqueStringArray(value) {
   return Array.isArray(value) &&
     value.every(item => nonempty(item)) &&
     new Set(value).size === value.length;
 }
 
-function requireStep(step) {
-  if (!Number.isInteger(step) || step < 1 || step > STEP_COUNT) {
-    fail("STEP_CONTRACT_INVALID", `step must be an integer from 1 through ${STEP_COUNT}`);
+function requireStep(step, count) {
+  if (!Number.isInteger(step) || step < 1 || step > count) {
+    fail("STEP_CONTRACT_INVALID", `step must be an integer from 1 through ${count}`);
   }
   return step;
 }
@@ -302,28 +292,36 @@ function validateAcceptanceDeclarations(contract) {
   return contract;
 }
 
-function validateLoadedContract(entry, step) {
+export function validateLoadedContract(entry, step, profileId = LEGACY_WORKFLOW_PROFILE) {
   exactFields(entry, STEP_KEYS, "STEP_CONTRACT_INVALID", "step contract");
+  const profile = getWorkflowProfile(profileId);
   const id = canonicalStepId(step);
   if (
     entry.number !== step || entry.id !== id || !nonempty(entry.title) ||
-    entry.phase !== expectedPhase(step) || entry.target !== `codex/assets/steps/${id}.md` ||
-    entry.source !== `assets/steps/${id}.md` || entry.ported !== true ||
+    entry.phase !== stepPhase(profile.id, step) || entry.target !== `${profile.targetDirectory}/${id}.md` ||
+    entry.source !== `${profile.sourceDirectory}/${id}.md` || entry.ported !== true ||
     !SHA256.test(entry.source_sha256 ?? "") ||
-    entry.next !== (step === STEP_COUNT ? null : canonicalStepId(step + 1)) ||
+    entry.next !== (step === profile.stepCount ? null : canonicalStepId(step + 1)) ||
     typeof entry.network !== "boolean" || typeof entry.visual_review !== "boolean" ||
     !uniqueStringArray(entry.inputs) || !uniqueStringArray(entry.outputs) ||
     !uniqueStringArray(entry.requires) || !uniqueStringArray(entry.optional_requires)
   ) {
     fail("STEP_CONTRACT_INVALID", "step contract is not canonical and ported");
   }
+  for (const dependency of [...entry.requires, ...entry.optional_requires]) {
+    if (!/^step\d{3}$/.test(dependency) || Number(dependency.slice(4)) < 1 || Number(dependency.slice(4)) >= step ||
+        (entry.requires.includes(dependency) && entry.optional_requires.includes(dependency))) {
+      fail("STEP_CONTRACT_INVALID", "step dependency is not an earlier selected-profile step");
+    }
+  }
   return validateAcceptanceDeclarations(entry);
 }
 
-export async function loadStepContract(pluginRoot, step) {
-  requireStep(step);
+export async function loadStepContract(pluginRoot, step, workflowProfile = LEGACY_WORKFLOW_PROFILE) {
+  const profile = getWorkflowProfile(workflowProfile);
+  requireStep(step, profile.stepCount);
   const { root } = await physicalRoot(pluginRoot, "PLUGIN_ROOT_INVALID");
-  const indexPath = join(root, "codex", "assets", "steps", "index.json");
+  const indexPath = join(root, ...profile.indexPath.split("/"));
   await physicalFile(root, indexPath, {
     missingCode: "STEP_CONTRACT_INVALID",
     unsafeCode: "PLUGIN_ROOT_INVALID"
@@ -337,17 +335,25 @@ export async function loadStepContract(pluginRoot, step) {
     });
   }
   if (
-    !isPlainObject(index) || Object.keys(index).sort().join(",") !== "schema_version,steps" ||
-    index.schema_version !== 1 || !Array.isArray(index.steps) || index.steps.length !== STEP_COUNT
+    !isPlainObject(index) || Object.keys(index).sort().join(",") !== (profile.id === LEGACY_WORKFLOW_PROFILE ? "schema_version,steps" : "schema_version,steps,total_steps,workflow_profile") ||
+    index.schema_version !== (profile.id === LEGACY_WORKFLOW_PROFILE ? 1 : 2) ||
+    (profile.id !== LEGACY_WORKFLOW_PROFILE && (index.workflow_profile !== profile.id || index.total_steps !== profile.stepCount)) ||
+    !Array.isArray(index.steps) || index.steps.length !== profile.stepCount
   ) {
-    fail("STEP_CONTRACT_INVALID", "step index must contain the canonical fifty-step schema");
+    fail("STEP_CONTRACT_INVALID", "step index must match the selected profile schema");
   }
   for (let offset = 0; offset < index.steps.length; offset += 1) {
+    validateLoadedContract(index.steps[offset], offset + 1, profile.id);
     if (index.steps[offset]?.number !== offset + 1 || index.steps[offset]?.id !== canonicalStepId(offset + 1)) {
       fail("STEP_CONTRACT_INVALID", "step index order is not canonical");
     }
   }
-  const contract = validateLoadedContract(index.steps[step - 1], step);
+  const contract = validateLoadedContract(index.steps[step - 1], step, profile.id);
+  const sourcePath = containedPath(root, contract.source, "STEP_CONTRACT_INVALID");
+  await physicalFile(root, sourcePath, { missingCode: "STEP_CONTRACT_INVALID", unsafeCode: "PLUGIN_ROOT_INVALID" });
+  if (createHash("sha256").update(await readFile(sourcePath)).digest("hex") !== contract.source_sha256) {
+    fail("STEP_CONTRACT_INVALID", "step source hash changed; review required");
+  }
   const targetPath = containedPath(root, contract.target, "STEP_CONTRACT_INVALID");
   await physicalFile(root, targetPath, {
     missingCode: "STEP_CONTRACT_INVALID",
@@ -530,9 +536,10 @@ function sameJson(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function runtimeReportIds(step) {
-  return [38, 44, 50].includes(step)
-    ? ["measured-quality-report", ...(step === 50 ? ["final-regression-report"] : [])]
+function runtimeReportIds(step, workflowProfile = LEGACY_WORKFLOW_PROFILE) {
+  const profile = getWorkflowProfile(workflowProfile);
+  return profile.milestones.quality.includes(step)
+    ? ["measured-quality-report", ...(step === profile.milestones.final ? ["final-regression-report"] : [])]
     : [];
 }
 
@@ -582,15 +589,16 @@ function historicalReplayContract(contract, persistedEvidence) {
   return contract;
 }
 
-async function measuredReports(step, workspaceRoot, afterArtifactOpen) {
-  if (!runtimeReportIds(step).length) return [];
-  const quality = await inspectQualityReport(workspaceRoot);
+async function measuredReports(step, workspaceRoot, afterArtifactOpen, workflowProfile) {
+  const profile = getWorkflowProfile(workflowProfile);
+  if (!runtimeReportIds(step, workflowProfile).length) return [];
+  const quality = await inspectQualityReport(workspaceRoot, { workflowProfile });
   if (quality.verdict !== "PASS") {
     fail("ACCEPTANCE_QUALITY_INCOMPLETE", "current measured quality PASS is required", { reason: quality.error });
   }
   const reports = [{ id: "measured-quality-report", path: QUALITY_REPORT_PATH }];
-  if (step === 50) {
-    const final = await inspectFinalRegression(workspaceRoot);
+  if (step === profile.milestones.final) {
+    const final = await inspectFinalRegression(workspaceRoot, workflowProfile);
     if (final.verdict !== "PASS") {
       fail("ACCEPTANCE_FINAL_REGRESSION_INCOMPLETE", "current final regression PASS is required", { reason: final.error });
     }
@@ -604,12 +612,12 @@ async function measuredReports(step, workspaceRoot, afterArtifactOpen) {
   }
   // Recheck after all artifact callbacks: inspected source, coverage and QA
   // evidence must still describe this candidate, and the report bytes must match.
-  const current = await inspectQualityReport(workspaceRoot);
+  const current = await inspectQualityReport(workspaceRoot, { workflowProfile });
   if (current.verdict !== "PASS" || !sameJson(current, quality)) {
     fail("ACCEPTANCE_QUALITY_INCOMPLETE", "measured quality changed during completion");
   }
-  if (step === 50) {
-    const currentFinal = await inspectFinalRegression(workspaceRoot);
+  if (step === profile.milestones.final) {
+    const currentFinal = await inspectFinalRegression(workspaceRoot, workflowProfile);
     if (currentFinal.verdict !== "PASS" || currentFinal.report_sha256 !== reports[1].digest) {
       fail("ACCEPTANCE_FINAL_REGRESSION_INCOMPLETE", "final regression changed during completion");
     }
@@ -623,12 +631,14 @@ export async function validateCompletionEvidence({
   evidence,
   workspaceRoot,
   persistedEvidence,
-  afterArtifactOpen
+  afterArtifactOpen,
+  workflowProfile = LEGACY_WORKFLOW_PROFILE
 } = {}) {
   if (afterArtifactOpen !== undefined && typeof afterArtifactOpen !== "function") {
     fail("ACCEPTANCE_OPTIONS_INVALID", "afterArtifactOpen must be a function");
   }
-  const reportIds = runtimeReportIds(contract?.number);
+  requireStep(contract?.number, getWorkflowProfile(workflowProfile).stepCount);
+  const reportIds = runtimeReportIds(contract.number, workflowProfile);
   // Optional declarations preserve old receipts. New completions always run
   // these gates; a custom/minimal contract cannot disable them.
   if (reportIds.length && Array.isArray(contract.acceptance)) {
@@ -638,7 +648,11 @@ export async function validateCompletionEvidence({
       }))] };
   }
   if (persistedEvidence !== undefined) {
-    const replayContract = historicalReplayContract(contract, persistedEvidence);
+    persistedEvidence = sanitizeEvidence(persistedEvidence);
+    const replayContract = workflowProfile === LEGACY_WORKFLOW_PROFILE ? historicalReplayContract(contract, persistedEvidence) : contract;
+    if (workflowProfile !== LEGACY_WORKFLOW_PROFILE && reportIds.some(id => !persistedEvidence.some(item => item.acceptance_id === id && item.kind === "check" && item.ok))) {
+      fail("ACCEPTANCE_MISSING", "profile receipts require runtime report evidence");
+    }
     const canonical = validateEvidenceShape(replayContract, evidence);
     const persisted = validateEvidenceShape(replayContract, persistedEvidence, {
       requireArtifactDigest: true
@@ -701,7 +715,7 @@ export async function validateCompletionEvidence({
       id: acceptanceId, path: "dist/index.html", validator: "html-document"
     }, expectedDigest, undefined, browserBindings);
   }
-  const reports = await measuredReports(contract.number, workspaceRoot, afterArtifactOpen);
+  const reports = await measuredReports(contract.number, workspaceRoot, afterArtifactOpen, workflowProfile);
   for (const report of reports) {
     const supplied = result.find(item => item.acceptance_id === report.acceptance_id);
     if (supplied && !sameJson(supplied, report)) {

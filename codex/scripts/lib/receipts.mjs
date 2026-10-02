@@ -6,7 +6,17 @@ import { HarnessError } from "./errors.mjs";
 import { pathsFor } from "./paths.mjs";
 import { validateState } from "./schema.mjs";
 
+import { LEGACY_WORKFLOW_PROFILE, getWorkflowProfile, resolveWorkflowProfile } from "../../../scripts/lib/workflow-profiles.mjs";
+
 const STEP_COUNT = 50;
+
+export function receiptProfile(receipt) {
+  return receipt.schema_version === 1 ? LEGACY_WORKFLOW_PROFILE : getWorkflowProfile(receipt.workflow_profile).id;
+}
+
+export function receiptMatchesState(receipt, state) {
+  return receipt.workflow_id === state.workflow_id && receiptProfile(receipt) === resolveWorkflowProfile(state).id;
+}
 const RECEIPT_FIELDS = new Set([
   "schema_version",
   "workflow_id",
@@ -166,12 +176,15 @@ export function parseReceipt(raw) {
   }
   if (!isPlainObject(value)) invalidReceipt("receipt must be an object");
   assertNoSensitiveData(value);
-  requireExactFields(value, RECEIPT_FIELDS, REQUIRED_RECEIPT_FIELDS, "receipt", invalidReceipt);
+  const fields = new Set([...RECEIPT_FIELDS, ...(value.schema_version === 2 ? ["workflow_profile"] : [])]);
+  requireExactFields(value, fields, [...REQUIRED_RECEIPT_FIELDS, ...(value.schema_version === 2 ? ["workflow_profile"] : [])], "receipt", invalidReceipt);
 
-  if (value.schema_version !== 1) invalidReceipt("receipt schema_version must be 1", { field: "schema_version" });
+  if (![1, 2].includes(value.schema_version)) invalidReceipt("receipt schema_version must be 1 or 2", { field: "schema_version" });
+  let profile;
+  try { profile = getWorkflowProfile(receiptProfile(value)); } catch (error) { invalidReceipt(error.message); }
   requireNonemptyString(value.workflow_id, "workflow_id", invalidReceipt);
-  if (!Number.isInteger(value.step) || value.step < 1 || value.step > STEP_COUNT) {
-    invalidReceipt(`step must be an integer from 1 through ${STEP_COUNT}`, { field: "step" });
+  if (!Number.isInteger(value.step) || value.step < 1 || value.step > profile.stepCount) {
+    invalidReceipt(`step must be an integer from 1 through ${profile.stepCount}`, { field: "step" });
   }
   if (!RECEIPT_PROVENANCE.has(value.provenance)) {
     invalidReceipt("receipt provenance is invalid", { field: "provenance" });
@@ -195,6 +208,7 @@ export function parseReceipt(raw) {
 
   const receipt = {
     schema_version: value.schema_version,
+    ...(value.schema_version === 2 ? { workflow_profile: value.workflow_profile } : {}),
     workflow_id: value.workflow_id,
     step: value.step,
     attempt_id: value.attempt_id,
@@ -398,7 +412,7 @@ function importedPrefixLength(receipts) {
 }
 
 function blockedReconciliation(state, reason, prefixReceipts = []) {
-  const normalizedPrefix = prefixReceipts.slice(0, STEP_COUNT - 1);
+  const normalizedPrefix = prefixReceipts.slice(0, state.total_steps - 1);
   const completedSteps = normalizedPrefix.map(receipt => receipt.step);
   const importedFrom = state.imported_from === null
     ? null
@@ -428,7 +442,7 @@ function blockedReconciliation(state, reason, prefixReceipts = []) {
 function reconciledState(state, prefixReceipts) {
   const completedSteps = prefixReceipts.map(receipt => receipt.step);
   const recoveredForward = completedSteps.length > state.completed_steps.length;
-  const completed = completedSteps.length === STEP_COUNT;
+  const completed = completedSteps.length === state.total_steps;
   const status = completed
     ? "completed"
     : recoveredForward && state.status !== "paused"
@@ -456,12 +470,14 @@ export function reconcileReceipts(rawState, receipts) {
   const byStep = new Map();
   const conflictingSteps = new Set();
   let workflowMismatch = false;
+  let profileMismatch = false;
   for (const raw of receipts) {
     const receipt = parseReceipt(raw);
     if (receipt.workflow_id !== state.workflow_id) {
       workflowMismatch = true;
       continue;
     }
+    if (!receiptMatchesState(receipt, state)) { profileMismatch = true; continue; }
     if (conflictingSteps.has(receipt.step)) continue;
     const existing = byStep.get(receipt.step);
     if (existing && canonicalJson(existing) !== canonicalJson(receipt)) {
@@ -473,11 +489,12 @@ export function reconcileReceipts(rawState, receipts) {
   }
 
   const prefixReceipts = [];
-  for (let step = 1; step <= STEP_COUNT && byStep.has(step); step += 1) {
+  for (let step = 1; step <= state.total_steps && byStep.has(step); step += 1) {
     prefixReceipts.push(byStep.get(step));
   }
   const stateAhead = state.completed_steps.length > prefixReceipts.length;
   const gap = [...byStep.keys()].some(step => step > prefixReceipts.length + 1);
+  if (profileMismatch) return blockedReconciliation(state, "RECEIPT_PROFILE_MISMATCH", prefixReceipts);
   if (workflowMismatch) {
     return blockedReconciliation(state, "RECEIPT_WORKFLOW_MISMATCH", prefixReceipts);
   }

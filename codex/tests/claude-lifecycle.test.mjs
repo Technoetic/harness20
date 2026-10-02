@@ -25,6 +25,7 @@ function fixture(t, projectName) {
   const plugin = join(root, 'cache', 'plugin', '2.2');
   cpSync(join(repo, 'hooks'), join(plugin, 'hooks'), { recursive: true });
   cpSync(join(repo, 'assets'), join(plugin, 'assets'), { recursive: true });
+  cpSync(join(repo, 'scripts'), join(plugin, 'scripts'), { recursive: true });
   const project = join(root, projectName); const other = join(root, 'other');
   mkdirSync(project); mkdirSync(other);
   const run = (name, event = {}, envRoot = '', cwd = other) => {
@@ -39,7 +40,7 @@ function fixture(t, projectName) {
   const state = (completed = [], current = 1) => {
     mkdirSync(join(project, 'step_archive', 'archived'), { recursive: true });
     for (let n = 1; n <= 3; n++) writeFileSync(join(project, 'step_archive', 'archived', `step00${n}.md`), '# Test\n## Task\n');
-    writeFileSync(join(project, 'step_archive', 'progress.json'), JSON.stringify({ last_updated: '', total_steps: 3, current_step: current, completed_steps: completed, failed_steps: [], metrics: { total_sessions: 0 }, session_history: [] }));
+    writeFileSync(join(project, 'step_archive', 'progress.json'), JSON.stringify({ last_updated: '', total_steps: 50, current_step: current, completed_steps: completed, failed_steps: [], metrics: { total_sessions: 0 }, session_history: [] }));
   };
   return { plugin, project, other, run, state };
 }
@@ -53,7 +54,7 @@ testEachProject('exact installed startup bytes use event cwd and environment pre
 });
 testEachProject('writer preserves first unfinished step; loader and Stop agree', (t, name) => {
   const f = fixture(t, name); f.state();
-  f.run('step-progress-writer', { cwd: f.project, last_assistant_message: 'Step 003/3 완료' });
+  f.run('step-progress-writer', { cwd: f.project, last_assistant_message: 'Step 003/50 완료' });
   const p = JSON.parse(readFileSync(join(f.project, 'step_archive', 'progress.json'), 'utf8'));
   assert.deepEqual(p.completed_steps, [3]); assert.equal(p.current_step, 1);
   assert.match(f.run('step-progress-loader', { cwd: f.project }), /step001/);
@@ -84,7 +85,7 @@ testEachProject('writer puts a drifted cursor back on the first unfinished step 
   assert.deepEqual(p.completed_steps, [2]); assert.equal(p.current_step, 1);
   // (b) A completion line is recorded, and the cursor follows the first unfinished step.
   f.state([2], 3);
-  p = writeUntil(stop('Step 001/3 완료'), progress => progress.completed_steps.includes(1));
+  p = writeUntil(stop('Step 001/50 완료'), progress => progress.completed_steps.includes(1));
   assert.deepEqual(p.completed_steps, [1, 2]); assert.equal(p.current_step, 3);
   // (c) A paused run: the cursor moves back and the pause fields stay.
   f.state([2], 3);
@@ -116,7 +117,7 @@ testEachProject('Stop is project scoped, bounded, sticky on stall, and resets af
   assert.equal(JSON.parse(f.run('step-auto-continue', { ...event, cwd: f.other })).decision, 'block');
   f.state([1], 2);
   assert.match(JSON.parse(f.run('step-auto-continue', event)).reason, /step002/);
-  f.state([1, 2, 3], 3); assert.equal(f.run('step-auto-continue', event), '');
+  f.state(Array.from({ length: 50 }, (_, i) => i + 1), 50); assert.equal(f.run('step-auto-continue', event), '');
 });
 testEachProject('the loader never creates progress.json and natural language never bootstraps', (t, name) => {
   const f = fixture(t, name);

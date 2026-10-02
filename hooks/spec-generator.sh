@@ -20,11 +20,23 @@ log() { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >>"$LOG_FILE" 2>/
 # manager owns this workspace.
 if [ -e "$PROJECT_ROOT/step_archive/.harness50-codex/state.json" ]; then exit 0; fi
 [ -f "$PROGRESS_FILE" ] || exit 0
+# Shared profile/archive identity; invalid metadata never activates a mixed archive.
+H50_PROFILE="$(node "$(dirname "${BASH_SOURCE[0]}")/lib/workflow-profile.mjs" resolve "$PROJECT_ROOT" 2>/dev/null)" || exit 0
+export H50_PROFILE
+ARCHIVED_DIR="$PROJECT_ROOT/$(printf '%s' "$H50_PROFILE" | python3 -c 'import json,sys; print(json.load(sys.stdin)["body_directory"])' | tr -d '\r')"
+
+
 command -v python3 >/dev/null 2>&1 || exit 0
+
+if [ "$(printf '%s' "$H50_PROFILE" | python3 -c 'import json,sys; print(json.load(sys.stdin)["workflow_profile"])' | tr -d '\r')" = "research-free-36-v1" ]; then
+  node "$(dirname "${BASH_SOURCE[0]}")/lib/workflow-profile.mjs" spec "$PROJECT_ROOT" 2>/dev/null || true
+  exit 0
+fi
 
 export PROGRESS_FILE SPEC_DIR ARCHIVED_DIR
 python3 - <<'PY'
 import json, os, re, datetime
+profile=json.loads(os.environ["H50_PROFILE"])
 p=json.load(open(os.environ["PROGRESS_FILE"],encoding="utf-8"))
 spec_dir=os.environ["SPEC_DIR"]; a_dir=os.environ["ARCHIVED_DIR"]
 total=int(p.get("total_steps",50))
@@ -52,12 +64,12 @@ def gen(n):
     sm=re.search(r'(?ms)^##\s+(실행 내용|개요|목적|Step-Back|검증).+?(?=^##\s+|^---|\Z)', body)
     ref="\n".join((sm.group(0).split("\n")[:30]) if sm else [f"본문 추출 실패. step{num}.md 직접 참조."])
     prev=f"{n-1:03d}"
-    final_line=("\n"+FINAL_SUMMARY_LINE) if n==50 and total==50 else ""
+    final_line=("\n"+FINAL_SUMMARY_LINE.replace("50단계",f"{total}단계")) if n==profile["milestones"]["final"] else ""
     now=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     content=f"""# SPEC-{num} — {title}
 
 자동 생성: {now}
-원본: step_archive/archived/step{num}.md
+원본: {profile["body_directory"]}/step{num}.md
 
 ---
 
@@ -73,8 +85,8 @@ def gen(n):
 
 ## ACCEPTANCE
 - 해당 Step의 자체 Self-Calibration 통과
-- 결과 파일: step_archive/archived/step{num}.md 본문 절차가 지정한 경로 (머리말 Sync 줄과 다르면 본문 절차를 따른다)
-- 품질 마일스톤(scripts/quality-gate.mjs): 완료 38단계 → trust5_r1, 완료 44단계 → trust5_r2, 완료 49단계 이후(최종 Step 050) → trust5_r3. Stop 훅(trust5-validator)이 step_archive/outputs/trust5_rN.md에 Verdict(PASS/FAIL/INCOMPLETE)를 기록하고, PASS가 아니면 복구를 요구한다.{final_line}
+- 결과 파일: {profile["body_directory"]}/step{num}.md 본문 절차가 지정한 경로 (머리말 Sync 줄과 다르면 본문 절차를 따른다)
+- 품질 마일스톤(scripts/quality-gate.mjs): 완료 {profile["milestones"]["quality"][0]}단계 → trust5_r1, 완료 {profile["milestones"]["quality"][1]}단계 → trust5_r2, 완료 {total-1}단계 이후(최종 Step {total:03d}) → trust5_r3. Stop 훅(trust5-validator)이 step_archive/outputs/trust5_rN.md에 Verdict(PASS/FAIL/INCOMPLETE)를 기록하고, PASS가 아니면 복구를 요구한다.{final_line}
 
 ## REFERENCE
 ```
@@ -82,7 +94,7 @@ def gen(n):
 ```
 
 ## RUN-COMMAND
-Read step_archive/archived/step{num}.md → 본문 실행
+Read {profile["body_directory"]}/step{num}.md → 본문 실행
 """
     # specs/ appears only when a SPEC is actually written (mirrors spec-generator.ps1).
     os.makedirs(spec_dir, exist_ok=True)

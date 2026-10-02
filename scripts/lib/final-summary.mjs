@@ -1,6 +1,6 @@
 // Read-only completion report for the end of step 50 (docs/FINAL-SUMMARY.md). It never runs
-// project commands, launches a browser, uses the network, reads workflow state (progress.json,
-// .harness50-codex) or rewrites evidence. The only write is SUMMARY_PATH, and only inside an
+// project commands, launches a browser, uses the network or rewrites evidence. Shared guarded metadata resolution
+// selects the current profile and generation for evidence inspection. The only write is SUMMARY_PATH, and only inside an
 // existing physical step_archive/. stdout and the file carry the same bytes, without any time.
 import { lstat, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -13,6 +13,9 @@ import { readBrowserReportBytes } from './browser-report.mjs';
 import { inspectQa } from './qa-report.mjs';
 import { inspectJevJudgment } from './jev-judge.mjs';
 import { inspectJevReview } from './jev-review.mjs';
+
+import { workflowContext, evidenceDirectory } from './workflow-context.mjs';
+import { LEGACY_WORKFLOW_PROFILE } from './workflow-profiles.mjs';
 
 export const SUMMARY_PATH = 'step_archive/outputs/final-summary.md';
 export const SUMMARY_HEADINGS = Object.freeze(['## 사용자 확인 필요', '## 변경', '## 발견']);
@@ -99,9 +102,9 @@ async function collectChanges(root, out) {
 }
 
 // The same three read-only inspections as `quality-gate.mjs --inspect-final`.
-async function collectGate(root, out) {
+async function collectGate(root, out, context) {
   const [quality, browser, regression] = await Promise.all([
-    inspectQualityReport(root), inspectBrowserOutput(root), inspectFinalRegression(root)]);
+    inspectQualityReport(root), inspectBrowserOutput(root), inspectFinalRegression(root, context.profile.id)]);
   const line = `quality=${quality.verdict} · browser=${browser.verdict} · regression=${regression.verdict}`;
   if (![quality, browser, regression].every(item => item.verdict === 'PASS')) {
     out.attention.push(`- 최종 게이트 미통과 ${line} ${tick(GATE)}`);
@@ -113,14 +116,17 @@ async function collectGate(root, out) {
   }
 }
 
-async function collectDeployment(root, out) {
+async function collectDeployment(root, out, context) {
   const files = [];
-  for (const [dir, pattern] of [['step_archive', /^step0(?:4[5-9]|50)_.+\.md$/], ['step_archive/outputs', /^step050_.+\.md$/]]) {
+  const start = context.profile.id === LEGACY_WORKFLOW_PROFILE ? 45 : 31;
+  const final = context.profile.milestones.final;
+  const reportPattern = new RegExp(`^step0(?:${Array.from({length: final - start + 1}, (_, i) => start + i).join('|')})_.+\\.md$`);
+  for (const [dir, pattern] of [['step_archive', reportPattern], ['step_archive/outputs', new RegExp(`^step${pad(final)}_.+\\.md$`)]]) {
     const { names } = await listNames(root, dir, pattern);
     files.push(...names.map(name => `${dir}/${name}`));
   }
-  if (!files.some(path => path.startsWith('step_archive/step045_'))) {
-    out.unavailable.push(`- 확인 불가: ${tick('step_archive/step045_*.md')} (없음)`);
+  if (!files.some(path => path.startsWith(`step_archive/step${pad(start)}_`))) {
+    out.unavailable.push(`- 확인 불가: ${tick(`step_archive/step${pad(start)}_*.md`)} (없음)`);
   }
   const hits = [];
   for (const path of files) {
@@ -166,28 +172,30 @@ async function collectBrowser(root, html, out) {
   out.findings.push(`- 브라우저 측정 ${backend ? `backend ${tick(backend)} · ` : ''}화면 ${report.routing.routes.length}개 × desktop·mobile × 2 시나리오 ${tick(BROWSER)}`);
 }
 
-async function collectQa(root, out) {
-  const state = await directoryState(join(root, ...QA_DIR.split('/')));
-  if (state === 'invalid') { out.unavailable.push(`- 확인 불가: ${tick(`${QA_DIR}/`)} (형식 오류)`); return; }
+async function collectQa(root, out, context) {
+  const qaDir = evidenceDirectory(QA_DIR, context);
+  const finalPointer = `${qaDir}/step${pad(context.profile.milestones.final)}.latest.json`;
+  const state = await directoryState(join(root, ...qaDir.split('/')));
+  if (state === 'invalid') { out.unavailable.push(`- 확인 불가: ${tick(`${qaDir}/`)} (형식 오류)`); return; }
   const sameAgent = [];
   let final = { status: 'missing' };
-  for (let step = 1; state === 'yes' && step <= 50; step++) {
-    const result = await inspectQa(root, step);
-    if (step === 50) final = result;
-    if (result.status === 'invalid') out.unavailable.push(`- 확인 불가: ${tick(`${QA_DIR}/step${pad(step)}.latest.json`)} (손상)`);
+  for (let step = 1; state === 'yes' && step <= context.profile.stepCount; step++) {
+    const result = await inspectQa(root, step, { workflowProfile: context.profile.id });
+    if (step === context.profile.milestones.final) final = result;
+    if (result.status === 'invalid') out.unavailable.push(`- 확인 불가: ${tick(`${qaDir}/step${pad(step)}.latest.json`)} (손상)`);
     else if (result.status !== 'missing' && result.report?.verifier?.mode === 'same-agent') {
       sameAgent.push(`step${pad(step)}${result.status === 'stale' ? '(이전 빌드)' : ''}`);
     }
   }
-  if (sameAgent.length) out.attention.push(`- 독립 검증 아님(verifier.mode ${tick('same-agent')}): ${sameAgent.join(', ')} ${tick(`${QA_DIR}/`)}`);
-  if (final.status === 'missing') { out.findings.push(`- 확인 불가: ${tick(FINAL_POINTER)} (없음)`); return; }
+  if (sameAgent.length) out.attention.push(`- 독립 검증 아님(verifier.mode ${tick('same-agent')}): ${sameAgent.join(', ')} ${tick(`${qaDir}/`)}`);
+  if (final.status === 'missing') { out.findings.push(`- 확인 불가: ${tick(finalPointer)} (없음)`); return; }
   if (final.status === 'invalid') return;
-  out.findings.push(`- 최종 회귀 보고서 ${tick(FINAL_POINTER)} → ${tick(final.report_sha256.slice(0, 12))} ${final.status} · 검증자 ${tick(final.report.verifier.mode)}`);
+  out.findings.push(`- 최종 회귀 보고서 ${tick(finalPointer)} → ${tick(final.report_sha256.slice(0, 12))} ${final.status} · 검증자 ${tick(final.report.verifier.mode)}`);
   const byId = new Map(final.report.outcomes.map(outcome => [outcome.id, outcome]));
   const extra = final.report.outcomes.filter(outcome => !FINAL_REGRESSION_CHECKS.includes(outcome.id));
   if (extra.length) {
     const passed = extra.filter(outcome => outcome.status === 'pass').length;
-    out.findings.push(`- 추가 검사 ${extra.length}개: pass ${passed} · 미통과 ${extra.length - passed} ${tick(FINAL_POINTER)}`);
+    out.findings.push(`- 추가 검사 ${extra.length}개: pass ${passed} · 미통과 ${extra.length - passed} ${tick(finalPointer)}`);
   }
   out.table = ['| 회귀 검사 | 결과 | 증거 수 |', '|---|---|---|', ...FINAL_REGRESSION_CHECKS.map(id => {
     const outcome = byId.get(id);
@@ -197,10 +205,11 @@ async function collectQa(root, out) {
 
 // One line per (kind, step, input); a later current result for the same input hides an older
 // failure. Rank: 0 reviewed (not shown), 1 needs review, 2 unverified, 3 stale.
-async function collectJev(root, out) {
+async function collectJev(root, out, context) {
   const groups = new Map();
-  for (const [dir, inspect, kind] of [['step_archive/outputs/jev-judgments', inspectJevJudgment, 'judge'],
-    ['step_archive/outputs/jev-reviews', inspectJevReview, 'review']]) {
+  const sources = [[evidenceDirectory('step_archive/outputs/jev-judgments', context), inspectJevJudgment, 'judge']];
+  if (context.profile.id === LEGACY_WORKFLOW_PROFILE) sources.push(['step_archive/outputs/jev-reviews', inspectJevReview, 'review']);
+  for (const [dir, inspect, kind] of sources) {
     const { state, names } = await listNames(root, dir, /^[a-f0-9]{64}\.json$/);
     if (state === 'missing') continue;
     if (state === 'invalid') { out.unavailable.push(`- 확인 불가: ${tick(`${dir}/`)} (형식 오류)`); continue; }
@@ -336,12 +345,15 @@ export async function collectFinalSummary(workspaceRoot) {
   const archive = await directoryState(join(root, 'step_archive'));
   if (archive !== 'yes') out.unavailable.push(`- 확인 불가: ${tick('step_archive/')} (${archive === 'missing' ? '없음' : '형식 오류'})`);
   const html = await collectChanges(root, out);
-  await collectGate(root, out);
+  let context;
+  try { context = await workflowContext(root); }
+  catch { out.unavailable.push('- 확인 불가: workflow profile/generation (형식 오류)'); }
+  if (context) await collectGate(root, out, context);
   if (archive === 'yes') {
-    await guarded(out, 'step_archive/', () => collectDeployment(root, out));
+    if (context) await guarded(out, 'step_archive/', () => collectDeployment(root, out, context));
     await guarded(out, BROWSER, () => collectBrowser(root, html, out));
-    await guarded(out, `${QA_DIR}/`, () => collectQa(root, out));
-    await guarded(out, 'step_archive/outputs/', () => collectJev(root, out));
+    if (context) await guarded(out, `${QA_DIR}/`, () => collectQa(root, out, context));
+    if (context) await guarded(out, 'step_archive/outputs/', () => collectJev(root, out, context));
     await guarded(out, TOPIC, () => collectTopic(root, out));
     await guarded(out, '.', () => collectDecisions(root, out));
   }

@@ -1,3 +1,4 @@
+import { workflowContext } from './workflow-context.mjs';
 import { open } from 'node:fs/promises';
 import { readSafe, physicalWorkspace, safePath, sha256 } from './quality-files.mjs';
 
@@ -111,6 +112,7 @@ async function bind(workspaceRoot, input) {
   try {
     const selected = canonicalInput(input);
     const root = await physicalWorkspace(workspaceRoot);
+    if ((await workflowContext(root)).generation) throw new Error('Planning review is legacy-only; use generic Jev judgment');
     const sources = await sourceSnapshot(root, [TOPIC, ...selected.planning.map(item => item.path)],
       [selected.topic_excerpt, ...selected.planning.map(item => item.excerpt)]);
     const questions = Object.fromEntries(selected.requirements.map(item => [item.id,
@@ -307,6 +309,7 @@ export async function inspectJevReview(workspaceRoot, reportPath) {
   try {
     if (typeof reportPath !== 'string' || !/^step_archive\/outputs\/jev-reviews\/[a-f0-9]{64}\.json$/.test(reportPath)) return invalid;
     const root = await physicalWorkspace(workspaceRoot);
+    if ((await workflowContext(root)).generation) throw new Error('Planning review is legacy-only; use generic Jev judgment');
     const bytes = await readSafe(root, reportPath, BODY_LIMIT);
     if (reportPath !== `${REPORT_PREFIX}${sha256(bytes)}.json`) return invalid;
     const report = JSON.parse(utf8(bytes));

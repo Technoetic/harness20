@@ -7,7 +7,7 @@ harness50의 옛 step 본문은 아래 `*-validator.ps1` / `*-checker.ps1` 스�
 
 - `mx-tag-validator.ps1` / `.sh` (PostToolUse 바인딩)
 - `trust5-validator.ps1` / `.sh` (Stop 바인딩)
-- `html-bundler.ps1` / `.sh` (step038에서 호출, 부트스트랩 시 `step_archive/tools/`로 복사)
+- `html-bundler.ps1` / `.sh` (새36의 step026, legacy50의 step038에서 호출, 부트스트랩 시 `step_archive/tools/`로 복사)
 
 ## 정책 (약속-실제 정합, 2026-07 평가 반영)
 

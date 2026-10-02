@@ -68,7 +68,7 @@ function projectRelative(resolved, nativeRoot) {
 // A Codex state.json there silences them, so edits to either never receive hook approval. The
 // same names in a subfolder are excluded too: a progress.json written there without a prompt would
 // start a run (loader instructions, approval, Stop continuation) once that folder is opened.
-const WORKFLOW_STATE = /(^|\/)step_archive\/(?:progress\.json$|\.harness50-codex(?:\/|$))/;
+const WORKFLOW_STATE = /(^|\/)step_archive\/(?:(?:progress|workflow-profile)\.json$|\.harness50-codex(?:\/|$))/;
 // Execution-linked files: a later git operation, install, editor, CI run, agent session or
 // user-approved command runs or follows them without anyone reading the edit. They keep the
 // normal permission prompt in auto mode. The guard mode below does not deny them, so ordinary
@@ -88,6 +88,7 @@ const EXECUTION_LINKED = [
   // Step bodies: the loader and the Stop hook tell the next session to read and run them, and only
   // webapp-trigger copies them in, so the model never needs to write there.
   /(^|\/)step_archive\/archived(\/|$)/,
+  /(^|\/)step_archive\/profiles(\/|$)/,
   // Flat step bodies: the fallback location of the same bodies (harness-activity stepBody), which
   // the loader and the Stop hook also tell the next session to read and run.
   /(^|\/)step_archive\/step\d{3}\.md$/,

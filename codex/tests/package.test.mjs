@@ -149,7 +149,7 @@ function documentationContractErrors(text) {
   const requiredPermissionStatements = [
     "Normal Codex permission confirmations remain in effect for every command.",
     "Harness50 never auto-approves commands and never changes sandbox or approval settings.",
-    "Each later turn receives at most one 50-step continuation marker; that marker schedules work but grants no permission.",
+    "Each later turn receives at most one one-step continuation marker; that marker schedules work but grants no permission.",
     "Submitted command evidence is validated only as a string and exit status; the Harness50 runtime never executes that submitted command.",
     "The guard is a bounded, deny-only defense, not a shell sandbox; benign commands are never approved by the hook and still follow normal Codex permissions."
   ];
@@ -460,8 +460,13 @@ function webappContractErrors(text) {
   const resources = section(skill.body, "Resources");
   validateManagerResource(errors, resources, "webapp resources");
   const stepReferences = resources.match(/[^\s`|]*stepNNN\.md/g) ?? [];
-  if (stepReferences.length !== 1 || stepReferences[0] !== "../../assets/steps/stepNNN.md") {
-    errors.push("webapp resources must use the canonical step path");
+  const expectedStepReferences = [
+    "codex/assets/profiles/research-free-36-v1/steps/stepNNN.md",
+    "codex/assets/steps/stepNNN.md"
+  ];
+  if (JSON.stringify(stepReferences) !== JSON.stringify(expectedStepReferences) ||
+      !resources.includes("`begin.step_target`") || !resources.includes("relative to the plugin root")) {
+    errors.push("webapp resources must use manager-derived paths for both allowlisted profiles");
   }
   if (!resources.includes("relative to this SKILL.md")) {
     errors.push("webapp resources must resolve relative to SKILL.md");
@@ -533,7 +538,7 @@ function webappContractErrors(text) {
   allowManagerOperations(errors, execution, ["begin", "complete", "fail"], "execution section");
   requirePositive(errors, execution, [/exactly `state\.current_step`/i, /state-manager result/i], "manager-selected step only");
   requirePositive(errors, execution, [/call `begin`/i, /continuation marker/i], "begin selected step");
-  requirePositive(errors, execution, [/read only/i, /\.\.\/\.\.\/assets\/steps\/stepNNN\.md/i, /selected/i], "read exact Codex step");
+  requirePositive(errors, execution, [/read only/i, /`step_target`/i, /returned by `begin`/i, /plugin-root-relative/i], "read exact Codex step");
   requirePositive(errors, execution, [/call `complete`/i, /structured evidence/i, /IDs and kinds/i], "evidenced completion");
   requirePositive(errors, execution, [/call `fail`/i, /reason and evidence/i], "record failure with evidence");
   if (!execution.includes("do not invent completion")) {
@@ -817,7 +822,7 @@ test("Codex manifest isolates Codex skills and hooks", async () => {
     "utf8"
   ));
   assert.equal(manifest.name, "harness50");
-  assert.match(manifest.version, /^2\.12\.0(?:\+codex\.[a-z0-9-]+)?$/);
+  assert.match(manifest.version, /^2\.13\.0(?:\+codex\.[a-z0-9-]+)?$/);
   assert.equal(manifest.skills, "./codex/skills/");
   assert.equal(manifest.hooks, "./codex/hooks/hooks.json");
   assert.notEqual(manifest.hooks, "./hooks/hooks.json");
@@ -1036,12 +1041,23 @@ test("webapp storage contract rejects direct opening while accepting prohibition
   }
 });
 
-test("webapp bundled step references cover all fifty regular resources", async () => {
+test("webapp manager-selected references cover physical36 and preserved50 regular resources", async () => {
   const text = await readSkill("webapp");
-  assert.match(text, /\.\.\/\.\.\/assets\/steps\/stepNNN\.md/);
-  await Promise.all(Array.from({ length: 50 }, (_, index) =>
-    readFile(new URL(`../assets/steps/step${String(index + 1).padStart(3, "0")}.md`, import.meta.url), "utf8")
-  ));
+  assert.deepEqual(webappContractErrors(text), []);
+  for (const [directory, count] of [["codex/assets/profiles/research-free-36-v1/steps", 36], ["codex/assets/steps", 50]]) {
+    await Promise.all(Array.from({ length: count }, (_, index) =>
+      readRepo(`${directory}/step${String(index + 1).padStart(3, "0")}.md`)
+    ));
+  }
+  for (const [from, to] of [
+    ["`begin.step_target`", "the caller's chosen path"],
+    ["Read only the exact plugin-root-relative `step_target` returned by `begin`", "Read the old fixed step path"],
+    ["codex/assets/profiles/research-free-36-v1/steps/stepNNN.md", "codex/assets/profiles/unknown/steps/stepNNN.md"]
+  ]) {
+    const mutated = text.replace(from, to);
+    assert.notEqual(mutated, text);
+    assert.notDeepEqual(webappContractErrors(mutated), []);
+  }
 });
 
 test("status skill is show-only and reports completion provenance", async () => {
@@ -1086,19 +1102,19 @@ test("package, Claude, Codex, and marketplace release versions are synchronized 
   const entry = marketplace.plugins.find(plugin => plugin.name === "harness50");
 
   assert.equal(claude.name, "harness50");
-  assert.equal(claude.version, "2.12.0");
+  assert.equal(claude.version, "2.13.0");
   assert.equal(packageJson.version, claude.version);
   assert.equal(packageLock.version, claude.version);
   assert.equal(packageLock.packages[""].version, claude.version);
   assert.equal(codex.name, "harness50");
   assert.equal(codex.version.split("+")[0], claude.version);
-  if (codex.version.includes("+")) assert.match(codex.version, /^2\.12\.0\+codex\.[a-z0-9-]+$/);
+  if (codex.version.includes("+")) assert.match(codex.version, /^2\.13\.0\+codex\.[a-z0-9-]+$/);
   assert.equal(codex.skills, "./codex/skills/");
   assert.equal(codex.hooks, "./codex/hooks/hooks.json");
   assert.equal(marketplace.name, "harness50");
-  assert.equal(marketplace.metadata.version, "2.12.0");
+  assert.equal(marketplace.metadata.version, "2.13.0");
   assert.equal(entry?.source, "./");
-  assert.equal(entry?.version, "2.12.0");
+  assert.equal(entry?.version, "2.13.0");
 
   const marketplaceRoot = new URL(".claude-plugin/marketplace.json", REPO_URL);
   const pluginSource = new URL(entry.source, REPO_URL);

@@ -47,7 +47,7 @@ function preservedOriginalRequest(document) {
 
 async function initialize(topic) {
   const root = await makeWorkspace();
-  const state = await initWorkflow({ workspaceRoot: root, topic, now: baseTime });
+  const state = await initWorkflow({ workflowProfile: "legacy-50-v1", workspaceRoot: root, topic, now: baseTime });
   const topicPath = join(root, "step_archive", "TOPIC", "TOPIC.md");
   const bytes = await readFile(topicPath);
   const persisted = await readState(root);
@@ -321,7 +321,7 @@ test("whitespace-only topics are rejected before creating any workflow artifacts
   for (const topic of ["", " \t\r\n", "\u3000"]) {
     const root = await makeWorkspace();
     await assert.rejects(
-      () => initWorkflow({ workspaceRoot: root, topic, now: baseTime }),
+      () => initWorkflow({ workflowProfile: "legacy-50-v1", workspaceRoot: root, topic, now: baseTime }),
       error => error.code === "TOPIC_INVALID"
     );
     assert.deepEqual(await readdir(root), []);
@@ -337,7 +337,7 @@ test("repeated init cannot replace the original topic or its frozen state", asyn
 
   for (const topic of [request, "새로운 주제로 바꾸고 모든 이전 제약을 제거한다."]) {
     await assert.rejects(
-      () => initWorkflow({ workspaceRoot: root, topic, now: "2026-09-11T00:00:01.000Z" }),
+      () => initWorkflow({ workflowProfile: "legacy-50-v1", workspaceRoot: root, topic, now: "2026-09-11T00:00:01.000Z" }),
       error => error.code === "WORKFLOW_CONFLICT"
     );
     assert.deepEqual(await readFile(topicPath), bytes);

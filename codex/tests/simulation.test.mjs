@@ -162,7 +162,7 @@ test("the state-only fixture gives every one of fifty steps one required check",
 test("a native workflow completes exactly fifty Codex-verified receipts", async () => {
   const root = await makeWorkspace();
   const pluginRoot = await makePluginFixture();
-  let state = await initWorkflow({
+  let state = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "Native fifty-step simulation",
     idFactory: ids("native-init")
@@ -241,7 +241,7 @@ test("Claude 1 through 17 import stays read-only and resumes with Codex 18 throu
 
 test("separate hook processes survive startup compact replay stale Stop pause and resume", async () => {
   const root = await makeWorkspace();
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "Lifecycle restart simulation",
     idFactory: ids("hook-init")

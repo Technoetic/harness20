@@ -10,13 +10,15 @@ const api = await import('../../scripts/lib/final-regression.mjs').catch(() => (
 const categories = ['e2e-regression', 'screenshot-regression', 'keyboard-regression',
   'mouse-regression', 'design-regression', 'console-regression'];
 
-async function fixture({ ids = categories, artifacts = ['dist/index.html'], status = 'pass' } = {}) {
+async function fixture({ ids = categories, artifacts = ['dist/index.html'], status = 'pass', step = 50, verifierMode = 'independent' } = {}) {
   const root = await makeWorkspace();
   await mkdir(join(root, 'dist'), { recursive: true });
   await mkdir(join(root, 'step_archive/outputs'), { recursive: true });
   await writeFile(join(root, 'dist/index.html'), '<html><body><button>Continue</button></body></html>');
+  if (step === 36) await writeFile(join(root, 'step_archive/workflow-profile.json'), JSON.stringify({ schema_version: 2, workflow_profile: 'research-free-36-v1', total_steps: 36 }));
+  if (step === 36) await writeFile(join(root, 'step_archive/progress.json'), JSON.stringify({ schema_version: 2, workflow_profile: 'research-free-36-v1', total_steps: 36, completed_steps: [], current_step: 36, run_started_at: '2026-10-02T01:00:00.000Z' }));
   await writeFile(join(root, 'src.js'), 'export const enabled = true;');
-  const snapshot = await snapshotQa(root, 50, { artifacts,
+  const snapshot = await snapshotQa(root, step, { artifacts,
     checks: ids.map(id => ({ id, requirement: `Rerun the full ${id} matrix on the final candidate.` })) });
   const outcomes = [];
   for (const id of ids) {
@@ -25,8 +27,8 @@ async function fixture({ ids = categories, artifacts = ['dist/index.html'], stat
     outcomes.push({ id, status, observation: 'Fixture measurement recorded.', evidence_paths: [path],
       next_check: status === 'pass' ? '' : 'Repair and rerun the matrix.' });
   }
-  const saved = await recordQa(root, 50, { snapshot_id: snapshot.snapshot_id,
-    verifier: { id: 'fixture-reviewer', mode: 'independent' }, outcomes,
+  const saved = await recordQa(root, step, { snapshot_id: snapshot.snapshot_id,
+    verifier: { id: 'fixture-reviewer', mode: verifierMode }, outcomes,
     next_actions: status === 'pass' ? [] : ['Rerun the failed matrix.'] });
   return { root, saved };
 }
@@ -71,4 +73,18 @@ test('current complete matrices expose the immutable report and final HTML diges
   assert.equal(result.report_sha256, saved.report_sha256);
   assert.equal(result.report_path, `step_archive/outputs/qa-reports/${saved.report_sha256}.report.json`);
   assert.equal(result.artifact_sha256, sha256(await readFile(join(root, 'dist/index.html'))));
+});
+
+
+test('new36 final regression requires declared independent mode while legacy50 retains its existing contract', async () => {
+  const sameAgent36 = await fixture({ step: 36, verifierMode: 'same-agent' });
+  assert.equal(sameAgent36.saved.verdict, 'PASS');
+  const rejected = await api.inspectFinalRegression(sameAgent36.root, 'research-free-36-v1');
+  assert.equal(rejected.verdict, 'INCOMPLETE');
+  assert.match(rejected.error, /independent/i);
+
+  const independent36 = await fixture({ step: 36 });
+  assert.equal((await api.inspectFinalRegression(independent36.root, 'research-free-36-v1')).verdict, 'PASS');
+  const sameAgent50 = await fixture({ verifierMode: 'same-agent' });
+  assert.equal((await api.inspectFinalRegression(sameAgent50.root)).verdict, 'PASS');
 });
