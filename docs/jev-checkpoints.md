@@ -124,6 +124,7 @@ if (!plugin || !workspace || flags.some(flag => !['--run', '--legacy'].includes(
 const root = resolve(workspace);
 const legacy = flags.includes('--legacy');
 const { initWorkflow } = await import(pathToFileURL(join(resolve(plugin), 'codex/scripts/lib/workflow.mjs')).href);
+await mkdir(root, { recursive: true });
 await initWorkflow({ workspaceRoot: root, workflowProfile: legacy ? 'legacy-50-v1' : 'research-free-36-v1', topic: '공개 합성 연도 필터 예제' });
 const path = 'step_archive/jev-public-example.md';
 const excerpt = [

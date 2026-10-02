@@ -905,7 +905,7 @@ test('D3 the pause commands and the step documents describe the same procedure',
     assert.ok(text(file).includes('§2-1') || text(file).includes('/harness-resume'), file);
   }
   for (const file of ['commands/webapp.md', 'agents/step-executor.md', 'skills/evaluator/SKILL.md']) assert.ok(text(file).includes('§2-1'), file);
-  assert.match(text('agents/step-executor.md'), /^Step NNN\/50 멈춤 필요 \| 사유: <permission-denied\|required-tool-failed\|required-input-missing> \| 증거: /m);
+  assert.match(text('agents/step-executor.md'), /^Step NNN\/<total> 멈춤 필요 \| 사유: <permission-denied\|required-tool-failed\|required-input-missing> \| 증거: /m);
   assert.match(text('skills/harness-rules/SKILL.md'), /^description: .*명명된 멈춤 예외/m);
   assert.match(text('commands/harness-status.md'), /\| 멈춤: <pause_reason> @step<paused_step> — <pause_note>/);
 });

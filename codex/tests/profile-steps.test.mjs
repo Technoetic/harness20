@@ -40,6 +40,13 @@ test("browser backend grouping points to the retained E2E and final gates", asyn
     [profileStepNumber(profile, 45), getWorkflowProfile(profile).milestones.final]);
 });
 
+test("final design handoff invalidates the retained E2E through mouse evidence coordinates", async () => {
+  const body = await readFile(join(root, target, "step035.md"), "utf8");
+  const priorChecks = /앞선 (\d+)~(\d+) 검사 결과/.exec(body);
+  assert.ok(priorChecks, "the final design handoff must identify the prior evidence it can invalidate");
+  assert.deepEqual(priorChecks.slice(1).map(Number), [31, 34]);
+});
+
 test("source advancement and QA inspection coordinates retain their workflow roles", async () => {
   const index = await loadIndex(root, profile);
   for (const entry of index.steps) {

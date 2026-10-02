@@ -82,7 +82,10 @@ test('guide includes executable public examples for every checkpoint and protect
   assert.match(await read('docs/QUALITY.md'), /jev-checkpoints\.md/);
 });
 
-test('all seven documented synthetic inputs prepare offline through the actual CLI', async t => {
+for (const { profile, total, checkpoints, flags } of [
+  { profile: 'research-free-36-v1', total: 36, checkpoints: [17, 18, 25, 31, 35], flags: [] },
+  { profile: 'legacy-50-v1', total: 50, checkpoints: [16, 24, 25, 30, 37, 45, 49], flags: ['--legacy'] }
+]) test(`documented ${profile} inputs prepare offline in a missing workspace through the actual CLI`, async t => {
   const directory = await mkdtemp(join(tmpdir(), 'harness50-jev-routing-'));
   t.after(async () => {
     assert.ok(resolve(directory).startsWith(resolve(tmpdir()) + sep));
@@ -94,7 +97,8 @@ test('all seven documented synthetic inputs prepare offline through the actual C
   assert.ok(script, 'missing runnable synthetic example');
   const example = join(directory, 'jev-examples.mjs');
   await writeFile(example, script, 'utf8');
-  const result = spawnSync(process.execPath, [example, fileURLToPath(root), join(directory, 'workspace')], {
+  const workspace = join(directory, 'workspace');
+  const result = spawnSync(process.execPath, [example, fileURLToPath(root), workspace, ...flags], {
     encoding: 'utf8', timeout: 30000,
     env: { ...process.env, TYPESAFE_API_KEY: '' }
   });
@@ -110,5 +114,9 @@ test('all seven documented synthetic inputs prepare offline through the actual C
     assert.equal(report.sources.length, 1);
     return report.step;
   });
-  assert.deepEqual(prepared, steps);
+  assert.deepEqual(prepared, checkpoints);
+  const state = JSON.parse(await readFile(join(workspace, 'step_archive/.harness50-codex/state.json'), 'utf8'));
+  assert.equal(state.total_steps, total);
+  assert.equal(state.workflow_profile ?? 'legacy-50-v1', profile);
+  assert.equal(state.schema_version, profile === 'legacy-50-v1' ? 1 : 2);
 });

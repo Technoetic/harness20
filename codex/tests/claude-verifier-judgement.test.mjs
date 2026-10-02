@@ -123,8 +123,8 @@ test('V5 the constitution routes screenshot judgement off haiku and the executor
   assert.match(section[1], /통째로 맡기지 않는다/);
   assert.match(section[1], /판정, QA `record`, Jev 체크포인트 호출, 완료 보고는 하지 않는다/);
   // The hand-back reuses the existing incomplete line, so no hook or writer parses a new format.
-  assert.match(section[1], /^Step NNN\/50 미완료 \| QA: unavailable \| 다음 검사: 시각 판정 필요 — step_archive\/outputs\/stepNNN_capture\.md$/m);
-  assert.match(executor, /^Step NNN\/50 미완료 \| QA: <report_sha256 또는 unavailable> \| 다음 검사: /m);
+  assert.match(section[1], /^Step NNN\/<total> 미완료 \| QA: unavailable \| 다음 검사: 시각 판정 필요 — step_archive\/outputs\/stepNNN_capture\.md$/m);
+  assert.match(executor, /^Step NNN\/<total> 미완료 \| QA: <report_sha256 또는 unavailable> \| 다음 검사: /m);
   assert.match(text('commands/webapp.md'), /호출 책임자를 그 단계를 실행하는 주체 하나로 정하고\(보통 step-executor, 시각 판정을 돌려받은 단계는 판정하는 호출자\)/);
 });
 
@@ -147,7 +147,8 @@ function assertExclusionJoin(step43, rules, label) {
   assert.ok(s11, `${label}: harness-rules has no section 11`);
   assert.match(s11[1], /선택된 디자인 토큰과 제외 목록은 위 표의 프로필별 설계 계약\(`harness50-design-contract`\)이고/, label);
   assert.match(s11[1], /계약 `exclude`에서 `adopted: false`인 항목의 위반은 최소 `Important`다\./, label);
-  assert.match(s11[1], /계약이 없는 이전 실행은 §5의 수치를 기준으로 쓴다\./, label);
+  assert.match(s11[1], /계약이 없는 이전 legacy50 실행은 §5의 수치를 기준으로 쓴다\./, label);
+  assert.match(s11[1], /새36의 필수 계약 누락은 INCOMPLETE다\./, label);
 }
 
 test('V7 step 43 keeps design exclusions out of findings and section 11 names the design contract', () => {
@@ -159,7 +160,8 @@ test('V7 step 43 keeps design exclusions out of findings and section 11 names th
     advisoryExclusion: [s43.replace(' 1번에서 `제외 계약: <id>`로 적은 요소는 advisory로도 적지 않는다.', ''), rules],
     noContract: [s43, rules.replace('위 표의 프로필별 설계 계약(`harness50-design-contract`)이고', '헌법 §5 값이고')],
     unadoptedAdvisory: [s43, rules.replace('위반은 최소 `Important`다.', '위반은 `advisory`다.')],
-    noFallback: [s43, rules.replace(' 계약이 없는 이전 실행은 §5의 수치를 기준으로 쓴다.', '')]
+    noFallback: [s43, rules.replace(' 계약이 없는 이전 legacy50 실행은 §5의 수치를 기준으로 쓴다.', '')],
+    newContractOptional: [s43, rules.replace('새36의 필수 계약 누락은 INCOMPLETE다.', '새36의 필수 계약 누락은 PASS다.')]
   };
   for (const [name, [mutatedStep, mutatedRules]] of Object.entries(mutations)) {
     assert.ok(mutatedStep !== s43 || mutatedRules !== rules, name);

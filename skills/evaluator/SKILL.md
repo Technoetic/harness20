@@ -26,7 +26,8 @@ disable-model-invocation: false
 호출자는 관리자가 선택한 `workflow_profile`, 현재 Step 번호와 전체 단계 수를 전달한다.
 새 `research-free-36-v1`은 36단계이며, 기존 `legacy-50-v1`만 50단계다.
 호스트는 신뢰한 resolver/상태 관리자로 실제 메타데이터를 검증한 뒤 그 프로필과 전체 수를 전달한다.
-프로필 없는 정확한 schema-v1·total50 기록은 legacy50으로 해석한다. 사용자에게 프로필을
+프로필 없는 정확한 schema-v1·total50 기록과 schema_version·workflow_profile을 생략한
+지원되는 이전 total50 기록은 신뢰한 관리자가 legacy50으로 정규화한다. 사용자에게 프로필을
 재확인하지 않고 검증된 결과를 사용한다. 실제 메타데이터가 없거나 불일치하면 추정하지 않고
 `INCOMPLETE`로 인계한다.
 새 실행의 비교 입력은 TOPIC과 사용자 제공 요구사항·자료, 18단계의

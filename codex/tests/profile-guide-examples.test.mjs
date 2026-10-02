@@ -43,5 +43,7 @@ test('public Jev example prepares the actual five new and seven legacy checkpoin
     for (const line of lines) assert.equal(JSON.parse(line.replace(/^step \d+: /, '')).status, 'prepared');
     const state = JSON.parse(await readFile(join(workspace, 'step_archive/.harness50-codex/state.json'), 'utf8'));
     assert.equal(state.total_steps, getWorkflowProfile(profile).stepCount);
+    assert.equal(state.workflow_profile ?? 'legacy-50-v1', profile);
+    assert.equal(state.schema_version, profile === 'legacy-50-v1' ? 1 : 2);
   }
 });

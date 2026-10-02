@@ -81,7 +81,7 @@ capability가 없거나 사용할 수 없으면 차단한다.
 
 ## 최종 후보 인계
 
-이 단계의 interaction code·semantic markup 수정은 앞선 45~48 검사 결과를 현재 후보의
+이 단계의 interaction code·semantic markup 수정은 앞선 31~34 검사 결과를 현재 후보의
 증거로 재사용할 수 없게 만들 수 있다. 수정한 파일과 영향을 받는 시나리오를 보고서에
 남긴다. 36단계는 마지막 build 뒤 전체 E2E·화면·키보드·마우스·디자인·console 검사를
 동일한 최종 HTML에서 다시 실행한다. 이 단계의 PASS만으로 최종 완료를 선언하지 않는다.

@@ -19,7 +19,8 @@ tools: Read, Write, Edit, Bash, Glob, Grep
 7. **선택된 workflow_profile과 total** (새 `research-free-36-v1`: 36, 기존 `legacy-50-v1`: 50). 아래 `<total>`은 이 값이며 번호로 프로필을 추정하지 않는다.
 
 호스트가 신뢰한 resolver/상태 관리자로 검증한 결과를 전달한다. 프로필 없는 정확한
-schema-v1·total50 기록은 legacy50으로 선택되므로 사용자 재확인이 필요 없다.
+schema-v1·total50 기록과 schema_version·workflow_profile을 생략한 지원되는 이전
+total50 기록은 신뢰한 관리자가 legacy50으로 정규화하므로 사용자 재확인이 필요 없다.
 실제 메타데이터가 없거나 불일치하면 추정하지 않고 미완료로 인계한다.
 
 ## 행동 규약
