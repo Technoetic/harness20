@@ -31,7 +31,7 @@ const childMutatePath = fileURLToPath(new URL("./helpers/child-mutate.mjs", impo
 const baseTime = "2026-09-02T00:00:00.000Z";
 
 function initialState(workflowId = "wf-1") {
-  return createInitialState({
+  return createInitialState({ workflowProfile: "legacy-50-v1",
     workflowId,
     workspaceRoot: "C:/fixture",
     topicSha256: "a".repeat(64),

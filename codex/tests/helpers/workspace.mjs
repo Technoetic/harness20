@@ -1,3 +1,4 @@
+import { LEGACY_WORKFLOW_PROFILE, getWorkflowProfile, stepPhase } from "../../../scripts/lib/workflow-profiles.mjs";
 import { createHash } from "node:crypto";
 import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
@@ -48,33 +49,22 @@ export async function readJson(path) {
   return JSON.parse(await readFile(path, "utf8"));
 }
 
-export async function makePluginFixture({ missingStep = null } = {}) {
+export async function makePluginFixture({ missingStep = null, workflowProfile = LEGACY_WORKFLOW_PROFILE } = {}) {
   const pluginRoot = await makeWorkspace();
-  const stepsRoot = join(pluginRoot, "codex", "assets", "steps");
+  const profile = getWorkflowProfile(workflowProfile);
+  const stepsRoot = join(pluginRoot, ...profile.targetDirectory.split("/"));
   await mkdir(stepsRoot, { recursive: true });
-  const steps = Array.from({ length: 50 }, (_, offset) => {
+  const steps = Array.from({ length: profile.stepCount }, (_, offset) => {
     const number = offset + 1;
     const id = `step${String(number).padStart(3, "0")}`;
     return {
       number,
       id,
       title: `Fixture step ${number}`,
-      phase: number <= 5
-        ? "preflight"
-        : number <= 15
-          ? "tooling"
-          : number <= 24
-            ? "research"
-            : number <= 30
-              ? "planning"
-              : number <= 38
-                ? "implementation"
-                : number <= 44
-                  ? "review"
-                  : "e2e",
-      source: `assets/steps/${id}.md`,
-      target: `codex/assets/steps/${id}.md`,
-      source_sha256: "a".repeat(64),
+      phase: stepPhase(profile.id, number),
+      source: `${profile.sourceDirectory}/${id}.md`,
+      target: `${profile.targetDirectory}/${id}.md`,
+      source_sha256: createHash("sha256").update(`# Fixture step ${number}\n`).digest("hex"),
       inputs: [],
       outputs: [],
       requires: [],
@@ -88,15 +78,17 @@ export async function makePluginFixture({ missingStep = null } = {}) {
         description: "Confirms the isolated fixture state transition."
       }],
       ported: true,
-      next: number === 50 ? null : `step${String(number + 1).padStart(3, "0")}`
+      next: number === profile.stepCount ? null : `step${String(number + 1).padStart(3, "0")}`
     };
   });
   await writeFile(
     join(stepsRoot, "index.json"),
-    `${JSON.stringify({ schema_version: 1, steps }, null, 2)}\n`,
+    `${JSON.stringify({ schema_version: profile.id === LEGACY_WORKFLOW_PROFILE ? 1 : 2, ...(profile.id === LEGACY_WORKFLOW_PROFILE ? {} : { workflow_profile: profile.id, total_steps: profile.stepCount }), steps }, null, 2)}\n`,
     "utf8"
   );
+  await mkdir(join(pluginRoot, ...profile.sourceDirectory.split("/")), { recursive: true });
   for (const step of steps) {
+    await writeFile(join(pluginRoot, step.source), `# ${step.title}\n`, "utf8");
     if (step.number === missingStep) continue;
     await writeFile(join(pluginRoot, step.target), `# ${step.title}\n`, "utf8");
   }

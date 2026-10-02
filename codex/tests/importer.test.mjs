@@ -308,7 +308,7 @@ test("a pre-existing valid state refuses import before creating artifacts", asyn
   const root = await makeWorkspace();
   const pluginRoot = await makePluginFixture();
   await writeClaudeCompletedPrefix(root, 1);
-  const state = createInitialState({
+  const state = createInitialState({ workflowProfile: "legacy-50-v1",
     workflowId: "existing-workflow",
     workspaceRoot: root,
     topicSha256: "a".repeat(64),

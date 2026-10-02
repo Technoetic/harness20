@@ -23,7 +23,7 @@ const fixedTime = "2026-09-11T00:00:00.000Z";
 test("resume refreshes an unused continuation without pause and rejects every stale marker", async () => {
   const root = await makeWorkspace();
   const repeatedId = () => "repeated-resume-id";
-  const initial = await initWorkflow({
+  const initial = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "Keep the same game workflow",
     now: fixedTime,
@@ -67,7 +67,7 @@ test("resume refreshes an unused continuation without pause and rejects every st
 test("CLI resume after completion keeps progress and topic and opens the next step", async () => {
   const root = await makeWorkspace();
   const pluginRoot = await makePluginFixture();
-  const initial = await initWorkflow({ workspaceRoot: root, topic: "Game topic stays immutable" });
+  const initial = await initWorkflow({ workflowProfile: "legacy-50-v1", workspaceRoot: root, topic: "Game topic stays immutable" });
   const topicPath = join(root, initial.topic_path);
   const topicBefore = await readFile(topicPath);
   const first = await beginStep({ workspaceRoot: root, step: 1, marker: initial.continuation });
@@ -108,7 +108,7 @@ test("CLI resume after completion keeps progress and topic and opens the next st
 
 test("resume replaces a pending failure retry without losing the same step", async () => {
   const root = await makeWorkspace();
-  const initial = await initWorkflow({ workspaceRoot: root, topic: "Retry the current game step" });
+  const initial = await initWorkflow({ workflowProfile: "legacy-50-v1", workspaceRoot: root, topic: "Retry the current game step" });
   const first = await beginStep({ workspaceRoot: root, step: 1, marker: initial.continuation });
   const failed = await failStep({
     workspaceRoot: root,

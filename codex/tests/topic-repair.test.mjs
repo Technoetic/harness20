@@ -27,7 +27,7 @@ async function repair(root, now = laterTime) {
 // Deliberately reconstruct a pre-fix input only inside a disposable test workspace.
 async function legacyFixture(request = original) {
   const root = await makeWorkspace();
-  const state = await workflow.initWorkflow({ workspaceRoot: root, topic: request, now: baseTime });
+  const state = await workflow.initWorkflow({ workflowProfile: "legacy-50-v1", workspaceRoot: root, topic: request, now: baseTime });
   const topicPath = join(root, state.topic_path);
   await writeFile(topicPath, request);
   const legacy = { ...state, topic_sha256: digest(request) };

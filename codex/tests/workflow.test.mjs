@@ -75,7 +75,7 @@ function plus(milliseconds) {
 }
 
 function initialState() {
-  return createInitialState({
+  return createInitialState({ workflowProfile: "legacy-50-v1",
     workflowId: "workflow-1",
     workspaceRoot: "C:/fixture",
     topicSha256: "a".repeat(64),
@@ -202,7 +202,7 @@ async function initAndBegin(root, {
   beginNow = plus(1),
   idFactory = ids("workflow-1", "nonce-1", "attempt-1")
 } = {}) {
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "Safe fixture topic",
     now: initNow,
@@ -222,7 +222,7 @@ async function initAndBegin(root, {
 
 async function failCurrentStepThreeTimes(root) {
   const factory = ids("workflow-fail", "nonce-initial", "attempt-1", "attempt-2", "attempt-3");
-  let state = await initWorkflow({
+  let state = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "Failure fixture",
     now: baseTime,
@@ -329,7 +329,7 @@ test("continuations are one-use and bind workflow step and receipt count", () =>
 
 test("processStop claims delivery in state and replays it without event authority", async () => {
   const root = await makeWorkspace();
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "state delivery",
     now: baseTime,
@@ -363,7 +363,7 @@ test("processStop claims delivery in state and replays it without event authorit
 
 test("processStop propagates post-commit telemetry path swaps and replays after repair", async () => {
   const root = await makeWorkspace();
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "projection integrity",
     now: baseTime,
@@ -402,7 +402,7 @@ test("processStop propagates post-commit telemetry path swaps and replays after 
 
 test("processStop reports post-commit same-inode growth and preserves state replay", async () => {
   const root = await makeWorkspace();
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "projection same inode",
     now: baseTime,
@@ -434,7 +434,7 @@ test("processStop reports post-commit same-inode growth and preserves state repl
 
 test("processStop reports post-commit event unlink before append and replays after repair", async () => {
   const root = await makeWorkspace();
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "projection unlink before",
     now: baseTime,
@@ -465,7 +465,7 @@ test("processStop reports post-commit event unlink before append and replays aft
 
 test("processStop reports post-commit event unlink after append and replays after repair", async () => {
   const root = await makeWorkspace();
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "projection unlink after",
     now: baseTime,
@@ -503,7 +503,7 @@ test("processStop reports post-commit event unlink after append and replays afte
 
 test("processStop tolerates an ordinary post-commit telemetry fault and replays from state", async () => {
   const root = await makeWorkspace();
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "projection availability",
     now: baseTime,
@@ -534,7 +534,7 @@ test("processStop tolerates an ordinary post-commit telemetry fault and replays 
 
 test("processStop rolls back a partial telemetry write before tolerating its I/O fault", async () => {
   const root = await makeWorkspace();
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "projection partial write",
     now: baseTime,
@@ -574,7 +574,7 @@ test("processStop rolls back a partial telemetry write before tolerating its I/O
 
 test("processStop infers and rolls back prepared bytes written by the first rejected call", async () => {
   const root = await makeWorkspace();
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "projection first write rejection",
     now: baseTime,
@@ -605,7 +605,7 @@ test("processStop infers and rolls back prepared bytes written by the first reje
 
 test("processStop rejects unlink during first-call rollback and replays after repair", async () => {
   const root = await makeWorkspace();
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "projection first write unlink",
     now: baseTime,
@@ -643,7 +643,7 @@ test("processStop rejects unlink during first-call rollback and replays after re
 
 test("processStop rejects a path swap during partial-write rollback and replays after repair", async () => {
   const root = await makeWorkspace();
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "projection rollback swap",
     now: baseTime,
@@ -690,7 +690,7 @@ test("processStop rejects a path swap during partial-write rollback and replays 
 
 test("processStop never truncates an unverified partial telemetry prefix", async () => {
   const root = await makeWorkspace();
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "projection rollback content",
     now: baseTime,
@@ -731,7 +731,7 @@ test("processStop never truncates an unverified partial telemetry prefix", async
 
 test("processStop does not regrow a concurrently truncated ledger during rollback", async () => {
   const root = await makeWorkspace();
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "projection rollback truncation",
     now: baseTime,
@@ -770,7 +770,7 @@ test("processStop does not regrow a concurrently truncated ledger during rollbac
 
 test("processStop does not misclassify arbitrary post-commit exceptions as telemetry I/O", async () => {
   const root = await makeWorkspace();
-  await initWorkflow({
+  await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "projection exception classification",
     now: baseTime,
@@ -793,7 +793,7 @@ test("processStop does not misclassify arbitrary post-commit exceptions as telem
 
 test("acceptStopDelivery atomically accepts only the exact requested state marker", async () => {
   const root = await makeWorkspace();
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "accept delivery",
     now: baseTime,
@@ -814,7 +814,7 @@ test("a consumed same-turn active Stop fails once while its inactive replay rele
   for (const active of [false, true]) {
     await t.test(`stop_hook_active=${active}`, async () => {
       const root = await makeWorkspace();
-      const initialized = await initWorkflow({
+      const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
         workspaceRoot: root,
         topic: `same turn ${active}`,
         now: baseTime,
@@ -930,7 +930,7 @@ test("processStop capacity uses the exact full UTF-8 failure batch before state 
   for (const extraByte of [1, 0]) {
     await t.test(extraByte === 1 ? "one byte short" : "exact fit", async () => {
       const root = await makeWorkspace();
-      const initialized = await initWorkflow({
+      const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
         workspaceRoot: root,
         topic: "UTF-8 capacity",
         now: baseTime,
@@ -1003,7 +1003,7 @@ test("processStop capacity uses the exact full UTF-8 failure batch before state 
 
 test("a full ledger cannot mutate the third active failure into blocked state", async () => {
   const root = await makeWorkspace();
-  let state = await initWorkflow({
+  let state = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "third failure capacity",
     now: baseTime,
@@ -1058,7 +1058,7 @@ test("a full ledger cannot mutate the third active failure into blocked state", 
 
 test("new workflow atomically creates topic and refuses all recognized shared work", async t => {
   const root = await makeWorkspace();
-  const state = await initWorkflow({
+  const state = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "안전한 주제",
     now: baseTime,
@@ -1070,7 +1070,7 @@ test("new workflow atomically creates topic and refuses all recognized shared wo
   const frozenTopic = await readFile(topicPath, "utf8");
   assert.ok(frozenTopic.includes("안전한 주제\n"));
   await assert.rejects(
-    () => initWorkflow({ workspaceRoot: root, topic: "다른 주제", now: plus(1), idFactory: ids("unused") }),
+    () => initWorkflow({ workflowProfile: "legacy-50-v1", workspaceRoot: root, topic: "다른 주제", now: plus(1), idFactory: ids("unused") }),
     error => error.code === "WORKFLOW_CONFLICT"
   );
   assert.equal(await readFile(topicPath, "utf8"), frozenTopic);
@@ -1098,7 +1098,7 @@ test("new workflow atomically creates topic and refuses all recognized shared wo
       const candidate = await makeWorkspace();
       await prepare(candidate);
       await assert.rejects(
-        () => initWorkflow({ workspaceRoot: candidate, topic: "new", now: baseTime, idFactory: ids("unused") }),
+        () => initWorkflow({ workflowProfile: "legacy-50-v1", workspaceRoot: candidate, topic: "new", now: baseTime, idFactory: ids("unused") }),
         error => error.code === "WORKFLOW_CONFLICT"
       );
       assert.equal(existsSync(join(candidate, "step_archive", "TOPIC", "TOPIC.md")), name === "existing topic");
@@ -1115,7 +1115,7 @@ test("init rejects a redirected TOPIC directory before writing outside the works
   await makeDirectoryLink(external, join(archiveRoot, "TOPIC"));
 
   await assert.rejects(
-    () => initWorkflow({
+    () => initWorkflow({ workflowProfile: "legacy-50-v1",
       workspaceRoot: root,
       topic: "must stay inside",
       now: baseTime,
@@ -1133,7 +1133,7 @@ test("workflow mutations reject redirected control roots before creating an exte
   const initExternal = await makeWorkspace();
   await makeDirectoryLink(initExternal, join(initRoot, "step_archive"));
   await assert.rejects(
-    () => initWorkflow({
+    () => initWorkflow({ workflowProfile: "legacy-50-v1",
       workspaceRoot: initRoot,
       topic: "redirected archive",
       now: baseTime,
@@ -1156,7 +1156,7 @@ test("workflow mutations reject redirected control roots before creating an exte
 
 test("first-use topic hierarchy and publication are durable with platform-correct handles", async () => {
   const root = await makeWorkspace();
-  await initWorkflow({
+  await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "durable topic",
     now: baseTime,
@@ -1184,8 +1184,8 @@ test("first-use topic hierarchy and publication are durable with platform-correc
 test("concurrent initialization serializes and never mixes topic with workflow state", async () => {
   const root = await makeWorkspace();
   const settled = await Promise.allSettled([
-    initWorkflow({ workspaceRoot: root, topic: "topic A", now: baseTime, idFactory: ids("workflow-a", "nonce-a") }),
-    initWorkflow({ workspaceRoot: root, topic: "topic B", now: baseTime, idFactory: ids("workflow-b", "nonce-b") })
+    initWorkflow({ workflowProfile: "legacy-50-v1", workspaceRoot: root, topic: "topic A", now: baseTime, idFactory: ids("workflow-a", "nonce-a") }),
+    initWorkflow({ workflowProfile: "legacy-50-v1", workspaceRoot: root, topic: "topic B", now: baseTime, idFactory: ids("workflow-b", "nonce-b") })
   ]);
   assert.equal(settled.filter(result => result.status === "fulfilled").length, 1);
   assert.equal(settled.filter(result => result.status === "rejected" && result.reason.code === "WORKFLOW_CONFLICT").length, 1);
@@ -1202,7 +1202,7 @@ test("concurrent initialization serializes and never mixes topic with workflow s
 test("begin consumes exactly the current marker and creates one unique current attempt", async () => {
   const root = await makeWorkspace();
   const factory = ids("workflow-begin", "nonce-begin", "attempt-begin");
-  const initialized = await initWorkflow({ workspaceRoot: root, topic: "begin", now: baseTime, idFactory: factory });
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1", workspaceRoot: root, topic: "begin", now: baseTime, idFactory: factory });
   const marker = { ...initialized.continuation };
   const started = await beginStep({
     workspaceRoot: root,
@@ -1231,7 +1231,7 @@ test("begin consumes exactly the current marker and creates one unique current a
 
 test("concurrent begin calls serialize so a marker creates only one attempt", async () => {
   const root = await makeWorkspace();
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "concurrent begin",
     now: baseTime,
@@ -1288,7 +1288,7 @@ test("resume cannot resurrect a consumed marker or recreate its attempt with rep
   const root = await makeWorkspace();
   const pluginRoot = await makePluginFixture();
   const repeated = () => "repeated-id";
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "generation binding",
     now: baseTime,
@@ -1348,7 +1348,7 @@ test("retry after failure cannot recreate a stale attempt when the raw ID repeat
   const root = await makeWorkspace();
   const pluginRoot = await makePluginFixture();
   const repeated = () => "repeated-failure-id";
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "failed attempt generations",
     now: baseTime,
@@ -1408,7 +1408,7 @@ test("workflow mutations reject regressing clocks even for anonymous ownership",
     error => error.code === "CLOCK_REGRESSION"
   );
   const root = await makeWorkspace();
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "monotonic clock",
     now: plus(100),
@@ -1687,7 +1687,7 @@ test("complete ignores caller-supplied writer and hook seams and persists throug
 test("each attempt can fail once and three consecutive failures block", async () => {
   const root = await makeWorkspace();
   const factory = ids("workflow-once", "nonce-once", "attempt-once");
-  const initialized = await initWorkflow({ workspaceRoot: root, topic: "fail once", now: baseTime, idFactory: factory });
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1", workspaceRoot: root, topic: "fail once", now: baseTime, idFactory: factory });
   const started = await beginStep({
     workspaceRoot: root,
     step: 1,
@@ -1732,7 +1732,7 @@ test("each attempt can fail once and three consecutive failures block", async ()
 
 test("explicit resume opens a fresh retry window and pause obeys state boundaries", async () => {
   const root = await makeWorkspace();
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "pause fixture",
     now: baseTime,
@@ -1800,7 +1800,7 @@ test("pause renews a live owner lease and rejects the exact expiry boundary", as
 test("begin rejects a codex directory swap performed by its idFactory without outside writes", async () => {
   const root = await makeWorkspace();
   const external = await makeWorkspace();
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "callback containment",
     now: baseTime,
@@ -1904,7 +1904,7 @@ test("fail rejects an event hard link installed by evidence before state advance
 test("begin rejects an event hard link installed by idFactory before state advances", async () => {
   const root = await makeWorkspace();
   const external = await makeWorkspace();
-  const initialized = await initWorkflow({
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "hard-link begin containment",
     now: baseTime,
@@ -2484,7 +2484,7 @@ test("show maps untrusted or malformed import diagnostics to constant safe outpu
 
 test("reset archives only Codex metadata and preserves Claude topic outputs and application bytes", async () => {
   const root = await makeWorkspace();
-  await initWorkflow({
+  await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "preserved topic",
     now: baseTime,
@@ -2512,7 +2512,7 @@ test("reset archives only Codex metadata and preserves Claude topic outputs and 
 test("reset rejects a redirected backups directory before moving metadata outside", async () => {
   const root = await makeWorkspace();
   const external = await makeWorkspace();
-  await initWorkflow({
+  await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "reset containment",
     now: baseTime,
@@ -2534,7 +2534,7 @@ test("reset rejects a redirected backups directory before moving metadata outsid
 test("reset does not execute an unknown caller idFactory during archival", async () => {
   const root = await makeWorkspace();
   const external = await makeWorkspace();
-  await initWorkflow({
+  await initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "reset callback isolation",
     now: baseTime,
@@ -2560,7 +2560,7 @@ test("workflow events contain only allowlisted metadata and never nonce evidence
   const root = await makeWorkspace();
   const pluginRoot = await makePluginFixture();
   const factory = ids("workflow-events", "NONCE_MUST_NOT_LOG", "attempt-events");
-  const initialized = await initWorkflow({ workspaceRoot: root, topic: "TOPIC_MUST_NOT_LOG", now: baseTime, idFactory: factory });
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1", workspaceRoot: root, topic: "TOPIC_MUST_NOT_LOG", now: baseTime, idFactory: factory });
   const started = await beginStep({
     workspaceRoot: root,
     step: 1,
@@ -2603,7 +2603,7 @@ test("workflow events contain only allowlisted metadata and never nonce evidence
 test("invalid event targets fail before consuming the continuation and permit a repaired retry", async () => {
   const root = await makeWorkspace();
   const factory = ids("workflow-event-failure", "nonce-event-failure", "attempt-event-failure");
-  const initialized = await initWorkflow({ workspaceRoot: root, topic: "events", now: baseTime, idFactory: factory });
+  const initialized = await initWorkflow({ workflowProfile: "legacy-50-v1", workspaceRoot: root, topic: "events", now: baseTime, idFactory: factory });
   const marker = { ...initialized.continuation };
   await unlink(pathsFor(root).eventsPath);
   await mkdir(pathsFor(root).eventsPath);

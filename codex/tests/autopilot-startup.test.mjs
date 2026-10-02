@@ -21,7 +21,7 @@ test("one short request supports all 50 verified handoffs without another human 
   let tick = Date.parse("2026-09-11T00:00:00.000Z");
   const now = () => new Date(tick++).toISOString();
   const request = "Replace Inline Code with Function Call을 체험하는 게임";
-  let state = await initWorkflow({ workspaceRoot, topic: request, now: now() });
+  let state = await initWorkflow({ workflowProfile: "legacy-50-v1", workspaceRoot, topic: request, now: now() });
   const topic = await readFile(join(workspaceRoot, "step_archive/TOPIC/TOPIC.md"), "utf8");
   for (const field of ["topic", "audience", "interactive", "real_world_apps", "constraints", "decisions"]) {
     assert.match(topic, new RegExp(`^## ${field}\\s*$`, "m"));
@@ -74,7 +74,7 @@ test("one Korean request completes 50 fixture steps directly from manager respon
   let tick = Date.parse("2026-09-11T01:00:00.000Z");
   const now = () => new Date(tick++).toISOString();
   const request = "마틴 파울러의 Replace Inline Code with Function Call을 추상화한 흥미로운 게임을 만들어줘";
-  let response = await initWorkflow({ workspaceRoot, topic: request, now: now() });
+  let response = await initWorkflow({ workflowProfile: "legacy-50-v1", workspaceRoot, topic: request, now: now() });
   const topicPath = join(workspaceRoot, "step_archive/TOPIC/TOPIC.md");
   const topic = await readFile(topicPath, "utf8");
   const topicHash = await hashFile(topicPath);
@@ -124,7 +124,7 @@ test("direct fixture retries use fail response markers and stop after three fail
   const workspaceRoot = await makeWorkspace();
   let tick = Date.parse("2026-09-11T02:00:00.000Z");
   const now = () => new Date(tick++).toISOString();
-  let response = await initWorkflow({ workspaceRoot, topic: "Isolated bounded retry fixture", now: now() });
+  let response = await initWorkflow({ workflowProfile: "legacy-50-v1", workspaceRoot, topic: "Isolated bounded retry fixture", now: now() });
   let oldMarker;
   const attemptIds = new Set();
 
@@ -174,7 +174,7 @@ test("pause prevents a pending direct fixture marker from starting the next step
   const pluginRoot = await makePluginFixture();
   let tick = Date.parse("2026-09-11T03:00:00.000Z");
   const now = () => new Date(tick++).toISOString();
-  let response = await initWorkflow({ workspaceRoot, topic: "Isolated direct pause fixture", now: now() });
+  let response = await initWorkflow({ workflowProfile: "legacy-50-v1", workspaceRoot, topic: "Isolated direct pause fixture", now: now() });
   const begun = await beginStep({
     workspaceRoot, step: response.current_step, marker: response.continuation, now: now()
   });

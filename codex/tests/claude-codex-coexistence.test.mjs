@@ -270,7 +270,7 @@ test('the probe stays aligned with the Codex state schema and path', t => {
   const root = tempRoot(t, 'h50-probe-');
   assert.equal(pathsFor(root).statePath, join(root, ...CODEX_STATE_RELATIVE.split('/')));
 
-  const initial = createInitialState({ workflowId: randomUUID(), workspaceRoot: root, topicSha256: sha256(TOPIC), now: AT });
+  const initial = createInitialState({ workflowProfile: "legacy-50-v1", workflowId: randomUUID(), workspaceRoot: root, topicSha256: sha256(TOPIC), now: AT });
   assert.equal(initial.schema_version, SCHEMA_VERSION);
   assert.equal(initial.total_steps, STEP_COUNT);
   assert.deepEqual(summarizeState(initial), {

@@ -19,7 +19,7 @@ const baseTime = "2026-09-02T00:00:00.000Z";
 const nextTime = "2026-09-02T00:00:01.000Z";
 
 function initialState(workflowId = "wf-1") {
-  return createInitialState({
+  return createInitialState({ workflowProfile: "legacy-50-v1",
     workflowId,
     workspaceRoot: "C:/fixture",
     topicSha256: "a".repeat(64),

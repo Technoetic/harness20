@@ -1,3 +1,4 @@
+import { LEGACY_WORKFLOW_PROFILE, getWorkflowProfile } from './workflow-profiles.mjs';
 import { inspectQa } from './qa-report.mjs';
 import { physicalWorkspace, readSafe, sha256 } from './quality-files.mjs';
 
@@ -7,10 +8,10 @@ export const FINAL_REGRESSION_CHECKS = Object.freeze([
 ]);
 
 // Inspection never runs project commands or rewrites earlier completion history.
-export async function inspectFinalRegression(workspaceRoot) {
+export async function inspectFinalRegression(workspaceRoot, workflowProfile = LEGACY_WORKFLOW_PROFILE) {
   try {
     const root = await physicalWorkspace(workspaceRoot);
-    const qa = await inspectQa(root, 50);
+    const qa = await inspectQa(root, getWorkflowProfile(workflowProfile).milestones.final, { workflowProfile });
     if (qa.status !== 'current' || qa.verdict !== 'PASS') {
       throw new Error('Final regression report is missing, failed or stale');
     }

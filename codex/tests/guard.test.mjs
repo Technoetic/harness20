@@ -100,7 +100,7 @@ async function inspectPatch(command, { workspaceRoot, active = true } = {}) {
 }
 
 async function init(root, prefix = "guard") {
-  return initWorkflow({
+  return initWorkflow({ workflowProfile: "legacy-50-v1",
     workspaceRoot: root,
     topic: "Guard fixture",
     now,

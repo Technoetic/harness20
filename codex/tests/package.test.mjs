@@ -460,8 +460,13 @@ function webappContractErrors(text) {
   const resources = section(skill.body, "Resources");
   validateManagerResource(errors, resources, "webapp resources");
   const stepReferences = resources.match(/[^\s`|]*stepNNN\.md/g) ?? [];
-  if (stepReferences.length !== 1 || stepReferences[0] !== "../../assets/steps/stepNNN.md") {
-    errors.push("webapp resources must use the canonical step path");
+  const expectedStepReferences = [
+    "codex/assets/profiles/research-free-36-v1/steps/stepNNN.md",
+    "codex/assets/steps/stepNNN.md"
+  ];
+  if (JSON.stringify(stepReferences) !== JSON.stringify(expectedStepReferences) ||
+      !resources.includes("`begin.step_target`") || !resources.includes("relative to the plugin root")) {
+    errors.push("webapp resources must use manager-derived paths for both allowlisted profiles");
   }
   if (!resources.includes("relative to this SKILL.md")) {
     errors.push("webapp resources must resolve relative to SKILL.md");
@@ -533,7 +538,7 @@ function webappContractErrors(text) {
   allowManagerOperations(errors, execution, ["begin", "complete", "fail"], "execution section");
   requirePositive(errors, execution, [/exactly `state\.current_step`/i, /state-manager result/i], "manager-selected step only");
   requirePositive(errors, execution, [/call `begin`/i, /continuation marker/i], "begin selected step");
-  requirePositive(errors, execution, [/read only/i, /\.\.\/\.\.\/assets\/steps\/stepNNN\.md/i, /selected/i], "read exact Codex step");
+  requirePositive(errors, execution, [/read only/i, /`step_target`/i, /returned by `begin`/i, /plugin-root-relative/i], "read exact Codex step");
   requirePositive(errors, execution, [/call `complete`/i, /structured evidence/i, /IDs and kinds/i], "evidenced completion");
   requirePositive(errors, execution, [/call `fail`/i, /reason and evidence/i], "record failure with evidence");
   if (!execution.includes("do not invent completion")) {
@@ -1036,12 +1041,23 @@ test("webapp storage contract rejects direct opening while accepting prohibition
   }
 });
 
-test("webapp bundled step references cover all fifty regular resources", async () => {
+test("webapp manager-selected references cover physical36 and preserved50 regular resources", async () => {
   const text = await readSkill("webapp");
-  assert.match(text, /\.\.\/\.\.\/assets\/steps\/stepNNN\.md/);
-  await Promise.all(Array.from({ length: 50 }, (_, index) =>
-    readFile(new URL(`../assets/steps/step${String(index + 1).padStart(3, "0")}.md`, import.meta.url), "utf8")
-  ));
+  assert.deepEqual(webappContractErrors(text), []);
+  for (const [directory, count] of [["codex/assets/profiles/research-free-36-v1/steps", 36], ["codex/assets/steps", 50]]) {
+    await Promise.all(Array.from({ length: count }, (_, index) =>
+      readRepo(`${directory}/step${String(index + 1).padStart(3, "0")}.md`)
+    ));
+  }
+  for (const [from, to] of [
+    ["`begin.step_target`", "the caller's chosen path"],
+    ["Read only the exact plugin-root-relative `step_target` returned by `begin`", "Read the old fixed step path"],
+    ["codex/assets/profiles/research-free-36-v1/steps/stepNNN.md", "codex/assets/profiles/unknown/steps/stepNNN.md"]
+  ]) {
+    const mutated = text.replace(from, to);
+    assert.notEqual(mutated, text);
+    assert.notDeepEqual(webappContractErrors(mutated), []);
+  }
 });
 
 test("status skill is show-only and reports completion provenance", async () => {

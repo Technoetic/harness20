@@ -1,3 +1,5 @@
+import { LEGACY_WORKFLOW_PROFILE, getWorkflowProfile, resolveWorkflowProfile } from "../../../scripts/lib/workflow-profiles.mjs";
+import { validateLoadedContract } from "./acceptance.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import { constants as fileConstants } from "node:fs";
 import {
@@ -89,16 +91,17 @@ export function normalizeClaudeProgress(value) {
   if (!isPlainObject(value)) {
     fail("CLAUDE_PROGRESS_INVALID", "Claude progress must be a JSON object");
   }
+  if (value.schema_version === 2 && !Number.isInteger(value.total_steps)) fail("CLAUDE_TOTAL_STEPS", "schema2 requires an exact numeric profile count");
   const totalSteps = normalizeStepNumber(value.total_steps);
-  if (totalSteps !== STEP_COUNT) {
-    fail("CLAUDE_TOTAL_STEPS", "Claude total_steps must be exactly 50");
-  }
+  let profile;
+  try { profile = resolveWorkflowProfile({ ...value, total_steps: totalSteps }); }
+  catch (error) { fail("CLAUDE_TOTAL_STEPS", error.message); }
   if (!Array.isArray(value.completed_steps)) {
     fail("CLAUDE_COMPLETED_STEPS", "Claude completed_steps must be an array");
   }
-  const sourceCurrentStep = requireStepRange(value.current_step, STEP_COUNT);
-  const normalizedValues = value.completed_steps.map(step => requireStepRange(step, STEP_COUNT));
-  const { normalized, prefix } = deriveContiguousPrefix(value.completed_steps, STEP_COUNT);
+  const sourceCurrentStep = requireStepRange(value.current_step, profile.stepCount);
+  const normalizedValues = value.completed_steps.map(step => requireStepRange(step, profile.stepCount));
+  const { normalized, prefix } = deriveContiguousPrefix(value.completed_steps, profile.stepCount);
   const warnings = [];
   if (
     typeof value.total_steps === "string" ||
@@ -113,13 +116,14 @@ export function normalizeClaudeProgress(value) {
   if (normalized.some(step => step > prefix.length + 1)) {
     warnings.push("sparse completed_steps beyond the contiguous prefix were ignored");
   }
-  const selectedStep = prefix.length === STEP_COUNT ? null : prefix.length + 1;
-  const expectedSourceStep = selectedStep ?? STEP_COUNT;
+  const selectedStep = prefix.length === profile.stepCount ? null : prefix.length + 1;
+  const expectedSourceStep = selectedStep ?? profile.stepCount;
   if (sourceCurrentStep !== expectedSourceStep) {
     warnings.push("current_step did not match the derived selected step");
   }
   return {
-    total_steps: STEP_COUNT,
+    ...(value.schema_version === 2 ? { schema_version: 2, workflow_profile: profile.id } : {}),
+    total_steps: profile.stepCount,
     current_step: selectedStep,
     completed_steps: prefix,
     normalized_steps: normalized,
@@ -521,8 +525,9 @@ async function loadTopic(workspace, workspaceRoot) {
   return sha256(bytes);
 }
 
-async function loadStepDefinitions(plugin, pluginRoot) {
-  const indexPath = join(pluginRoot, "codex", "assets", "steps", "index.json");
+async function loadStepDefinitions(plugin, pluginRoot, workflowProfile) {
+  const profile = getWorkflowProfile(workflowProfile);
+  const indexPath = join(pluginRoot, ...profile.indexPath.split("/"));
   let index;
   try {
     const { bytes } = await readContainedFile(plugin, indexPath, {
@@ -536,12 +541,15 @@ async function loadStepDefinitions(plugin, pluginRoot) {
     if (error?.code === "IMPORT_PATH_UNSAFE") throw error;
     fail("CODEX_STEP_DEFINITIONS", "Codex step definitions are missing or invalid");
   }
-  if (!isPlainObject(index) || index.schema_version !== 1 || !Array.isArray(index.steps) || index.steps.length !== STEP_COUNT) {
-    fail("CODEX_STEP_DEFINITIONS", "Codex step definitions must contain exactly 50 steps");
+  if (!isPlainObject(index) || index.schema_version !== (profile.id === LEGACY_WORKFLOW_PROFILE ? 1 : 2) ||
+      Object.keys(index).sort().join(",") !== (profile.id === LEGACY_WORKFLOW_PROFILE ? "schema_version,steps" : "schema_version,steps,total_steps,workflow_profile") ||
+      (profile.id !== LEGACY_WORKFLOW_PROFILE && (index.workflow_profile !== profile.id || index.total_steps !== profile.stepCount)) ||
+      !Array.isArray(index.steps) || index.steps.length !== profile.stepCount) {
+    fail("CODEX_STEP_DEFINITIONS", "Codex step definitions must match the selected profile");
   }
-  for (let number = 1; number <= STEP_COUNT; number += 1) {
+  for (let number = 1; number <= profile.stepCount; number += 1) {
     const id = `step${String(number).padStart(3, "0")}`;
-    const target = `codex/assets/steps/${id}.md`;
+    const target = `${profile.targetDirectory}/${id}.md`;
     const definition = index.steps[number - 1];
     if (
       !isPlainObject(definition) ||
@@ -551,6 +559,12 @@ async function loadStepDefinitions(plugin, pluginRoot) {
     ) {
       fail("CODEX_STEP_DEFINITIONS", `Codex definition ${id} is not canonical`, { step: number });
     }
+    try { validateLoadedContract(definition, number, profile.id); } catch { fail("CODEX_STEP_DEFINITIONS", `Codex definition ${id} is invalid`); }
+    const { bytes: sourceBytes } = await readContainedFile(plugin, join(pluginRoot, ...definition.source.split("/")), {
+      missingCode: "CODEX_STEP_DEFINITIONS", missingMessage: "source step is missing",
+      changedCode: "IMPORT_PATH_UNSAFE", changedMessage: "source step changed while being read"
+    });
+    if (sha256(sourceBytes) !== definition.source_sha256) fail("CODEX_STEP_DEFINITIONS", "source step hash changed");
     const definitionPath = join(pluginRoot, ...target.split("/"));
     let contents;
     try {
@@ -571,9 +585,10 @@ async function loadStepDefinitions(plugin, pluginRoot) {
   }
 }
 
-function importedReceipt({ workflowId, step, importedAt, sourceSha256 }) {
+function importedReceipt({ workflowId, step, importedAt, sourceSha256, workflowProfile }) {
   return {
-    schema_version: 1,
+    schema_version: workflowProfile === LEGACY_WORKFLOW_PROFILE ? 1 : 2,
+    ...(workflowProfile === LEGACY_WORKFLOW_PROFILE ? {} : { workflow_profile: workflowProfile }),
     workflow_id: workflowId,
     step,
     attempt_id: null,
@@ -592,12 +607,13 @@ function importedReceipt({ workflowId, step, importedAt, sourceSha256 }) {
 
 function importedState({ workspaceRoot, workflowId, topicSha256, normalized, sourceSha256, importedAt }) {
   const initial = createInitialState({
+    workflowProfile: resolveWorkflowProfile(normalized).id,
     workflowId,
     workspaceRoot,
     topicSha256,
     now: importedAt
   });
-  const completed = normalized.completed_steps.length === STEP_COUNT;
+  const completed = normalized.completed_steps.length === normalized.total_steps;
   return validateState({
     ...initial,
     status: completed ? "completed" : "running",
@@ -699,7 +715,7 @@ export async function importClaudeProgress({
 
       const normalized = normalizeClaudeProgress(parseProgress(sourceBytes));
       const topicSha256 = await loadTopic(workspace, safeWorkspaceRoot);
-      await loadStepDefinitions(plugin, safePluginRoot);
+      await loadStepDefinitions(plugin, safePluginRoot, resolveWorkflowProfile(normalized).id);
       const workflowId = idFactory();
       if (typeof workflowId !== "string" || workflowId.trim() === "") {
         fail("IMPORT_OPTIONS_INVALID", "idFactory must return a non-empty workflow ID");
@@ -721,6 +737,7 @@ export async function importClaudeProgress({
       for (const step of normalized.completed_steps) {
         await assertPhysicalPath(workspace, paths.receiptsDir, { kind: "directory" });
         await writeReceiptExclusive(safeWorkspaceRoot, importedReceipt({
+          workflowProfile: resolveWorkflowProfile(normalized).id,
           workflowId,
           step,
           importedAt,

@@ -23,7 +23,7 @@ Hook availability is not a prerequisite for this active-turn execution.
 Resolve these installed resources relative to this SKILL.md, not from the current working directory:
 
 - State manager: `../../scripts/harness-state.mjs`
-- Codex step selected by the manager: `../../assets/steps/stepNNN.md`
+- Codex step selected by the manager: `begin.step_target` (relative to the plugin root). New runs use `codex/assets/profiles/research-free-36-v1/steps/stepNNN.md`; legacy runs use `codex/assets/steps/stepNNN.md`.
 - Shared QA reporter: `../../../scripts/qa-report.mjs`
 - QA report protocol and input schema: `../../../docs/QA-REPORTS.md`
 - Shared Jev checkpoint helper: `../../../scripts/jev-judge.mjs`
@@ -78,7 +78,7 @@ Run `show`, then apply the first matching branch:
 After every routing or recovery operation, inspect the returned state before another
 mutation. If `import-claude` or `reconcile` returns `completed`, report the existing
 result and distinguish `imported` from `codex_verified`; do not call `resume` or
-otherwise mutate it. This includes an import with all 50 steps and recovery of the final receipt.
+otherwise mutate it. This includes an import with all selected-profile steps and recovery of the final receipt.
 
 1. When a valid Codex state exists, use it first. If its status is `completed`, report the existing result through Completion report and do not mutate it or call `resume`. Otherwise call `reconcile` only when diagnostics indicate receipt recovery is needed. Apply Legacy topic recovery below when applicable, then call `resume` and follow One-step execution for the returned current step.
 2. Only if no Codex state exists and Claude progress exists, call `import-claude`, report `imported` historical completions separately from `codex_verified` completions, then call `resume` and follow One-step execution.
@@ -150,7 +150,7 @@ One-step execution below is one work unit inside this loop, not one whole turn.
 
 1. Take exactly `state.current_step` from the state-manager result; do not infer or scan for another step. Before beginning a legacy Step 1 retry, apply Legacy topic recovery when needed and use the state and marker returned by `resume`.
 2. Call `begin` for that step with the manager-issued continuation marker.
-3. Read only the exact Codex `../../assets/steps/stepNNN.md` selected by that number, never a Claude source step.
+3. Read only the exact plugin-root-relative `step_target` returned by `begin` (also exposed by `show`). The manager derives the allowlisted profile path and selected step; do not construct a fixed legacy path or trust a caller-supplied path.
 4. Before a relevant product QA attempt or retry, use the shared reporter's `inspect --workspace "<project-root>" --step N`. Read its sanitized observations and next actions. Stale findings are history only; `preserve` is empty for stale, missing or invalid reports. Missing history is normal for a first attempt or legacy workspace. Current preserved checks constrain repairs but do not replace required acceptance checks.
 5. Perform that one step and evaluate each required acceptance ID using its declared acceptance kind. For product QA, after implementation and the required build, use `snapshot --workspace "<project-root>" --step N --input -` with explicit candidate files and mandatory check IDs from the step and product requirements. Follow the QA protocol; steps without applicable product QA continue through their declared acceptance flow. The reporter cannot discover omitted files or requirements.
 6. Record each QA round with `record --workspace "<project-root>" --step N --input -`, the returned snapshot ID, actual verifier mode, observations, evidence paths and next actions. Snapshot before QA and record before `complete` or `fail`; never bind old results to a fresh snapshot. Failed, missing or unexecuted required checks remain incomplete. Report data never grants completion authority.
