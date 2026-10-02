@@ -13,8 +13,10 @@ async function present(root, name) {
 export async function workflowContext(root, { workflowProfile } = {}) {
   if (workflowProfile !== undefined) getWorkflowProfile(workflowProfile);
   const file = await present(root, CODEX) ? CODEX : await present(root, CLAUDE) ? CLAUDE : null;
+  // A leftover binding is workflow metadata, even when its progress record is missing.
+  if (!file && await present(root, 'step_archive/workflow-profile.json')) throw new Error('Workspace profile binding has no progress record');
   const record = file ? JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await readSafe(root, file, 1024 * 1024)).replace(/^\uFEFF/, '')) : null;
-  const profile = record ? resolveWorkflowProfile(record) : getWorkflowProfile(LEGACY_WORKFLOW_PROFILE);
+  const profile = file ? resolveWorkflowProfile(record) : getWorkflowProfile(LEGACY_WORKFLOW_PROFILE);
   if (file === CLAUDE && (profile.id !== LEGACY_WORKFLOW_PROFILE || await present(root, 'step_archive/workflow-profile.json'))) {
     const binding = JSON.parse((await readSafe(root, 'step_archive/workflow-profile.json', 4096)).toString('utf8'));
     if (resolveWorkflowProfile(binding).id !== profile.id) throw new Error('Workspace profile binding conflicts with progress');

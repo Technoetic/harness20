@@ -9,6 +9,8 @@ import { prepareQuality } from './helpers/completion-quality.mjs';
 import { prepareJevJudgment } from '../../scripts/lib/jev-judge.mjs';
 import { runJevJudgment, inspectJevJudgment } from '../../scripts/lib/jev-judge.mjs';
 import { writeFinalSummary } from '../../scripts/lib/final-summary.mjs';
+import { workflowContext, recheckWorkflowContext } from '../../scripts/lib/workflow-context.mjs';
+import { createInitialState, validateState } from '../scripts/lib/schema.mjs';
 
 const profile = 'research-free-36-v1';
 async function progress(root, overrides = {}) {
@@ -59,6 +61,69 @@ test('actual invalid or conflicting profile metadata rejects QA writes and reads
   assert.equal((await inspectQa(root, 27)).status, 'invalid');
   await assert.rejects(() => assessment(root, 27));
 });
+
+for (const file of ['progress.json', '.harness50-codex/state.json']) {
+  for (const value of [null, false, 0, '']) {
+    test(`present ${file} containing ${JSON.stringify(value)} cannot fall back to legacy evidence`, async () => {
+      const root = await candidate();
+      await assessment(root, 27);
+      const before = await workflowContext(root);
+      assert.equal((await inspectQa(root, 27)).verdict, 'PASS');
+      await mkdir(join(root, 'step_archive/.harness50-codex'), { recursive: true });
+      await writeFile(join(root, 'step_archive', file), JSON.stringify(value));
+      assert.equal((await inspectQa(root, 27)).status, 'invalid');
+      await assert.rejects(() => workflowContext(root));
+      await assert.rejects(() => recheckWorkflowContext(root, before));
+      await assert.rejects(() => assessment(root, 27));
+    });
+  }
+}
+
+for (const marker of [
+  { schema_version: 2, workflow_profile: profile, total_steps: 36 },
+  { schema_version: 999 }
+]) {
+  test(`orphan profile marker schema${marker.schema_version} cannot reactivate legacy QA`, async () => {
+    const root = await candidate();
+    await assessment(root, 27);
+    const before = await workflowContext(root);
+    await writeFile(join(root, 'step_archive/workflow-profile.json'), JSON.stringify(marker));
+    assert.equal((await inspectQa(root, 27)).status, 'invalid');
+    await assert.rejects(() => workflowContext(root));
+    await assert.rejects(() => recheckWorkflowContext(root, before));
+    await assert.rejects(() => assessment(root, 27));
+    const summary = await writeFinalSummary(root);
+    assert.match(summary.text, /workflow profile\/generation \(형식 오류\)/);
+    assert.doesNotMatch(summary.text, /step050\.latest/);
+  });
+}
+
+test('a genuinely metadata-free legacy evidence workspace retains its exact fallback', async () => {
+  const root = await candidate();
+  await assessment(root, 27);
+  const context = await workflowContext(root);
+  assert.equal(context.profile.id, 'legacy-50-v1');
+  assert.equal(context.generation, null);
+  assert.equal((await inspectQa(root, 27)).verdict, 'PASS');
+});
+
+for (const workflowProfile of ['legacy-50-v1', profile]) {
+  test(`valid Codex ${workflowProfile} ownership ignores stale Claude metadata and marker`, async () => {
+    const root = await candidate();
+    await assessment(root, 27);
+    const state = createInitialState({ workflowProfile, workflowId: 'valid-owner', workspaceRoot: root,
+      topicSha256: 'a'.repeat(64), now: '2026-10-02T01:00:00.000Z' });
+    validateState(state);
+    await mkdir(join(root, 'step_archive/.harness50-codex'), { recursive: true });
+    await writeFile(join(root, 'step_archive/.harness50-codex/state.json'), JSON.stringify(state));
+    await writeFile(join(root, 'step_archive/progress.json'), 'null');
+    await writeFile(join(root, 'step_archive/workflow-profile.json'), JSON.stringify({ schema_version: 999 }));
+    assert.equal((await workflowContext(root)).profile.id, workflowProfile);
+    assert.equal((await inspectQa(root, 27)).status, workflowProfile === profile ? 'missing' : 'current');
+    await assessment(root, 27);
+    assert.equal((await inspectQa(root, 27)).verdict, 'PASS');
+  });
+}
 test('generic Jev helper accepts new planning17 and rejects removed old checkpoints', async () => {
   const root = await candidate(); await progress(root);
   const input = { schema_version: 1, step: 17, sources: [{ path: 'step_archive/outputs/observed.md', excerpt: 'Observed candidate.' }],
