@@ -10,6 +10,15 @@ import { makeWorkspace } from './helpers/workspace.mjs';
 
 const repo = fileURLToPath(new URL('../../', import.meta.url));
 
+function runPowerShell(args, options) {
+  // GitHub Actions starts Node from pwsh; let Windows PowerShell rebuild its own module path.
+  return spawnSync('powershell.exe', args, {
+    ...options,
+    env: Object.fromEntries(Object.entries(options.env ?? process.env)
+      .filter(([key]) => key.toLowerCase() !== 'psmodulepath'))
+  });
+}
+
 test('isolated packaged preflight validates both definitions and refuses missing shared dependencies or changed bodies', {
   skip: process.platform !== 'win32', timeout: 180000
 }, async () => {
@@ -21,7 +30,7 @@ test('isolated packaged preflight validates both definitions and refuses missing
     });
   }
   const smoke = () => {
-    const result = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+    const result = runPowerShell(['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
       resolve(repo, 'codex/tests/install-smoke.ps1'), '-PluginRoot', packaged, '-Mode', 'Preflight'],
     { encoding: 'utf8', timeout: 60000, windowsHide: true });
     assert.ifError(result.error);
@@ -92,9 +101,48 @@ Write-Output 'selected profile readers verified'
 `;
   const scriptPath = join(fixture, 'profile-readers.ps1');
   await writeFile(scriptPath, script, 'utf8');
-  const result = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, '-PluginRoot', repo],
+  const result = runPowerShell(['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, '-PluginRoot', repo],
     { encoding: 'utf8', timeout: 30000, windowsHide: true });
   assert.ifError(result.error);
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.equal(result.stdout.trim(), 'selected profile readers verified');
+});
+
+test('PowerShell smoke children hash safely despite an inherited incompatible Utility module', {
+  skip: process.platform !== 'win32', timeout: 30000
+}, async () => {
+  const fixture = await makeWorkspace();
+  const moduleRoot = join(fixture, 'Microsoft.PowerShell.Utility', '99.0.0');
+  await mkdir(moduleRoot, { recursive: true });
+  await writeFile(join(moduleRoot, 'Microsoft.PowerShell.Utility.psd1'),
+    "@{RootModule='Microsoft.PowerShell.Utility.psm1';ModuleVersion='99.0.0';GUID='84579e8f-e2da-44eb-a0b7-ff23c9d52767';FunctionsToExport=@('Get-FileHash');CmdletsToExport=@();AliasesToExport=@()}", 'utf8');
+  await writeFile(join(moduleRoot, 'Microsoft.PowerShell.Utility.psm1'),
+    "function Get-FileHash { throw 'INCOMPATIBLE_POWERSHELL_MODULE_FIXTURE' }; Export-ModuleMember -Function Get-FileHash", 'utf8');
+  await writeFile(join(fixture, 'hash-source.txt'), 'abc', 'utf8');
+  const smokeSource = await readFile(join(repo, 'codex/tests/install-smoke.ps1'), 'utf8');
+  const stopOffset = smokeSource.indexOf('function Stop-Smoke {');
+  const hashOffset = smokeSource.indexOf('function Get-Sha256 {');
+  assert.ok(stopOffset > 0 && hashOffset > stopOffset);
+  const scriptPath = join(fixture, 'hash-reader.ps1');
+  // Exercise the smoke's actual hash reader before other Utility cmdlets preload a default.
+  await writeFile(scriptPath, `$ErrorActionPreference = 'Stop'
+${smokeSource.slice(stopOffset, smokeSource.indexOf('function Test-IsReparsePoint {', stopOffset))}
+${smokeSource.slice(hashOffset, smokeSource.indexOf('function Assert-SingleLinkFile {', hashOffset))}
+Write-Output (Get-Sha256 '${join(fixture, 'hash-source.txt').replaceAll("'", "''")}')
+Write-Output $env:HARNESS50_FIXTURE
+`, 'utf8');
+  const environment = {
+    ...Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toLowerCase() !== 'psmodulepath')),
+    PsMoDuLePaTh: fixture,
+    HARNESS50_FIXTURE: 'preserved'
+  };
+  const before = { ...environment };
+  const result = runPowerShell(['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath],
+    { env: environment, encoding: 'utf8', timeout: 20000, windowsHide: true });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.deepEqual(result.stdout.trim().split(/\r?\n/), [
+    'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad', 'preserved'
+  ]);
+  assert.deepEqual(environment, before);
 });
