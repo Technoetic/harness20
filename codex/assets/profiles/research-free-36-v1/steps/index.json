@@ -118,7 +118,7 @@
       "phase": "preflight",
       "source": "assets/profiles/research-free-36-v1/steps/step003.md",
       "target": "codex/assets/profiles/research-free-36-v1/steps/step003.md",
-      "source_sha256": "abaf04e31a9132b54c93c6712b171a3991fc82d54745d3a09e88ed24e846ef32",
+      "source_sha256": "24ca5b251ea7296ed0b8ab124981972b9ca58ad39f64e4b6769da0dd564ec559",
       "inputs": [
         "step_archive/step001_preflight.md"
       ],
@@ -2314,7 +2314,7 @@
       "phase": "e2e",
       "source": "assets/profiles/research-free-36-v1/steps/step036.md",
       "target": "codex/assets/profiles/research-free-36-v1/steps/step036.md",
-      "source_sha256": "f04d71a66b5d5a76ec259c8c5628e4aae3065c0847c7416b5d5e04d113f15128",
+      "source_sha256": "0557e0bac6dc215f4b589a7f9654b5f3ac419b2a506f2746d1a17fbaf0be6fc8",
       "inputs": [
         "step_archive/step026_smoke_test.md",
         "dist/index.html",

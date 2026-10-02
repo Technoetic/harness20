@@ -12,7 +12,7 @@ persistence: session
 
 **확인 명령**: 플러그인 체크아웃에서 `node scripts/verify-output.mjs --probe` — 가용 백엔드(Aside CLI 또는 Playwright)를 JSON으로 보고한다 (docs/BROWSER-TOOLS.md)
 
-**백엔드 고정 명령**: probe가 백엔드를 선택하면 같은 체크아웃에서 `node scripts/verify-output.mjs --probe --lock --workspace "<project-root>"`를 실행해 그 선택을 프로젝트의 `step_archive/outputs/browser-backend.json`에 고정한다 (schema_version, selected, tool_version, probed_at). 이후 `--backend` 없이 실행하는 모든 브라우저 검증(Step 31·50 포함)은 이 고정 백엔드만 사용하며, 사용할 수 없어도 다른 백엔드로 넘어가지 않는다. 백엔드를 의도적으로 바꿀 때만 `--backend <name>`을 더해 고정 명령을 다시 실행한다.
+**백엔드 고정 명령**: probe가 백엔드를 선택하면 같은 체크아웃에서 `node scripts/verify-output.mjs --probe --lock --workspace "<project-root>"`를 실행해 그 선택을 프로젝트의 `step_archive/outputs/browser-backend.json`에 고정한다 (schema_version, selected, tool_version, probed_at). 이후 `--backend` 없이 실행하는 모든 브라우저 검증(Step 31·36 포함)은 이 고정 백엔드만 사용하며, 사용할 수 없어도 다른 백엔드로 넘어가지 않는다. 백엔드를 의도적으로 바꿀 때만 `--backend <name>`을 더해 고정 명령을 다시 실행한다.
 
 ## 검증
 

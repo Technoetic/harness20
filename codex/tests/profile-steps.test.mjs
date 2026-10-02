@@ -5,11 +5,60 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadIndex, validateRepositoryParity } from "../scripts/validate-steps.mjs";
+import { getWorkflowProfile, originalStepNumber, profileStepNumber } from "../../scripts/lib/workflow-profiles.mjs";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const profile = "research-free-36-v1";
 const target = `codex/assets/profiles/${profile}/steps`;
 const source = `assets/profiles/${profile}/steps`;
+
+test("declared completion markers name their containing step and selected total exactly once", async () => {
+  const index = await loadIndex(root, profile);
+  const legacy = await loadIndex(root);
+  for (const entry of index.steps) {
+    const original = legacy.steps[originalStepNumber(profile, entry.number) - 1];
+    for (const host of ["source", "target"]) {
+      const previous = await readFile(join(root, original[host]), "utf8");
+      const current = await readFile(join(root, entry[host]), "utf8");
+      const pattern = /\bStep\s*(\d+)\/(\d+)\s+완료/g;
+      const before = [...previous.matchAll(pattern)];
+      const after = [...current.matchAll(pattern)];
+      assert.equal(after.length, before.length, `${entry[host]} must retain each declared completion marker`);
+      for (const match of after) {
+        assert.deepEqual([Number(match[1]), Number(match[2])], [entry.number, index.total_steps],
+          `${entry[host]} completion marker must identify this step, not a different valid coordinate`);
+      }
+    }
+  }
+});
+
+test("browser backend grouping points to the retained E2E and final gates", async () => {
+  const body = await readFile(join(root, source, "step003.md"), "utf8");
+  const group = /브라우저 검증\(Step\s*([\d·]+) 포함\)/.exec(body);
+  assert.ok(group, "backend lock instructions must explicitly cover both later browser gates");
+  assert.deepEqual(group[1].split("·").map(Number),
+    [profileStepNumber(profile, 45), getWorkflowProfile(profile).milestones.final]);
+});
+
+test("source advancement and QA inspection coordinates retain their workflow roles", async () => {
+  const index = await loadIndex(root, profile);
+  for (const entry of index.steps) {
+    const body = await readFile(join(root, entry.source), "utf8");
+    for (const match of body.matchAll(/자동으로 (step\d{3})\.md를 읽고 수행/g)) {
+      assert.equal(match[1], entry.next, `${entry.id} advances to the next retained instruction`);
+    }
+    for (const match of body.matchAll(/inspect --workspace "<project-root>" --step (\d+)/g)) {
+      assert.equal(Number(match[1]), entry.number, `${entry.id} inspects its own QA evidence`);
+    }
+  }
+  for (const host of [source, target]) {
+    const finalBody = await readFile(join(root, host, "step036.md"), "utf8");
+    const group = /Step\s*(\d+) 및 Step\s*(\d+)의 실제 분기 검증/.exec(finalBody);
+    assert.ok(group, `${host} final gate must retain actual branch verification`);
+    assert.deepEqual(group.slice(1).map(Number),
+      [getWorkflowProfile(profile).milestones.implementation, profileStepNumber(profile, 45)]);
+  }
+});
 
 test("new profile resolves 36 physical source contracts with hashes and preserved quality gates", async () => {
   const index = await loadIndex(root, profile);
