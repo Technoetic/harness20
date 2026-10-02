@@ -1,6 +1,6 @@
 ---
 name: debug-step
-description: Step 디버깅 스킬. 테스트 실패나 오류 발생 시 c8 커버리지 + 서브에이전트 병렬 디버깅을 자동 수행한다. 디버깅 Step(50, 70 등)에서 자동 활성화.
+description: Step 디버깅 스킬. 테스트 실패나 오류 발생 시 c8 커버리지 + 서브에이전트 병렬 디버깅을 자동 수행한다. 실패한 검사와 최종 회귀 검증(새36의36, legacy50의50)에서 활성화.
 disable-model-invocation: false
 ---
 

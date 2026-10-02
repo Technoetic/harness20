@@ -216,7 +216,7 @@ Sub-lines: `@MX:SPEC`, `@MX:LEGACY`, `@MX:REASON`, `@MX:TEST`, `@MX:PRIORITY`
 
 ## 11. 검증 판정과 finding 형식
 
-- 검증자는 필수 기준(설계 명세, 선택된 디자인 토큰, 필수 acceptance, 기능·접근성·보안)을 어긴 finding만 `Critical`/`Important`로 기록한다. 필수 검사 실패나 미해결 필수 finding이 있으면 `FAIL`이다. 인용할 기준이 없는 미관·선호 의견은 `advisory`이며, advisory만으로 `FAIL`이나 추가 라운드를 만들지 않는다. 선택된 디자인 토큰과 제외 목록은 위 표의 프로필별 설계 계약(`harness50-design-contract`)이고, 계약 `exclude`에서 `adopted: false`인 항목의 위반은 최소 `Important`다. 계약이 없는 이전 실행은 §5의 수치를 기준으로 쓴다. 이 실행에서는 계약을 복원하지 않으며, §5 '기본 제외 목록'(`host` 5종)은 필수 기준이 아니다(`docs/DESIGN-CONTRACT.md` "Workspaces without a contract"의 Claude 항목).
+- 검증자는 필수 기준(설계 명세, 선택된 디자인 토큰, 필수 acceptance, 기능·접근성·보안)을 어긴 finding만 `Critical`/`Important`로 기록한다. 필수 검사 실패나 미해결 필수 finding이 있으면 `FAIL`이다. 인용할 기준이 없는 미관·선호 의견은 `advisory`이며, advisory만으로 `FAIL`이나 추가 라운드를 만들지 않는다. 선택된 디자인 토큰과 제외 목록은 위 표의 프로필별 설계 계약(`harness50-design-contract`)이고, 계약 `exclude`에서 `adopted: false`인 항목의 위반은 최소 `Important`다. 계약이 없는 이전 legacy50 실행은 §5의 수치를 기준으로 쓴다. 새36의 필수 계약 누락은 INCOMPLETE다. 이 실행에서는 계약을 복원하지 않으며, §5 '기본 제외 목록'(`host` 5종)은 필수 기준이 아니다(`docs/DESIGN-CONTRACT.md` "Legacy workspaces without a contract"의 Claude 항목).
 - 필수 finding마다 위치(소스 `file:line`, 또는 route·viewport·selector·스크린샷 파일과 영역), 어긴 기준의 출처, 기대값과 관찰값, 재현 방법(route·viewport·선행 조작)을 쓴다. 스크린샷 영역과 viewport는 언제나 쓸 수 있으므로 위치를 못 찾았다는 이유로 필수 finding을 `advisory`로 낮추지 않는다.
 - 이전 버전 단계 본문의 "사소한 위화감도 놓치지 않는다"와 "부족한 부분이 있으면 FAIL"은 관찰을 빠짐없이 적으라는 뜻으로 읽는다. 판정은 이 절을 따른다.
 

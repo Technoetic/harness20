@@ -252,7 +252,7 @@ test('S7 the README states install scope, removal and requirements, and no stale
   const withCount = readme.replace('[![Dual Shell]', `${badge}[![Dual Shell]`);
   assert.notEqual(withCount, readme, 'the badge row was not found');
   assert.ok(installErrors(withCount).includes('stale: 200+'), 'a 200+ pattern count went unnoticed');
-  const everywhere = readme.replace('하네스 작업 공간(진행 중·멈춘·50단계를 마친 실행', '설치 범위 전체(모든 폴더)(진행 중·멈춘·50단계를 마친 실행');
+  const everywhere = readme.replace('하네스 작업 공간(진행 중·멈춘·선택된 전체 단계를 마친 실행', '설치 범위 전체(모든 폴더)(진행 중·멈춘·선택된 전체 단계를 마친 실행');
   assert.notEqual(everywhere, readme, 'the guard scope line was not found');
   assert.ok(installErrors(everywhere).includes('stale: 설치 범위 전체(모든 폴더)'), 'the old guard scope went unnoticed');
 });

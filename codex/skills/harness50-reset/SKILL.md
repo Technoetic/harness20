@@ -11,6 +11,9 @@ Reset ends Codex control of the current workflow without disturbing the work the
 
 Resolve `../../scripts/harness-state.mjs` relative to this SKILL.md, not from the current working directory. Pass the current project directory as the workspace.
 
+Existing receipt/archive profile meanings stay unchanged. Reset deactivates the
+selected workflow; only a later explicit new start selects default36.
+
 ## Reset operation
 
 For `$harness50-reset`, Call only `reset` through the state manager to recoverably deactivate only Codex control metadata. If the manager returns an error, report it and stop without a filesystem fallback.

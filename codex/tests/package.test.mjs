@@ -149,7 +149,7 @@ function documentationContractErrors(text) {
   const requiredPermissionStatements = [
     "Normal Codex permission confirmations remain in effect for every command.",
     "Harness50 never auto-approves commands and never changes sandbox or approval settings.",
-    "Each later turn receives at most one 50-step continuation marker; that marker schedules work but grants no permission.",
+    "Each later turn receives at most one one-step continuation marker; that marker schedules work but grants no permission.",
     "Submitted command evidence is validated only as a string and exit status; the Harness50 runtime never executes that submitted command.",
     "The guard is a bounded, deny-only defense, not a shell sandbox; benign commands are never approved by the hook and still follow normal Codex permissions."
   ];

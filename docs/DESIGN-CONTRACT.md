@@ -1,15 +1,18 @@
 # Design contract: visual tokens and exclusions
 
-Step 30 fixes the visual tokens and the named list of design styles to leave out in
-one block. Steps 37, 43 and 49 (and the Claude evaluator skill) use only this block as
-"the selected design tokens" and "the exclusion list". Both hosts write and read the
-same format. Four rules differ by host and are marked **Claude** or **Codex** below:
-the default list, a TOPIC that both asks for and excludes a style, the step 43
-notation, and a workspace without a contract.
+For fresh `research-free-36-v1`, Step 18 fixes the visual tokens and exclusions.
+Implementation 25, layout review 27 and final design review 35 compare supplied
+requirements/materials, that contract and measured current output. External
+reference captures and research-provenance files are not prerequisites.
+Both hosts use the same contract format. The default exclusion list and
+conflicting TOPIC rules below remain host-specific.
+
+Explicit `legacy-50-v1` keeps design30, implementation37, reference43 and final49,
+its original `step030_레이아웃설계_chunk1.md` path and archived reference method.
 
 ## Location and format
 
-`step_archive/step030_레이아웃설계_chunk1.md` holds exactly one fenced block whose
+`step_archive/step018_레이아웃설계_chunk1.md` holds exactly one fenced block whose
 info string is `json harness50-design-contract`:
 
 ```json harness50-design-contract
@@ -74,32 +77,34 @@ The values are an example.
 ## Exceptions
 
 A `legacy` or `host` item may be adopted only when the TOPIC asks for that style or
-the selected aesthetic cannot exist without it. Step 30 then sets `adopted: true`,
+the selected aesthetic cannot exist without it. Step 18 then sets `adopted: true`,
 writes the reason in `exception_reason` and repeats it in the layout design as one
-`결정/사유: <id> 채택 — <사유>` line (the Claude step 50 summary lists these lines).
+`결정/사유: <id> 채택 — <사유>` line (the Claude step 36 summary lists these lines).
 A `topic` item is never adopted. When the TOPIC both asks for and excludes the same
 style:
 
 - **Claude**: the exclusion wins. The `topic` item stays `adopted: false`, the design
-  leaves the style out, and step 30 records the choice as one `결정/사유` line. An
+  leaves the style out, and step 18 records the choice as one `결정/사유` line. An
   ambiguous request is decided, not a reason for a named pause (constitution §1 and
   §2-1).
-- **Codex**: step 30 blocks instead of guessing (Codex step 30, 시각 토큰·제외 계약).
+- **Codex**: step 18 blocks instead of guessing (Codex step 18, 시각 토큰·제외 계약).
 
 ## Precedence and judgement
 
-- The contract wins over reference fidelity. Step 37 does not copy an excluded
-  element from a capture, step 43 does not report it as missing, and the Claude
-  evaluator does not deduct design fidelity for it. Step 43 records the difference
-  with the item id: **Claude** as `제외 계약: <id>`, **Codex** as
-  `excluded-by-contract` and the id.
-- At step 49 an element that matches an item with `adopted: false` is at least an
+- The contract wins over a supplied reference. New36 reviews the current output
+  against the Step18 contract; an excluded reference element is not required.
+  Explicit legacy Step43 keeps its difference notation: **Claude** as `제외 계약: <id>`,
+  **Codex** as `excluded-by-contract` plus id.
+- At step 35 an element that matches an item with `adopted: false` is at least an
   `Important` finding. A style preference outside the contract is advisory.
 - Values outside `tokens` are token violations, as before.
 
-## Workspaces without a contract
+New36 must have its Step18 contract. A missing required block remains missing
+input; do not apply the historical fallback below to a fresh run.
 
-A workspace that finished step 30 before this contract existed has no block. Do not
+## Legacy workspaces without a contract
+
+Only an existing legacy50 workspace that finished step 30 before this contract existed has no block. Do not
 edit the step 30 outputs.
 
 - **Codex** (steps 37, 43 and 49 read this procedure): the current step writes the

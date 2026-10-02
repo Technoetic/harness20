@@ -1,4 +1,12 @@
-# Step 44 report migration
+# Routing integration: new36 and legacy report migration
+
+Fresh `research-free-36-v1` routing is Step30 and writes
+`step_archive/step030_routing검증.md` using `routing-integration-report`.
+Steps31–36 consume it. New36 has no old044 artifact fallback; missing current
+routing checks remain incomplete. Existing legacy50 uses Step44 and the unchanged
+historical receipt/input rules below. Never renumber old evidence.
+
+## Legacy50: Step44 report migration
 
 Since v2.4.3, the routing integration report is
 `step_archive/step044_routing검증.md` and its artifact acceptance ID is

@@ -45,7 +45,7 @@ and [opaque-origin restrictions in the HTML standard](https://html.spec.whatwg.o
 
 ## Design and markup
 
-Inventory independent screens during planning. In Step 30, record each screen's
+Inventory independent screens during planning. In Step 18, record each screen's
 ID, purpose, canonical path, incoming links, and expected screen after reload.
 Carry the complete inventory through subsequent design and implementation work.
 Filters, transient dialogs and controls do not need their own route unless they
@@ -124,10 +124,14 @@ must include representative concrete detail routes and separately test its other
 valid and invalid parameter cases. A finite manifest is not proof of every
 possible application state.
 
+For new36 the design/implementation/routing/E2E/final stages are 18/25/30/31/36.
+Explicit legacy50 retains 30/37/44/45/50 and report044; existing historical
+receipt fallback applies only there. The manifest capacity remains 1–50 routes.
+
 ## Verification
 
-Step 44 is **클라이언트 사이드 라우팅** (client-side routing). Step 30 designs
-the route inventory and Step 37 implements it; Step 44 integrates and rechecks it
+Step 30 is **클라이언트 사이드 라우팅** (client-side routing). Step 18 designs
+the route inventory and Step 25 implements it; Step 30 integrates and rechecks it
 after JavaScript modularization, CSS separation and design corrections. Its
 required completion checks cover the screen/URL map, deep links and traversal,
 native and compatible backends, mode-specific server fallback, and ordinary
@@ -136,16 +140,16 @@ screen regions in the same HTML can be selected directly from the current URL.
 Development JavaScript and CSS stay in separate source files; the build bundles
 them into the one self-contained HTML, including its inert JSON route manifest.
 
-Step 44 writes `step_archive/step044_routing검증.md` under the
-`routing-integration-report` artifact acceptance ID. Steps 45–50 consume this
+Step 30 writes `step_archive/step030_routing검증.md` under the
+`routing-integration-report` artifact acceptance ID. Steps 31–36 consume this
 routing, structure, accessibility and build evidence. Missing or failed routing
 checks block a new completion. Existing workspaces follow
-[the Step 44 migration guide](STEP044-MIGRATION.md); historical receipts stay
-immutable and are not promoted to current validation evidence. Step 44 reviews the server fallback
-configuration and local direct entry; Step 45 requires local history-mode direct
+[the legacy Step44 migration guide](STEP044-MIGRATION.md); historical receipts stay
+immutable and are not promoted to current validation evidence. Step 30 reviews the server fallback
+configuration and local direct entry; Step 31 requires local history-mode direct
 entry and reload, and repeats them on a real deployment only when an authorized
 target is already available. Otherwise it records deployment verification as
-pending and scopes completion to the local artifact. Step 50 still requires the
+pending and scopes completion to the local artifact. Step 36 still requires the
 final schema-3 browser report bound to the current HTML.
 
 Run the verifier from a checkout with one [browser backend](BROWSER-TOOLS.md)
@@ -182,7 +186,7 @@ it cannot establish that condition. Screenshots for this scenario use
 Both scenarios share the existing overall deadline and network restrictions.
 
 `navigation_api.available` and `navigation_api.property_present` report observed
-capability, not proof that an application used the native backend. Step 45 must
+capability, not proof that an application used the native backend. Step 31 must
 also demonstrate native interception in a capable browser, as well as correct
 behavior when the API is missing or present but unusable. The shipped router has
 real-browser regression coverage for these cases and for direct `file://` use.
@@ -195,7 +199,7 @@ satisfy fresh completion. Existing historical receipts retain their recovery
 semantics; replaying a receipt does not perform a new browser verification.
 
 Codex validates the route inventory against the same stable HTML bytes it hashes.
-Both hosts check current quality, browser and final regression evidence before recording a new Step 50.
+Both hosts check current quality, browser and final regression evidence before recording a new Step 36.
 The inspection command does not execute project commands or launch a browser:
 
 ```text
@@ -204,12 +208,12 @@ node "<plugin-root>/scripts/quality-gate.mjs" --inspect-final --workspace "<proj
 
 History-mode verification serves the same HTML at the declared paths in an isolated
 browser context. **This proves application routing, not deployment rewrites.**
-Step 45 also checks direct entry and refresh on an already authorized, available
+Step 31 also checks direct entry and refresh on an already authorized, available
 deployment target. Without one, `deployment-verification: pending` is explicit;
 local completion does not claim deployment readiness. If deployment is itself a
 user requirement, pending verification cannot satisfy that requirement. No step
 implicitly authorizes a deployment. Record the serving URL, mode, fallback and
-tested build digest for reuse in Steps 46–50. Live evidence applies only to the
+tested build digest for reuse in Steps 32–36. Live evidence applies only to the
 deployed revision that was checked, not to later local builds.
 Keep project-specific E2E for title, focus, active
 navigation, dialogs, filters, asynchronous data, and other states.

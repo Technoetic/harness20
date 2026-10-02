@@ -176,7 +176,7 @@ and state that the summary is unavailable.
 When the user requests Jev-first or maximum supported Jev use, including a standing
 authorized preference, route every eligible typed judgment in the current request
 to Jev first. This includes ordinary chat, arithmetic and questions outside the
-seven checkpoints. Do not skip because the answer seems easy or obvious. This
+fixed checkpoints. Do not skip because the answer seems easy or obvious. This
 mode handles direct questions without initializing, resuming or rewriting workflow
 state; only an actual workflow control request enters the corresponding procedure.
 
@@ -208,7 +208,8 @@ work transparently. All acceptance gates, reviewers, tests and state writers rem
 
 ## Optional Jev checkpoint routing
 
-At steps 16, 24, 25, 30, 37, 45 and 49, after selected evidence is ready and before
+For selected `research-free-36-v1`, use steps 17, 18, 25, 31 and 35. Explicit
+`legacy-50-v1` retains steps 16, 24, 25, 30, 37, 45 and 49. After selected evidence is ready and before
 the existing independent review, use `../../../scripts/jev-judge.mjs` according to
 `../../../docs/jev-checkpoints.md`. The active task must authorize both Jev and
 transmission of those selected excerpts. Reuse existing authorization covering that
@@ -231,7 +232,8 @@ proven failure. The optional API exception does not grant general browsing or ex
 the step's collection scope. This advisory route leaves required Acceptance,
 independent reviewers, actual screenshots, project E2E, the QA writer and all manager
 mutations unchanged. A Jev result, exit zero or `current` never completes a step.
-The automatic Step 25 route uses the generic helper only; the legacy `jev-review.mjs`
+The new36 planning17 and implementation25 routes use the generic helper only;
+the legacy `jev-review.mjs` is only for legacy50 planning25. That
 adapter stays compatible and is not invoked again for the same judgment.
 
 ## Boundaries and handoff
