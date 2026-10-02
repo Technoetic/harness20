@@ -1,0 +1,180 @@
+---
+name: step017
+persistence: session
+---
+
+# Step 17 - 기획: 요구사항 기반 (독립 검증 루프)
+
+<!-- MOAI-ENRICHED v1 -->
+> **📐 Plan → Run → Sync** (MoAI-ADK 워크플로우)
+> - **Plan**: 본 Step의 SPEC 자동 생성 `step_archive/specs/SPEC-017.md` 를 먼저 읽고 Acceptance 기준을 확정한다.
+> - **Run**: 본문 지침대로 실행. 구현 산출물에는 `@MX:NOTE` 최소 1개 부착 (위험 시 `@MX:WARN` + `@MX:REASON`, 계약 시 `@MX:ANCHOR` + `@MX:REASON`, 미완료 시 `@MX:TODO`). MoAI mx-tag-protocol SoT 준수.
+> - **Sync**: 결과 파일 `step_archive/step017_*.md` 저장 후 1줄 완료 보고 `Step 017/36 완료`.
+>
+> **모델 정책**: 구현 서브에이전트 = **haiku** (CLAUDE.md 정책 준수). 평가 라운드만 sonnet.
+>
+> **위치**: 구현·정리 구간 (E2E 검증 step031 전)
+
+## Memory-of-Thought
+
+기획 전에 다음을 확인하라:
+- 이전 단계 검증 보고서(`step_archive/outputs/step0*_검증*.md`)의 `## 실패 패턴` 절(있으면) — 이전에 실패한 패턴을 반복하지 않는다
+- 이전 기획 Step의 결과 파일 — 중복되거나 상충되는 내용이 없는지 확인한다
+- 성공한 기획 패턴이 있으면 재활용한다
+
+## 실행 내용
+
+사용자 요청과 명시적으로 제공된 자료를 기반으로 기획 문서 초안을 작성한다. **기획 작성자와 검증자를 분리하여** 요구사항가 기획에 충실히 반영되었는지 확인한다.
+
+## 핵심 원칙: 작성 에이전트 ≠ 검증 에이전트
+
+기획을 작성한 에이전트가 스스로 "요구사항를 잘 반영했다"고 판단하는 것을 **금지**한다.
+
+**필요한 파일:**
+
+- `step_archive/TOPIC/TOPIC.md` (튜토리얼 주제 — **필수, 가장 먼저 Read. 기획의 모든 결정이 본 주제·타깃·제약을 충족해야 한다**)
+- 사용자가 명시적으로 제공한 자료 (전체 요구사항)
+
+Class 지향으로 기획한다.
+
+플러그인 `docs/ROUTING.md`에 따라 독립 화면 목록과 화면별 사용자 목적을 기획에
+포함한다. 각 화면에는 공유·직접 접속 가능한 URL이 필요하다. 단순 필터·대화상자는
+독립 화면과 구분하고, 실제 단일 화면 앱에 불필요한 화면을 추가하지 않는다.
+검증자는 메뉴 아래 화면이 누락되지 않았는지 확인해 18단계 주소 설계에 전달한다.
+
+## 주제 충실성 (필수)
+
+기획 작성 에이전트(A)와 검증 에이전트(B) 모두 `step_archive/TOPIC/TOPIC.md`를 먼저 Read한다.
+
+- 검증 에이전트 B의 판정 축에 다음을 추가한다:
+  - **주제 일치**: 기획 결과물이 TOPIC.md의 `topic`을 실제로 다루는가? (관련 없는 주제로 표류 금지)
+  - **타깃 적합성**: TOPIC.md의 `audience`에 적합한 난이도·설명 방식인가?
+  - **인터랙티브 충족**: TOPIC.md의 `interactive` 요구가 기획에 반영되었는가?
+  - **사례 반영**: TOPIC.md의 `real_world_apps`에 명시된 대중 앱 사례가 기획에 포함되었는가?
+- 위 4축 중 하나라도 부족하면 FAIL 처리한다.
+
+## 실행 순서
+
+### 1단계: 기획 작성 에이전트 (에이전트 A) 실행
+
+에이전트 A가 사용자가 명시적으로 제공한 자료를 기반으로 기획 문서 초안을 작성한다.
+
+결과: step017_planning_chunk*.md (500줄 이하/청크)
+
+### 2단계: 요구 반영 검증 에이전트 (에이전트 B) 실행
+
+**에이전트 B의 역할: 요구사항가 기획에 반영되었는지 검증만 수행. 기획 수정 금지.**
+
+에이전트 B에게 전달할 프롬프트 (N = 현재 라운드 번호):
+
+```
+너는 요구 반영 검증자다. 기획을 수정하지 않는다. 반영 여부 판정만 한다.
+
+1. TOPIC과 사용자 요청·제공 자료를 먼저 Read한다. 요구 ID, 실제 출처 경로와 SHA-256을 대조한다.
+   - 필수 요구 누락·충돌 또는 hash 불일치는 INCOMPLETE다.
+
+2. 기획 문서를 모두 Read한다:
+   - `step_archive/step017_planning_chunk*.md` (Glob 검색)
+
+3. 이전 라운드 검증 결과가 있으면 Read한다:
+   - `step_archive/outputs/step017_검증_r*.md` (Glob 검색)
+
+4. 다음 축으로 검증한다:
+   - **데이터 기반**: 기획의 각 결정이 제공 자료에 근거하는가 (명시적으로 제공된 자료)
+   - **누락**: 요청에 명시된 중요 패턴이 기획에 빠지지 않았는가
+   - **왜곡**: 요구사항가 기획에서 잘못 해석/변형되지 않았는가
+   - **출처**: 기획의 주요 결정마다 출처(요청·제공 자료의 파일·절)가 추적 가능한가
+
+5. 결과를 `step_archive/outputs/step017_검증_rN.md`에 저장한다.
+   - 실제 검사한 요청·제공 입력의 경로·SHA-256과 대응 요구 축을 기록한다.
+   - 반영 충실하면: "PASS"로 시작
+   - 부족하면: "FAIL"로 시작하고 누락/왜곡 항목 구체적 나열
+```
+
+에이전트 B는 haiku를 사용한다.
+
+### 3단계: 판정 확인
+
+- **PASS** → 다음 Step으로 이동
+- **FAIL** → 4단계 (기획 보강 에이전트 A)
+
+### 4단계: 기획 보강 에이전트 (에이전트 A) 실행
+
+에이전트 A가 검증 피드백을 반영하여 기획 문서를 보강한다. 통과 판정하지 않는다.
+
+### 반복 제한: 최대 5라운드
+
+최대 5라운드까지 수정·재검증한다. 같은 필수 항목이 2연속 미수정이면 조기 종료한다.
+모든 필수 항목의 현재 증거가 PASS일 때만 완료한다. 실패·누락·미검증 또는 한도 소진이면
+미해결 항목과 다음 검사를 기록하고 현재 Step을 INCOMPLETE로 인계한다.
+필수 실패를 스킵하거나 완료 보고 후 다음 Step으로 진행하지 않는다.
+한도 소진이나 같은 필수 항목의 연속 미수정으로 끝나면 `required-input-missing`, 필수 실행·시각 검사 기능이 없으면 `required-tool-failed`로 헌법 §2-1 명명된 멈춤을 기록하고 턴을 끝낸다.
+
+## 제공 API 계약과 미확정 요구
+
+API를 사용하는 경우 사용자가 제공한 명세·자료 또는 명시적으로 선언한 계약에서
+target, version, schema, auth, rate-limit, error, retry 정책을 추출한다. 요구 ID와
+출처 파일·절·SHA-256을 연결한다. 누락된 필수 항목은 missing requirements로 남겨
+차단하거나 명시적인 계약 결정을 받는다. 대상이 없으면 근거 있는 N/A를 기록한다.
+추정한 최신 외부 사실이나 실행하지 않은 검증을 PASS로 기록하지 않는다.
+테스트 결과는 선언한 계약의 동작 증거이며 외부 사실의 현재성을 증명하지 않는다.
+
+## Jev 의미 체크포인트
+
+TOPIC의 요구와 기획의 대응 문장이 준비되면 선택한 요구가 명시적으로 반영됐는지 묻는다. 기존 `scripts/jev-review.mjs`와 `docs/JEV-REVIEW.md`는 버전 1 호환 경로다. 새 자동 검토는 일반 helper만 사용하며 두 어댑터를 중복 호출하지 않는다.
+
+현재 작업에서 Jev 사용과 선택한 발췌문의 외부 전송이 승인된 경우 호스트가 자동 호출한다.
+기존 승인이 해당 범위를 포함하면 재확인하지 않는다. 단계 도달이나 `TYPESAFE_API_KEY` 존재는 승인이 아니다.
+승인이 없거나 서비스가 불가하면 이유를 기존 단계 보고서에 기록하고 독립 검증을 계속한다.
+
+신뢰한 플러그인의 `node "<plugin-root>/scripts/jev-judge.mjs" prepare --workspace ROOT --input -`로 준비한다.
+재사용 전 `inspect --workspace ROOT --report PATH`의 상태와 현재 prepare의 `request_hash`, `policy_hash`, `input_hash`, `sources`를 모두 대조한다.
+새 호출은 동일 JSON으로 `run --workspace ROOT --input - --allow-network`를 실행한다.
+변하지 않은 입력에는 한 배치만 호출하는 호스트 정책을 적용하며 전역 하드 쿼터로 해석하지 않는다.
+`unverified`·`stale`는 판정 근거로 쓰지 않고 abstain·낮은 confidence는 호스트가 원본을 검토한다.
+승인된 선택 API 예외는 일반 웹 탐색이나 새 자료 수집을 허용하지 않는다.
+
+입력 파일·발췌문 범위, 동의·중복 방지·보고서 검사는 `docs/jev-checkpoints.md`를 따른다.
+기존 독립 검증·Acceptance·실제 검사와 완료 writer는 유지한다. Jev 결과나 `current`는 PASS 또는 완료 권한이 아니다.
+
+## 실패 패턴 기록
+
+종료 시(PASS 또는 INCOMPLETE) 도중 FAIL 항목과 해결 여부를 이 Step 검증 보고서의 `## 실패 패턴` 절에 적는다. PASS로 끝나도 도중 FAIL은 남긴다. `step_archive/progress.json`은 수정하지 않는다(완료는 Stop 훅, 멈춤은 `harness-pause.mjs`만 기록한다).
+
+## 주의사항
+
+- 에이전트 A가 스스로 "잘 반영했다"고 판단하는 것을 금지한다
+- 에이전트 B가 기획을 수정하는 것을 금지한다
+- 에이전트 B의 현재 PASS만 완료 조건이다. 실패·한도 소진은 미완료 종료 조건이다
+
+합리적인 선에서 최대한 많은 서브에이전트를 병렬로 사용해야 한다 (동시 실행 최대 10개).
+
+**기획 결과는 청크 단위로 저장한다:**
+
+```
+step017_planning_chunk1.md (500줄 이하)
+step017_planning_chunk2.md (500줄 이하)
+step017_planning_chunk3.md (500줄 이하)
+...
+```
+
+서브에이전트는 항상 haiku를 사용한다.
+
+## Self-Calibration
+
+기획 완료 후 다음을 스스로 평가하라:
+- 이전 실패 패턴을 피하고 있는가? (Y/N)
+- N이면 해당 부분을 보완하고 재평가한다.
+
+---
+
+필수 요구와 현재 검증 증거가 모두 PASS일 때만 이 지침을 완료하고 자동으로 step018.md를 읽고 수행한다. 사용자 확인을 기다리지 않는다.
+
+## 정의별 입력·산출물 계약
+
+- 입력: `step_archive/TOPIC/TOPIC.md`
+- 입력: `step_archive/step016_gate_status.md`
+- 산출물: `step_archive/step017_planning_chunk1.md`
+- 산출물: `step_archive/outputs/step017_검증.md`
+
+필수 수락 항목: `base-planning-snapshot`, `planning-verification-report`, `topic-fidelity`, `requirements-traceability`, `planning-chunks-bounded`, `bounded-independent-review`, `pass-verdict`, `provided-api-contract`
