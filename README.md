@@ -1,6 +1,6 @@
 <div align="center">
 
-# harness50
+# harness36
 
 ### 한 줄 요청 → 36 step 자율주행 → 인터랙티브 웹 튜토리얼 1편
 
@@ -9,7 +9,7 @@
 
 <br/>
 
-[![Claude Code Plugin](https://img.shields.io/badge/Claude_Code-Plugin-191919?style=for-the-badge&logo=anthropic&logoColor=white)](https://github.com/Technoetic/harness50)
+[![Claude Code Plugin](https://img.shields.io/badge/Claude_Code-Plugin-191919?style=for-the-badge&logo=anthropic&logoColor=white)](https://github.com/Technoetic/harness36)
 [![License MIT](https://img.shields.io/badge/License-MIT-A855F7?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows_·_macOS_·_Linux-0EA5E9?style=for-the-badge&logo=windows&logoColor=white)](#-claude-code-설치)
 [![Hooks](https://img.shields.io/badge/Hooks-28_files-F59E0B?style=for-the-badge)](hooks/)
@@ -23,7 +23,7 @@
 
 <img src="docs/screenshots/hero-cast.svg" width="90%" alt="harness50 자율주행 데모 — /webapp 한 줄 입력으로 step이 자동 진행되는 터미널 시뮬레이션 (legacy 107단계 완주 기록)"/>
 
-<sub>데모 캐스트는 legacy 107단계 완주 실기록이다. v2.0부터 하네스는 50단계로 축약됐다 (원본은 <a href="https://github.com/Technoetic/harness50/tree/legacy-107"><code>legacy-107</code></a> 태그).</sub>
+<sub>데모 캐스트는 legacy 107단계 완주 실기록이다. v2.0부터 하네스는 50단계로 축약됐다 (원본은 <a href="https://github.com/Technoetic/harness36/tree/legacy-107"><code>legacy-107</code></a> 태그).</sub>
 
 </div>
 
@@ -31,7 +31,7 @@
 
 ## Workflow profiles / 새36와 기존50
 
-제품명은 **harness50**입니다. 새 Claude/Codex 시작은 `research-free-36-v1`의 36단계를 사용합니다.
+공개 저장소명은 **harness36**입니다. 기존 설치와 상태 호환성을 위해 플러그인·마켓플레이스 식별자 `harness50`은 유지합니다. 새 Claude/Codex 시작은 `research-free-36-v1`의 36단계를 사용합니다.
 외부 조사 단계가 제거됐으며 입력은 사용자 요구, TOPIC, 명시적으로 제공된 자료,
 18단계 설계 계약과 현재 측정 출력입니다. 누락된 API 대상·버전·스키마·인증·오류/재시도
 계약은 누락 요구사항으로 남깁니다. 테스트 통과는 외부 사실의 최신성을 검증한 것이 아닙니다.
@@ -151,7 +151,7 @@ codex plugin add harness50@harness50
 공개 저장소에서 Claude Code와 Codex 어댑터를 함께 설치할 수 있습니다.
 
 ```text
-codex plugin marketplace add Technoetic/harness50
+codex plugin marketplace add Technoetic/harness36
 codex plugin add harness50@harness50
 ```
 
@@ -469,7 +469,7 @@ graph TB
 </div>
 
 ```
-harness50/
+harness36/
 ├── .claude-plugin/
 │   ├── plugin.json                    ← 버전 원본 · MIT
 │   └── marketplace.json               ← /plugin marketplace add 진입점
@@ -586,13 +586,13 @@ Stop 훅은 문구가 아니라 progress.json 상태로 판정한다. 선택된 
 Claude Code 터미널에서 평소처럼 말 걸면 됩니다. 메인 에이전트가 슬래시 명령 절차를 안내해 줍니다.
 
 ```text
-harness50 플러그인을 깔아줘. Technoetic/harness50 레포에 있어.
+harness50 플러그인을 깔아줘. Technoetic/harness36 레포에 있어.
 ```
 
 Claude가 다음 2단계를 차례로 안내합니다 (사용자가 직접 입력):
 
 ```text
-/plugin marketplace add Technoetic/harness50
+/plugin marketplace add Technoetic/harness36
 /plugin install harness50@harness50
 ```
 
@@ -604,7 +604,7 @@ Claude가 다음 2단계를 차례로 안내합니다 (사용자가 직접 입�
 마켓플레이스 등록 → 설치 2단계:
 
 ```text
-/plugin marketplace add Technoetic/harness50
+/plugin marketplace add Technoetic/harness36
 /plugin install harness50@harness50
 ```
 
@@ -895,7 +895,7 @@ MIT License · Copyright (c) 2026 [Technoetic](https://github.com/Technoetic)
 
 <br/>
 
-[![Open in Claude Code](https://img.shields.io/badge/Open_in_Claude_Code-Plugin-191919?style=for-the-badge&logo=anthropic&logoColor=white)](https://github.com/Technoetic/harness50)
-[![Star this repo](https://img.shields.io/github/stars/Technoetic/harness50?style=for-the-badge&color=F59E0B)](https://github.com/Technoetic/harness50/stargazers)
+[![Open in Claude Code](https://img.shields.io/badge/Open_in_Claude_Code-Plugin-191919?style=for-the-badge&logo=anthropic&logoColor=white)](https://github.com/Technoetic/harness36)
+[![Star this repo](https://img.shields.io/github/stars/Technoetic/harness36?style=for-the-badge&color=F59E0B)](https://github.com/Technoetic/harness36/stargazers)
 
 </div>

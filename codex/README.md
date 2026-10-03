@@ -4,7 +4,7 @@ Harness50의 Codex 어댑터는 새36 절차를 36개의 검증 가능한 단계
 
 ## Workflow profiles / 새36와 기존50
 
-제품명은 **harness50**입니다. 새 Claude/Codex 시작은 `research-free-36-v1`의 36단계를 사용합니다.
+공개 저장소명은 **harness36**입니다. 기존 설치와 상태 호환성을 위해 플러그인·마켓플레이스 식별자 `harness50`은 유지합니다. 새 Claude/Codex 시작은 `research-free-36-v1`의 36단계를 사용합니다.
 외부 조사 단계가 제거됐으며 입력은 사용자 요구, TOPIC, 명시적으로 제공된 자료,
 18단계 설계 계약과 현재 측정 출력입니다. 누락된 API 대상·버전·스키마·인증·오류/재시도
 계약은 누락 요구사항으로 남깁니다. 테스트 통과는 외부 사실의 최신성을 검증한 것이 아닙니다.
@@ -97,7 +97,7 @@ codex plugin add harness50@harness50
 공개 저장소에서 다음 경로로 설치할 수 있습니다.
 
 ```text
-codex plugin marketplace add Technoetic/harness50
+codex plugin marketplace add Technoetic/harness36
 codex plugin add harness50@harness50
 ```
 

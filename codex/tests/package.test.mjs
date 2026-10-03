@@ -132,7 +132,7 @@ function documentationContractErrors(text) {
   const install = sections[requiredSections[1]];
   for (const command of [
     "codex plugin marketplace add <path-to-harness50>",
-    "codex plugin marketplace add Technoetic/harness50",
+    "codex plugin marketplace add Technoetic/harness36",
     "codex plugin add harness50@harness50"
   ]) {
     if (!install.includes(command)) errors.push(`missing Codex install command: ${command}`);
