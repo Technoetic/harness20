@@ -26,7 +26,7 @@ if (-not $node) { exit 0 }
 
 $guard = Join-Path $PSScriptRoot 'lib/command-guard.mjs'
 if (-not (Test-Path -LiteralPath $guard -PathType Leaf)) {
-  [Console]::Error.WriteLine('Harness50: hooks/lib/command-guard.mjs is missing; destructive-guard made no decision.')
+  [Console]::Error.WriteLine('Harness36: hooks/lib/command-guard.mjs is missing; destructive-guard made no decision.')
   exit 1
 }
 # node's stderr is inherited and reaches the host unchanged.

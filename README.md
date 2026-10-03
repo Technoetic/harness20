@@ -4,9 +4,9 @@
 
 ### 한 줄 요청 → 36 step 자율주행 → 인터랙티브 웹 튜토리얼 1편
 
-현재 공개 버전: **[v2.13.0](https://github.com/Technoetic/harness36/releases/tag/v2.13.0)** · Claude Code와 Codex 지원 · 새 실행 36단계, 기존 50단계 이력 보존.
+현재 공개 버전: **[v3.0.0](https://github.com/Technoetic/harness36/releases/tag/v3.0.0)** · Claude Code와 Codex 지원 · 새 실행 36단계, 기존 50단계 이력 보존.
 
-**`/webapp 논문 트렌드 분석 대시보드`** 한 줄을 던지면 36단계 완료나 명명된 멈춤 전까지 멈추지 않는 결정론적 절차가 가동된다.<br/>
+**`/harness36:webapp 논문 트렌드 분석 대시보드`** 한 줄을 던지면 36단계 완료나 명명된 멈춤 전까지 멈추지 않는 결정론적 절차가 가동된다.<br/>
 모델을 똑똑하게 만드는 대신 **모델이 놓을 트랙을 좁힌다**.
 
 <br/>
@@ -33,7 +33,7 @@
 
 ## Workflow profiles / 새36와 기존50
 
-공개 저장소명은 **harness36**입니다. 기존 설치와 상태 호환성을 위해 플러그인·마켓플레이스 식별자 `harness50`은 유지합니다. 새 Claude/Codex 시작은 `research-free-36-v1`의 36단계를 사용합니다.
+공개 저장소·플러그인·마켓플레이스 이름은 **harness36**입니다. Claude Code는 `/harness36:webapp <주제>`, Codex는 `$harness36:webapp <주제>`로 시작합니다. 새 실행은 `research-free-36-v1`의 36단계를 사용하며, 기존 50단계 실행과 내부 저장 경로는 보존합니다.
 외부 조사 단계가 제거됐으며 입력은 사용자 요구, TOPIC, 명시적으로 제공된 자료,
 18단계 설계 계약과 현재 측정 출력입니다. 누락된 API 대상·버전·스키마·인증·오류/재시도
 계약은 누락 요구사항으로 남깁니다. 테스트 통과는 외부 사실의 최신성을 검증한 것이 아닙니다.
@@ -88,18 +88,20 @@ Jev 체크포인트는 17·18·25·31·35입니다.
 
 | Host | Start | Status | Reset |
 |---|---|---|---|
-| Claude Code | `/webapp <topic>` | `/harness-status` | `/harness-reset` |
-| Codex | `$webapp <topic>` | `$harness50-status` | `$harness50-reset` |
+| Claude Code | `/harness36:webapp <topic>` | `/harness36:harness-status` | `/harness36:harness-reset` |
+| Codex | `$harness36:webapp <topic>` | `$harness36:harness36-status` | `$harness36:harness36-reset` |
+
+짧은 이름도 사용할 수 있습니다: Claude Code의 `/webapp`, `/harness-status`, `/harness-reset`과 Codex의 `$webapp`, `$harness36-status`, `$harness36-reset`. 각 시작 명령에는 주제를 붙입니다.
 
 Codex does not provide a `/webapp` slash command. Codex에서 기존 작업을 이어가려면 `$webapp resume`, 자동 이어가기를 멈추려면 `$webapp pause`를 사용합니다.
 
 Claude Code에서 자동 이어가기를 멈추려면 `/harness-pause`, 멈춘 작업을 이어가려면 `/harness-resume`을 사용합니다. `/harness-reset`은 진행 기록을 새로 만들고 `/webapp <topic>`은 완료 기록이 있는 진행을 건드리지 않으므로 둘 다 재개 수단이 아닙니다.
 
-플러그인 이름이 표시되는 Codex에서는 `$harness50:webapp`, `$harness50:harness50-status`, `$harness50:harness50-reset`을 선택합니다. 짧은 이름과 같은 제어 요청으로 처리됩니다.
+플러그인 이름이 표시되는 Codex에서는 `$harness36:webapp`, `$harness36:harness36-status`, `$harness36:harness36-reset`을 선택합니다. 짧은 이름과 같은 제어 요청으로 처리됩니다.
 
 Codex의 새 작업은 한 줄 주제로 시작할 수 있습니다. 초기화 관리자가 원문과 명시 조건을 보존하면서 여섯 필수 주제 항목을 준비하고, 미지정 항목만 기본값으로 표시한 뒤 해시를 고정합니다. 완성된 Markdown/YAML 주제는 바이트 그대로 보존하며, 기존 workflow의 주제는 변경하지 않습니다.
 
-`$harness50:webapp <주제>`를 한 번 입력하면 현재 대화에서 검증된 단계를 순서대로 진행합니다.
+`$harness36:webapp <주제>`를 한 번 입력하면 현재 대화에서 검증된 단계를 순서대로 진행합니다.
 각 단계의 증거와 완료 기록을 저장한 뒤 상태 관리자가 반환한 다음 단계로 바로 이어갑니다.
 단계 완료 때마다 최종 응답이나 추가 `resume` 입력을 요구하지 않습니다. 현재 대화 내 실행은
 Stop 후크 없이 동작하며, 전체 완료·사용자 일시정지·실제 입력 대기·차단 상태에서 멈춥니다.
@@ -141,11 +143,11 @@ Node.js 22 이상과 `TYPESAFE_API_KEY`를 사용합니다. 키 설정이나 단
 
 ### Local checkout
 
-개발용 체크아웃을 설치하려면 아래 `<path-to-harness50>`에 저장소 루트를 지정합니다.
+개발용 체크아웃을 설치하려면 아래 `<path-to-harness36>`에 저장소 루트를 지정합니다.
 
 ```text
-codex plugin marketplace add <path-to-harness50>
-codex plugin add harness50@harness50
+codex plugin marketplace add <path-to-harness36>
+codex plugin add harness36@harness36
 ```
 
 ### GitHub source
@@ -154,7 +156,7 @@ codex plugin add harness50@harness50
 
 ```text
 codex plugin marketplace add Technoetic/harness36
-codex plugin add harness50@harness50
+codex plugin add harness36@harness36
 ```
 
 The published repository includes both Claude Code and Codex adapters. 설치 후에는 새 Codex 세션을 엽니다. 훅을 통한 턴 간 자동 재개를 사용하려면 아래 신뢰 게이트를 완료해야 합니다.
@@ -162,12 +164,19 @@ The published repository includes both Claude Code and Codex adapters. 설치 �
 ## Permissions and continuation / 권한과 이어가기
 
 - Normal Codex permission confirmations remain in effect for every command.
-- Harness50 never auto-approves commands and never changes sandbox or approval settings.
+- Harness36 never auto-approves commands and never changes sandbox or approval settings.
 - Each later turn receives at most one one-step continuation marker; that marker schedules work but grants no permission.
-- Submitted command evidence is validated only as a string and exit status; the Harness50 runtime never executes that submitted command.
+- Submitted command evidence is validated only as a string and exit status; the Harness36 runtime never executes that submitted command.
 - The guard is a bounded, deny-only defense, not a shell sandbox; benign commands are never approved by the hook and still follow normal Codex permissions.
 
 ## Migration and reset / 마이그레이션과 리셋
+
+### harness50 → harness36 설치 전환
+
+v3.0.0은 설치 ID와 명령 namespace를 `harness36`으로 바꿉니다. 기존 `harness50` 설치가 자동으로 개명되지는 않습니다. 진행 중인 실행은 먼저 일시 정지하고, 기존 플러그인을 해당 설치 범위에서 비활성화한 뒤 새 `harness36`을 설치·활성화하세요. 두 이름의 플러그인을 동시에 활성화하지 마세요. 이전에 특정 프로젝트에서 꺼 둔 설정은 새 이름에서도 유지합니다.
+
+기존 플러그인 캐시는 롤백과 다른 프로젝트를 위해 보존합니다. 전환 중에는 기존 설치를 제거하거나 캐시 폴더를 개명하지 않습니다. `step_archive/.harness50-codex/`, Claude 진행 기록, TOPIC, 단계 본문과 산출물은 이동·개명 없이 이어서 사용합니다. 기존 36/50 실행의 프로필과 계약 식별자도 유지합니다. 새 설치 후 호스트를 다시 시작하고 Codex의 변경된 훅 정의는 직접 검토·신뢰해야 합니다.
+
 
 - Only when no Codex workflow exists, existing Claude progress may be imported read-only once.
 - Codex never writes back to Claude progress and never merges later Claude changes.
@@ -176,7 +185,7 @@ The published repository includes both Claude Code and Codex adapters. 설치 �
 
 가져온 과거 완료 기록과 Codex에서 검증한 완료 기록은 별도로 표시됩니다.
 
-Claude Code hooks defer to an existing Codex workflow. While `step_archive/.harness50-codex/state.json` exists, they never create, rewrite or advance Claude `progress.json`, never block Stop, never auto-approve Claude edits and never re-initialize TOPIC; SessionStart reports the Codex step in one line instead. The two Claude guards still check Bash commands there, because a Claude session has no other Harness50 guard in a Codex workspace.
+Claude Code hooks defer to an existing Codex workflow. While `step_archive/.harness50-codex/state.json` exists, they never create, rewrite or advance Claude `progress.json`, never block Stop, never auto-approve Claude edits and never re-initialize TOPIC; SessionStart reports the Codex step in one line instead. The two Claude guards still check Bash commands there, because a Claude session has no other Harness36 guard in a Codex workspace.
 Codex로 시작한 작업을 Claude Code에서 이어갈 때는 Codex 상태 관리자(`codex/scripts/harness-state.mjs`)와 `codex/skills/webapp/SKILL.md` 절차를 따릅니다. 대화 속 완료 보고는 단계를 진행시키지 않습니다. 상태 파일이 손상되었으면 경고만 표시하고, 복구나 리셋은 사용자가 결정합니다. Codex 리셋이 `state.json`을 백업으로 옮기면 Claude 훅은 기존 동작으로 돌아갑니다.
 
 ## Hook trust gate / 후크 신뢰 게이트
@@ -588,14 +597,14 @@ Stop 훅은 문구가 아니라 progress.json 상태로 판정한다. 선택된 
 Claude Code 터미널에서 평소처럼 말 걸면 됩니다. 메인 에이전트가 슬래시 명령 절차를 안내해 줍니다.
 
 ```text
-harness50 플러그인을 깔아줘. Technoetic/harness36 레포에 있어.
+harness36 플러그인을 깔아줘. Technoetic/harness36 레포에 있어.
 ```
 
 Claude가 다음 2단계를 차례로 안내합니다 (사용자가 직접 입력):
 
 ```text
 /plugin marketplace add Technoetic/harness36
-/plugin install harness50@harness50
+/plugin install harness36@harness36
 ```
 
 > [!IMPORTANT]
@@ -607,7 +616,7 @@ Claude가 다음 2단계를 차례로 안내합니다 (사용자가 직접 입�
 
 ```text
 /plugin marketplace add Technoetic/harness36
-/plugin install harness50@harness50
+/plugin install harness36@harness36
 ```
 
 ### 방법 3 — 로컬 경로 (개발 / 커스터마이즈)
@@ -615,14 +624,14 @@ Claude가 다음 2단계를 차례로 안내합니다 (사용자가 직접 입�
 레포를 clone한 뒤 그 루트를 로컬 마켓플레이스로 등록하고 설치합니다:
 
 ```text
-/plugin marketplace add /absolute/path/to/harness50
-/plugin install harness50@harness50
+/plugin marketplace add /absolute/path/to/harness36
+/plugin install harness36@harness36
 ```
 
 설치하지 않고 한 세션에서만 불러오려면 CLI 진입 시 플래그를 씁니다:
 
 ```bash
-claude --plugin-dir /absolute/path/to/harness50
+claude --plugin-dir /absolute/path/to/harness36
 ```
 
 ### 설치 범위 — 어디서 켤지 먼저 정한다
@@ -638,7 +647,7 @@ claude --plugin-dir /absolute/path/to/harness50
 프로젝트 폴더에서 실행합니다:
 
 ```bash
-claude plugin install harness50@harness50 --scope local
+claude plugin install harness36@harness36 --scope local
 ```
 
 > [!WARNING]
@@ -646,14 +655,14 @@ claude plugin install harness50@harness50 --scope local
 
 ### 끄기·제거
 
-- 한 프로젝트에서만 끄기: `claude plugin disable harness50@harness50 --scope project`(개인 설정이면 `--scope local`). 같은 효과의 설정은 다음과 같습니다.
+- 한 프로젝트에서만 끄기: `claude plugin disable harness36@harness36 --scope project`(개인 설정이면 `--scope local`). 같은 효과의 설정은 다음과 같습니다.
 
   ```json
-  { "enabledPlugins": { "harness50@harness50": false } }
+  { "enabledPlugins": { "harness36@harness36": false } }
   ```
 
-- 다시 켜기: `claude plugin enable harness50@harness50 --scope project`
-- 완전 제거: `claude plugin uninstall harness50@harness50 --scope <설치한 범위>` 다음 `claude plugin marketplace remove harness50`
+- 다시 켜기: `claude plugin enable harness36@harness36 --scope project`
+- 완전 제거: `claude plugin uninstall harness36@harness36 --scope <설치한 범위>` 다음 `claude plugin marketplace remove harness36`
 - 세션 안에서는 `/plugin`으로 같은 작업을 합니다. 변경은 Claude Code를 다시 시작한 뒤 적용됩니다.
 - 제거해도 프로젝트의 `step_archive/`는 남습니다. 2.9.0 이하를 Windows에서 user 범위로 쓴 적이 있으면 무관한 폴더(홈 포함)에 그 버전의 로더가 만든 `step_archive/progress.json`이 남아 있을 수 있습니다. 2.10.0부터는 단계 본문이 없는 이 파일을 실행으로 보지 않으며, 지워도 됩니다.
 - `/harness-pause`는 실행 하나의 자동 진행만 멈추고 훅은 그대로 둡니다(두 가드는 멈춘 실행에서도 동작). 훅 전체를 멈추려면 플러그인을 끕니다.
@@ -725,7 +734,7 @@ step031 E2E는 프로젝트의 `npm run e2e`를 실행한다 — 러너(Playwrig
 
 ```text
 /harness-status
-→ harness50: 25/36 완료 | current=step026 | r1=- r2=- r3=-
+→ harness36: 25/36 완료 | current=step026 | r1=- r2=- r3=-
 ```
 
 ### 완료 보고
@@ -751,7 +760,7 @@ Step 036/36 완료
 
 ```text
 /harness-reset
-→ harness50 리셋 완료 — 새 주제는 /webapp <주제>, 현재 주제를 1단계부터 다시 하려면 /harness-resume
+→ harness36 리셋 완료 — 새 주제는 /webapp <주제>, 현재 주제를 1단계부터 다시 하려면 /harness-resume
 
 /webapp 새 주제
 → step001부터 새 주제로 실행
@@ -763,10 +772,10 @@ Step 036/36 완료
 
 ```text
 /harness-pause 회의로 잠시 중단
-→ harness50 멈춤 — step026에서 자동 진행 중지. 재개: /harness-resume
+→ harness36 멈춤 — step026에서 자동 진행 중지. 재개: /harness-resume
 
 /harness-status
-→ harness50: 25/36 완료 | current=step026 | r1=- r2=- r3=- | 멈춤: user-request @step026 — 회의로 잠시 중단
+→ harness36: 25/36 완료 | current=step026 | r1=- r2=- r3=- | 멈춤: user-request @step026 — 회의로 잠시 중단
 
 /harness-resume
 → step026부터 이어서 실행
@@ -807,12 +816,12 @@ PASS/FAIL/INCOMPLETE 판정이며 점수는 없다. 진행 기록 훅은 새 `St
 | **PostToolUse** | mx-tag-validator + lsp-autofix | @MX 태그 검증 + Biome/Stylelint 자동수정 |
 | **Stop** | stop-advance(step-progress-writer 다음 step-auto-continue, 순서대로) + spec-generator + trust5-validator (셋은 병렬) | progress 갱신 뒤 미완료면 block JSON(거부된 완료는 끝에 이유와 할 일) · SPEC 생성 · r1/r2/r3 평가 |
 
-`step_archive/.harness50-codex/state.json`이 있는 Codex 작업 공간에서는 step 훅(loader·writer·auto-continue·obedience-guard·webapp-trigger·spec-generator·trust5-validator)이 progress.json과 TOPIC.md를 만들거나 바꾸지 않고 Stop도 막지 않으며, Claude 편집을 자동 승인하지도 않습니다. SessionStart는 `hooks/lib/codex-workflow.mjs`가 읽은 Codex 진행 단계를 한 줄로만 알립니다([마이그레이션과 리셋](#migration-and-reset--마이그레이션과-리셋)). 두 가드는 Codex 작업 공간에서도 Bash 명령을 검사합니다(그 공간의 Claude 세션에는 다른 Harness50 가드가 없음).
+`step_archive/.harness50-codex/state.json`이 있는 Codex 작업 공간에서는 step 훅(loader·writer·auto-continue·obedience-guard·webapp-trigger·spec-generator·trust5-validator)이 progress.json과 TOPIC.md를 만들거나 바꾸지 않고 Stop도 막지 않으며, Claude 편집을 자동 승인하지도 않습니다. SessionStart는 `hooks/lib/codex-workflow.mjs`가 읽은 Codex 진행 단계를 한 줄로만 알립니다([마이그레이션과 리셋](#migration-and-reset--마이그레이션과-리셋)). 두 가드는 Codex 작업 공간에서도 Bash 명령을 검사합니다(그 공간의 Claude 세션에는 다른 Harness36 가드가 없음).
 
 **활성 조건.** Claude Code 훅은 `hooks/lib/harness-activity.mjs` 한 곳의 판정을 따릅니다. 다음을 모두 만족할 때만 진행 중인 실행입니다: `step_archive/.harness50-codex/state.json` 항목이 없음, `step_archive/progress.json`이 프로젝트 안의 1MB 이하 일반 파일, `paused`가 없거나 false, `status`가 없거나 active·running·in_progress, `total_steps`가 선택 프로필의 개수(새36·legacy50), 완료 단계가 그 범위의 중복 없는 정수, 현재 단계가 첫 번째 빈 단계, 그 단계의 본문 파일이 있음. `hooks/run-hook.mjs`가 셸을 띄우기 전에 이 판정을 한 번 하므로, 무관한 폴더에서는 훅이 파일을 만들거나 승인·block·지시 주입을 하지 않습니다. Stop의 `stop-advance`는 두 부분을 각자의 판정으로 순서대로 띄웁니다: 진행 기록 훅을 먼저, step-auto-continue는 그 판정이 진행 기록 훅 실행 전과 후에 모두 통과할 때만. 현재 단계만 첫 빈 단계와 어긋난 실행(drift: `current_step`이 1~(선택된 전체 단계 수+1)의 다른 정수이고 첫 빈 단계의 본문 파일이 있음)은 진행 기록 훅만 돌아 현재 단계를 첫 빈 단계로 되돌리고, 그 뒤부터 다른 훅이 다시 켜집니다. `current_step`은 완료 기록에서 정해지는 값이므로, 커서를 앞으로 옮겨도 단계를 건너뛸 수 없습니다. 어긋남을 발견한 Stop 한 번은 이어가기를 지시하지 않습니다.
 
 - destructive-guard와 permission-request-guard는 하네스 작업 공간(진행 중·멈춘·선택된 전체 단계를 마친 실행, 커서만 어긋난 실행, Codex 작업 공간)에서만 실행됩니다. 진행 기록이 없거나, 옛 로더가 남긴 본문 없는 기록이거나, 중지되었거나 손상된 기록인 폴더에서는 셸을 띄우지 않고 호스트의 정상 권한 확인을 따릅니다(Bash는 원래 자동 승인되지 않음). 판정은 `hooks/lib/command-guard.mjs` 하나가 두 OS에 똑같이 내립니다: 차단(승인 불가, PermissionRequest도 Bash는 같은 집합만 거부)과 확인(승인 가능: sudo·패키지 설치·git hooksPath 설정 등).
-- webapp-trigger는 첫 줄이 `/webapp <주제>`(또는 `/harness50:webapp <주제>`)일 때만 실행됩니다.
+- webapp-trigger는 첫 줄이 `/harness36:webapp <주제>` 또는 `/webapp <주제>`일 때만 실행됩니다. 기존 `/harness50:webapp <주제>` 입력 판별도 유지합니다.
 - step-progress-loader는 진행 중인 실행, 멈춘 실행(멈춘 위치 한 줄), Codex 작업 공간(한 줄 안내)에서 실행됩니다.
 - step-obedience-guard는 진행 중인 실행과 멈춘 실행(멈춘 위치 한 줄)에서 실행됩니다.
 - step-progress-writer는 진행 중인 실행, 멈춘 실행, 커서만 어긋난 실행에서 실행됩니다. Stop에서는 `stop-advance` 안에서 먼저 돌고(출력은 버림, 28초 예산), 보고된 완료를 거부하면 `step_archive/progress-refusals.json`에 남겨 step-auto-continue가 이유와 할 일을 짧게 전합니다(거부할 것이 없으면 지움). 멈춘 실행에서는 멈춘 턴에 보고된 완료 줄만 기록하고, 기록할 줄이 없고 커서도 맞으면 아무것도 쓰지 않습니다. 커서가 어긋난 실행에서는 새로 기록할 줄이 없어도 `current_step`을 첫 빈 단계로 되돌립니다(멈춘 실행의 멈춤 필드는 그대로 둠).
@@ -871,7 +880,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests/security-regression.ps
 
 | 출처 | 무엇을 빌렸나 |
 |:---|:---|
-| [**Technoetic/claude-code-commands**](https://github.com/Technoetic/claude-code-commands) | **자매 레포** — harness50의 9회차 audit 패턴이 원래 어디서 왔는지 보여주는 1년치 슬래시 명령 20종 컬렉션 |
+| [**Technoetic/claude-code-commands**](https://github.com/Technoetic/claude-code-commands) | **자매 레포** — harness36의 9회차 audit 패턴이 원래 어디서 왔는지 보여주는 1년치 슬래시 명령 20종 컬렉션 |
 | [MoAI-ADK](https://github.com/moai-research/MoAI) | @MX 4종 태그 시스템 · TRUST 5 게이트 · EARS SPEC 형식 |
 | [superpowers](https://github.com/obra/superpowers) | brainstorming · TDD · debugging 스킬 구조와 개발 절차를 참고. 적용 범위·승인은 호스트별 규약을 따름 |
 | [Claude Code 공식 hooks](https://docs.claude.com/en/docs/claude-code/hooks) | `{"decision":"block"}` 자동 재개 메커니즘 · PreToolUse `permissionDecision:"allow"` |

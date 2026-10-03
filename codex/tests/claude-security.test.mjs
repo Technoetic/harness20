@@ -52,7 +52,7 @@ for (const [name, state] of Object.entries({ missing: null, malformed: '{', empt
     assert.equal(run(fixture(t, state), 'auto-approve', write('src/app.js')).output, '');
   });
 }
-for (const target of ['.claude/subdir/../settings.json', '/cache/harness50/2.1.0/hooks/auto-approve.ps1', path.join(repo, 'hooks/auto-approve.ps1')]) {
+for (const target of ['.claude/subdir/../settings.json', '/cache/harness50/2.1.0/hooks/auto-approve.ps1', '/cache/harness36/0.0.0-test/hooks/auto-approve.ps1', '/cache/HARNESS36/0.0.0-test/.claude-plugin/plugin.json', path.join(repo, 'hooks/auto-approve.ps1')]) {
   test(`protect canonical target ${target}`, t => {
     const root = fixture(t);
     assert.equal(run(root, 'auto-approve', write(target)).output, '');

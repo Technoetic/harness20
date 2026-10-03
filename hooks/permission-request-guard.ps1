@@ -39,7 +39,7 @@ try { $tool = [string]($raw | ConvertFrom-Json).tool_name } catch {}
 if ($tool -notin @('Bash', 'WebFetch')) {
   $protection = $raw | & $node (Join-Path $PSScriptRoot 'lib/approval-policy.mjs') guard 2>$null
   if ($protection -eq 'protected') {
-    [Console]::Out.Write('{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny","reason":"harness50: protected or invalid path"}}}')
+    [Console]::Out.Write('{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny","reason":"harness36: protected or invalid path"}}}')
     exit 2
   }
 }
@@ -48,7 +48,7 @@ if ($tool -in @('Write', 'Edit', 'MultiEdit', 'NotebookEdit')) { exit 0 }
 # 2. The command catalog's block set and dangerous URLs. node's stderr is inherited.
 $guard = Join-Path $PSScriptRoot 'lib/command-guard.mjs'
 if (-not (Test-Path -LiteralPath $guard -PathType Leaf)) {
-  [Console]::Error.WriteLine('Harness50: hooks/lib/command-guard.mjs is missing; permission-request-guard made no decision.')
+  [Console]::Error.WriteLine('Harness36: hooks/lib/command-guard.mjs is missing; permission-request-guard made no decision.')
   exit 1
 }
 $out = $raw | & $node $guard permission

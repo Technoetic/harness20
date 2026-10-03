@@ -19,7 +19,7 @@ const budgets = {"step-progress-loader":28000,"webapp-trigger":9000,"step-obedie
 const sequences = {"stop-advance":["step-progress-writer","step-auto-continue"]};
 const args = process.argv.slice(2);
 if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
-  console.error('Harness50: expected one registered hook name');
+  console.error('Harness36: expected one registered hook name');
   process.exitCode = 64;
 } else {
   const name = args[0];
@@ -40,7 +40,7 @@ if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
   // Armed before the hook starts, so the budget also covers any work done before spawn.
   const watchdog = setTimeout(() => {
     timedOut = true;
-    console.error(`Harness50: ${name} did not finish within ${budgets[name] / 1000} s and was stopped without a decision.`);
+    console.error(`Harness36: ${name} did not finish within ${budgets[name] / 1000} s and was stopped without a decision.`);
     if (!child) process.exit(1);
     // A node started by PowerShell is outside Node's job object and inherits the hook's output
     // handles, so end the whole tree while PowerShell is still its root.
@@ -90,7 +90,7 @@ if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
     child = started;
     childGroup = !windows;
     const timer = setTimeout(() => {
-      console.error(`Harness50: ${part} did not finish within ${budgets[part] / 1000} s and was stopped without a decision.`);
+      console.error(`Harness36: ${part} did not finish within ${budgets[part] / 1000} s and was stopped without a decision.`);
       if (windows) spawnSync('taskkill.exe', ['/PID', String(started.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true, timeout: 2000 });
       signalChild('SIGKILL');
       if (stdout === 'pipe') started.stdout.destroy();
@@ -99,7 +99,7 @@ if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
     if (stdout === 'pipe') started.stdout.resume();
     started.once('error', error => {
       clearTimeout(timer);
-      console.error(`Harness50: could not start registered hook (${error.code || 'spawn error'})`);
+      console.error(`Harness36: could not start registered hook (${error.code || 'spawn error'})`);
       finish(1);
     });
     started.once('close', (code, signal) => {
@@ -136,7 +136,7 @@ if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
     });
     child.once('error', error => {
       clearTimeout(watchdog);
-      console.error(`Harness50: could not start registered hook (${error.code || 'spawn error'})`);
+      console.error(`Harness36: could not start registered hook (${error.code || 'spawn error'})`);
       process.exitCode = 1;
     });
     child.once('close', (code, signal) => {

@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.0.0 - 2026-10-03
+
+- Rename the public Claude Code and Codex plugin and marketplace identities to `harness36`. Canonical starts are `/harness36:webapp <topic>` in Claude Code and `$harness36:webapp <topic>` in Codex; Codex status/reset skills become `harness36-status` and `harness36-reset`.
+- Accept both new `harness36` and legacy `harness50` control inputs in the existing parsers. Bootstrap, paused controls and Codex lifecycle routing recognize the new namespace. Parser compatibility does not install or activate the old namespace in a new host.
+- Protect both plugin names in installation/cache path guards. Preserve existing workflow storage, receipts, profile IDs, source hashes, 36/50 step bodies, quality/routing contract names and historical releases.
+- Document an explicit installation transition: disable the old plugin in its existing scope before enabling the new one, retain old caches, preserve project disable settings, and review changed hook definitions manually. An old installation is not renamed automatically.
+- Update package/preflight identity checks and derive installed plugin/cache identity from the current manifest and marketplace instead of a single hardcoded local marketplace.
+
+
 ## 2.13.0 - 2026-10-03
 
 - New Claude and Codex workflows default to the versioned `research-free-36-v1` definition. Remove original research stages 16–20, 22–24, 26–29, 40 and 43; preserve the surviving order, independent reviews, measured quality gates and final regression. Planning uses supplied requirements/materials, design declares a contract, and verification checks current implementation/output. Missing external/API facts remain missing.

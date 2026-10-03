@@ -173,7 +173,7 @@ test('the probe reports absent, running, paused, blocked and completed Codex sta
   const running = contextLine(probe(root));
   assert.equal(running,
     "[HARNESS] Codex workflow wf-incident is running at step 30/50 (29/50 complete) - continue it only through " +
-    "the harness50 plugin's codex/scripts/harness-state.mjs (show, resume, begin, complete) following " +
+    "the harness36 plugin's codex/scripts/harness-state.mjs (show, resume, begin, complete) following " +
     'codex/skills/webapp/SKILL.md; Claude progress.json and chat completion reports are not authoritative here.');
 
   for (const status of ['paused', 'blocked']) {
@@ -376,12 +376,14 @@ testEachName('the webapp trigger never re-initializes a Codex workspace', (t, na
   f.codex(codexState());
   const before = f.snapshot();
 
-  const lines = f.run('webapp-trigger', { prompt: '/webapp fractions' }).split(/\r?\n/);
-  assert.equal(lines.length, 2, lines.join('\n'));
-  assert.match(lines[0], /^\[HARNESS\] webapp trigger skipped: .*TOPIC\.md and progress\.json were left unchanged\./);
-  assert.match(lines[1], /^\[HARNESS\] Codex workflow wf-incident is running at step 30\/50/);
-  // TOPIC.md bytes (pinned by topic_sha256) are unchanged; no progress.json, archived/ or tools/.
-  assert.deepEqual(f.snapshot(), before);
+  for (const prompt of ['/webapp fractions', '/harness36:webapp fractions', '/harness50:webapp fractions']) {
+    const lines = f.run('webapp-trigger', { prompt }).split(/\r?\n/);
+    assert.equal(lines.length, 2, lines.join('\n'));
+    assert.match(lines[0], /^\[HARNESS\] webapp trigger skipped: .*TOPIC\.md and progress\.json were left unchanged\./);
+    assert.match(lines[1], /^\[HARNESS\] Codex workflow wf-incident is running at step 30\/50/);
+    // TOPIC.md bytes (pinned by topic_sha256) are unchanged; no progress.json, archived/ or tools/.
+    assert.deepEqual(f.snapshot(), before, prompt);
+  }
   assert.equal(f.run('webapp-trigger', { prompt: 'unrelated question' }), '');
 });
 

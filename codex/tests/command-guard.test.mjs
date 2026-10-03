@@ -111,6 +111,15 @@ test('escaped quotes, a bare privilege shell and persistence files are caught', 
   }
 });
 
+test('harness36 and harness50 installed hooks retain persistence-write protection', () => {
+  for (const target of ['/cache/harness36/0.0.0-test/hooks/auto-approve.ps1', '/plugins/harness36/.claude-plugin/plugin.json',
+    'C:\\cache\\HARNESS36\\0.0.0-test\\hooks\\auto-approve.ps1', '/cache/harness50/2.13.0/hooks/auto-approve.ps1']) {
+    assert.deepEqual(inspectCommand(`echo example > ${target}`), { level: 'ask', rule: 'persistence-write' }, target);
+    assert.equal(contentNeedsPrompt(`echo example > ${target}`), true, target);
+  }
+  assert.equal(inspectCommand('echo example > src/harness36-notes.md').level, 'pass');
+});
+
 test('helpers: segments, commandOf, dangerousTarget and secretPath', () => {
   // Once with quote characters removed, once with them as separators.
   assert.deepEqual(segments('a "b; c" | d'), ['a b', 'c', 'd', 'a', 'b', 'c', 'd']);
@@ -206,7 +215,7 @@ test('CLI pretool mode: block on stderr with exit 2, ask as JSON, pass silent', 
   assert.equal(asked.status, 0);
   assert.equal(asked.stderr, '');
   assert.deepEqual(JSON.parse(asked.stdout), { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask',
-    permissionDecisionReason: 'harness50: privilege needs your confirmation (destructive-guard ask rule)' } });
+    permissionDecisionReason: 'harness36: privilege needs your confirmation (destructive-guard ask rule)' } });
   assert.match(asked.stdout, /^[\x20-\x7e]+$/);
   for (const event of [bash('npm test'), bash('git commit -m "단계 완료"'), { tool_name: 'Write', tool_input: { file_path: 'x', content: 'rm -rf /' } }, '{broken', '', 'null']) {
     assert.deepEqual(cli(module, 'pretool', event), { status: 0, stdout: '', stderr: '' }, JSON.stringify(event));
@@ -218,8 +227,8 @@ test('CLI permission mode denies exactly the block set and dangerous URLs', t =>
   const denied = cli(module, 'permission', bash('rm -rf /', 'PermissionRequest'));
   assert.equal(denied.status, 2);
   assert.deepEqual(JSON.parse(denied.stdout), { hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'deny',
-    reason: 'harness50: PermissionRequest blocked - destructive command pattern (recursive-delete-root) (cross-plugin tamper protection)' } } });
-  assert.match(denied.stderr, /^Harness50 denied this permission request because the command text matches a destructive pattern/);
+    reason: 'harness36: PermissionRequest blocked - destructive command pattern (recursive-delete-root) (cross-plugin tamper protection)' } } });
+  assert.match(denied.stderr, /^Harness36 denied this permission request because the command text matches a destructive pattern/);
   assert.match(denied.stderr, /git commit -F <file>/);
   // What destructive-guard passes or asks about is never refused here.
   for (const command of ['git commit -m "remove sudo usage"', 'rm -rf ./dist', 'sudo apt install jq', 'git branch -d x', 'pip install semgrep']) {
@@ -229,7 +238,7 @@ test('CLI permission mode denies exactly the block set and dangerous URLs', t =>
   for (const url of ['http://169.254.169.254/', 'HTTP://LOCALHOST:3000/', 'https://example.com/install.SH', 'file:///etc/passwd', 'http://192.168.0.1/']) {
     const result = fetch(url);
     assert.equal(result.status, 2, url);
-    assert.match(result.stdout, /"behavior":"deny","reason":"harness50: PermissionRequest blocked - dangerous URL"/, url);
+    assert.match(result.stdout, /"behavior":"deny","reason":"harness36: PermissionRequest blocked - dangerous URL"/, url);
     assert.equal(result.stderr, '', url);
   }
   for (const url of ['https://example.com', 'https://example.com/shop?x=1']) assert.deepEqual(fetch(url), { status: 0, stdout: '', stderr: '' }, url);
@@ -288,7 +297,7 @@ test(`the ${nativeVariant} guard wrappers relay the catalog decision`, t => {
       assert.equal(pre.stdout, '', command);
       assert.match(pre.stderr, new RegExp(`Rule: ${rule}\\r?\\n`), command);
       assert.equal(permission.status, 2, command);
-      assert.match(permission.stdout, new RegExp(`"behavior":"deny","reason":"harness50: PermissionRequest blocked - destructive command pattern \\(${rule}\\)`), command);
+      assert.match(permission.stdout, new RegExp(`"behavior":"deny","reason":"harness36: PermissionRequest blocked - destructive command pattern \\(${rule}\\)`), command);
     } else {
       assert.equal(pre.status, 0, `${command}: ${pre.stderr}`);
       assert.equal(pre.stderr, '', command);

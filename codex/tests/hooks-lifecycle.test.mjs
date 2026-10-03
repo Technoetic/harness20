@@ -250,7 +250,7 @@ test("SessionStart accepts the official full shape and all documented sources wi
     assert.deepEqual(Object.keys(result.output), ["hookSpecificOutput"]);
     assert.equal(result.output.hookSpecificOutput.hookEventName, "SessionStart");
     const context = result.output.hookSpecificOutput.additionalContext;
-    assert.match(context, /^Harness50: running, 0\/50 complete\./);
+    assert.match(context, /^Harness36: running, 0\/50 complete\./);
     assert.match(context, /Topic: step_archive\/TOPIC\/TOPIC\.md\./);
     assert.match(context, /Next: Step 001\./);
     assert.match(context, /\$webapp resume\.$/);
@@ -303,7 +303,7 @@ test("SessionStart reports corrupt state concisely without overwrite or disclosu
   assert.equal(result.stderr, "");
   assert.equal(
     result.output.hookSpecificOutput.additionalContext,
-    "Harness50 state is unreadable. Run $harness50-status, then repair or reset the Codex workflow."
+    "Harness36 state is unreadable. Run $harness36-status, then repair or reset the Codex workflow."
   );
   assert.ok(Buffer.from(await readFile(paths.statePath)).equals(corrupt));
   assert.doesNotMatch(result.stdout, /sk-proj|password|node:internal|hook-lifecycle|\\|\/[A-Za-z]/i);
@@ -356,8 +356,14 @@ test(`${agentType} subagent prompts preserve parent state and lifecycle events`,
 });
 }
 
-test("only exact explicit Harness50 control-skill calls bypass pause", async () => {
-  const accepted = ["$webapp", "$webapp resume", "$webapp build a small dashboard", "$harness50-status", "$harness50-reset", "$harness50:webapp", "$harness50:webapp resume", "$harness50:harness50-status", "$harness50:harness50-reset", "$harness50:status", "$harness50:reset"];
+test("only exact explicit Harness36 and legacy Harness50 control-skill calls bypass pause", async () => {
+  const accepted = [
+    "$webapp", "$webapp resume", "$webapp build a small dashboard",
+    "$harness36-status", "$harness36-reset", "$harness36:webapp", "$harness36:webapp resume",
+    "$harness36:harness36-status", "$harness36:harness36-reset", "$harness36:status", "$harness36:reset",
+    "$harness50-status", "$harness50-reset", "$harness50:webapp", "$harness50:webapp resume",
+    "$harness50:harness50-status", "$harness50:harness50-reset", "$harness50:status", "$harness50:reset"
+  ];
   for (const prompt of accepted) {
     const root = await makeWorkspace();
     await init(root, "control");
@@ -373,6 +379,12 @@ test("only exact explicit Harness50 control-skill calls bypass pause", async () 
   const rejected = [
     "please run $webapp resume",
     "$webappx",
+    "$harness36:webappx",
+    "$harness36:harness36-status now",
+    "$harness36-status now",
+    "$harness36-reset-now",
+    "$harness36:harness50-status",
+    "$harness50:harness36-reset",
     "$harness50:webappx",
     "$harness50:harness50-status now",
     "$harness50-status now",

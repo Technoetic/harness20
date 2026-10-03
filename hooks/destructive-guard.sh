@@ -18,7 +18,7 @@ NODE="${HARNESS50_NODE:-}"
 
 DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 if [ ! -f "$DIR/lib/command-guard.mjs" ]; then
-  echo 'Harness50: hooks/lib/command-guard.mjs is missing; destructive-guard made no decision.' >&2
+  echo 'Harness36: hooks/lib/command-guard.mjs is missing; destructive-guard made no decision.' >&2
   exit 1
 fi
 printf '%s' "$RAW" | "$NODE" "$DIR/lib/command-guard.mjs" pretool

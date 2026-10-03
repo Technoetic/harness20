@@ -40,7 +40,7 @@ case "/$REL" in
   */node_modules/*|*/.git/*|*/step_archive/*|*/.claude/*) exit 0 ;;
 esac
 case "$FP" in
-  */plugins/harness50/*) exit 0 ;;
+  */plugins/harness36/*|*/plugins/harness50/*) exit 0 ;;
 esac
 
 
