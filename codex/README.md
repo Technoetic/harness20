@@ -1,4 +1,4 @@
-# Harness50 for Codex
+# harness36 for Codex
 
 Harness50의 Codex 어댑터는 새36 절차를 36개의 검증 가능한 단계로 실행하되, Codex의 정상 권한 확인과 명시적인 후크 신뢰 절차를 유지합니다. Claude Code 설치와 기존 동작은 [루트 안내서](../README.md)를 참고하세요.
 

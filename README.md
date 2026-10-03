@@ -4,6 +4,8 @@
 
 ### 한 줄 요청 → 36 step 자율주행 → 인터랙티브 웹 튜토리얼 1편
 
+현재 공개 버전: **[v2.13.0](https://github.com/Technoetic/harness36/releases/tag/v2.13.0)** · Claude Code와 Codex 지원 · 새 실행 36단계, 기존 50단계 이력 보존.
+
 **`/webapp 논문 트렌드 분석 대시보드`** 한 줄을 던지면 36단계 완료나 명명된 멈춤 전까지 멈추지 않는 결정론적 절차가 가동된다.<br/>
 모델을 똑똑하게 만드는 대신 **모델이 놓을 트랙을 좁힌다**.
 
@@ -23,7 +25,7 @@
 
 <img src="docs/screenshots/hero-cast.svg" width="90%" alt="harness50 자율주행 데모 — /webapp 한 줄 입력으로 step이 자동 진행되는 터미널 시뮬레이션 (legacy 107단계 완주 기록)"/>
 
-<sub>데모 캐스트는 legacy 107단계 완주 실기록이다. v2.0부터 하네스는 50단계로 축약됐다 (원본은 <a href="https://github.com/Technoetic/harness36/tree/legacy-107"><code>legacy-107</code></a> 태그).</sub>
+<sub>데모 캐스트는 legacy 107단계 완주 실기록이다(원본은 <a href="https://github.com/Technoetic/harness36/tree/legacy-107"><code>legacy-107</code></a> 태그). v2.0에서 50단계로 줄였고, v2.13.0의 새 실행은 조사 14단계를 제거한 36단계를 사용한다.</sub>
 
 </div>
 
