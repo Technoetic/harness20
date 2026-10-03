@@ -1,19 +1,19 @@
 {
-  "name": "harness50",
+  "name": "harness36",
   "owner": {
     "name": "Technoetic",
     "url": "https://github.com/Technoetic"
   },
   "metadata": {
-    "description": "harness50 마켓플레이스 — 새 실행36·기존50 보존 웹 튜토리얼 하네스 플러그인 배포",
-    "version": "2.13.0"
+    "description": "harness36 마켓플레이스 — 새 실행36·기존50 보존 웹 튜토리얼 하네스 플러그인 배포",
+    "version": "3.0.0"
   },
   "plugins": [
     {
-      "name": "harness50",
+      "name": "harness36",
       "source": "./",
       "description": "Web tutorial generator with a 36-step research-free autopilot for new runs and preserved legacy 50-step workflows. One prompt drives hooks, quality gates, and independent verification. Windows + macOS/Linux.",
-      "version": "2.13.0",
+      "version": "3.0.0",
       "author": { "name": "Technoetic" },
       "homepage": "https://github.com/Technoetic/harness36",
       "license": "MIT",

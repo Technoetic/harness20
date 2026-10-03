@@ -160,3 +160,99 @@ Write-Output $env:HARNESS50_FIXTURE
   ]);
   assert.deepEqual(environment, before);
 });
+
+test('installed identity validates explicit personal or harness36 marketplaces while preserving disabled legacy caches', {
+  skip: process.platform !== 'win32', timeout: 60000
+}, async () => {
+  const fixture = await makeWorkspace();
+  const codexHome = join(fixture, 'codex-home');
+  const bin = join(fixture, 'bin');
+  await mkdir(bin, { recursive: true });
+  await writeFile(join(bin, 'codex.cmd'), [
+    '@echo off',
+    'rem Read-only installed catalog fixture; no installation or config writes.',
+    'if not "%~1"=="plugin" exit /b 9',
+    'if not "%~2"=="list" exit /b 9',
+    'if not "%~3"=="--json" exit /b 9',
+    'if not "%~4"=="" exit /b 9',
+    'type "%~dp0catalog.json"',
+    ''
+  ].join('\r\n'), 'utf8');
+  const manifest = JSON.parse(await readFile(join(repo, '.codex-plugin/plugin.json'), 'utf8'));
+  const version = manifest.version;
+  const smokeSource = await readFile(join(repo, 'codex/tests/install-smoke.ps1'), 'utf8');
+  const mainOffset = smokeSource.lastIndexOf('\ntry {');
+  assert.ok(mainOffset > 0);
+  const scriptPath = join(fixture, 'identity-reader.ps1');
+  const quotedBin = join(bin, 'codex.cmd').replaceAll("'", "''");
+  await writeFile(scriptPath, `${smokeSource.slice(0, mainOffset)}
+$script:CodexExecutable = '${quotedBin}'
+$script:Report.manifest.name = 'harness36'
+$script:Report.manifest.version = '${version}'
+try {
+  $resolved = Get-InstalledPluginRoot $PluginRoot $PluginRoot
+  [ordered]@{ passed=$true; root=$resolved } | ConvertTo-Json -Compress
+} catch {
+  [ordered]@{ passed=$false; error_code=$_.Exception.Data['SmokeCode']; message=$_.Exception.Message } | ConvertTo-Json -Compress
+  exit 1
+}
+`, 'utf8');
+  const environment = { ...process.env, CODEX_HOME: codexHome };
+  const legacyRoot = join(codexHome, 'plugins/cache/personal/harness50/2.13.0');
+  await mkdir(legacyRoot, { recursive: true });
+  const legacyFile = join(legacyRoot, 'preserved.txt');
+  await writeFile(legacyFile, 'existing legacy cache stays unchanged', 'utf8');
+  const entry = (marketplaceName, sourcePath, overrides = {}) => ({
+    pluginId: `harness36@${marketplaceName}`, name: 'harness36', marketplaceName, version,
+    installed: true, enabled: true, source: { source: 'local', path: sourcePath },
+    installPolicy: 'AVAILABLE', authPolicy: 'ON_INSTALL', ...overrides
+  });
+  const observe = async (marketplaceName, requestedRoot, installed) => {
+    await writeFile(join(bin, 'catalog.json'), JSON.stringify({ installed, available: [] }), 'utf8');
+    const result = runPowerShell(['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath,
+      '-PluginRoot', requestedRoot, '-MarketplaceName', marketplaceName],
+    { env: environment, encoding: 'utf8', timeout: 15000, windowsHide: true });
+    assert.ifError(result.error);
+    return result;
+  };
+  for (const marketplaceName of ['personal', 'harness36']) {
+    const sourceRoot = join(fixture, `source-${marketplaceName}`);
+    const cacheRoot = join(codexHome, 'plugins/cache', marketplaceName, 'harness36', version);
+    for (const root of [sourceRoot, cacheRoot]) {
+      await mkdir(join(root, '.codex-plugin'), { recursive: true });
+      await mkdir(join(root, '.claude-plugin'), { recursive: true });
+      await writeFile(join(root, '.codex-plugin/plugin.json'), JSON.stringify({
+        name: 'harness36', version, skills: './codex/skills/', hooks: './codex/hooks/hooks.json'
+      }), 'utf8');
+      await writeFile(join(root, '.claude-plugin/marketplace.json'), JSON.stringify({ name: 'harness36' }), 'utf8');
+    }
+    const active = entry(marketplaceName, sourceRoot);
+    const legacy = entry('personal', legacyRoot, { pluginId: 'harness50@personal', name: 'harness50', version: '2.13.0', enabled: false });
+    const positive = await observe(marketplaceName, cacheRoot, [active, legacy]);
+    assert.equal(positive.status, 0, positive.stderr || positive.stdout);
+    assert.deepEqual(JSON.parse(positive.stdout.trim()), { passed: true, root: cacheRoot });
+    for (const [label, inputMarketplace, requestedRoot, installed] of [
+      ['unsafe marketplace path', '../personal', cacheRoot, [active]],
+      ['missing explicit marketplace', '', cacheRoot, [active]],
+      ['wrong selected marketplace', marketplaceName === 'personal' ? 'harness36' : 'personal', cacheRoot, [active]],
+      ['source used as active cache', marketplaceName, sourceRoot, [active]],
+      ['unexpected plugin ID', marketplaceName, cacheRoot, [{ ...active, pluginId: 'harness50@personal' }]],
+      ['legacy and renamed hooks both active', marketplaceName, cacheRoot, [active, { ...legacy, enabled: true }]],
+      ['duplicate active renamed install', marketplaceName, cacheRoot, [active, entry('another', sourceRoot)]]
+    ]) {
+      const rejected = await observe(inputMarketplace, requestedRoot, installed);
+      assert.equal(rejected.status, 1, `${label}: ${rejected.stdout}`);
+      const report = JSON.parse(rejected.stdout.trim());
+      assert.equal(report.passed, false, label);
+      assert.ok(['PARAMETER_INVALID', 'PLUGIN_IDENTITY_FAILED'].includes(report.error_code), `${label}: ${rejected.stdout}`);
+    }
+    const sourceManifest = join(sourceRoot, '.codex-plugin/plugin.json');
+    const previous = await readFile(sourceManifest);
+    await writeFile(sourceManifest, JSON.stringify({ name: 'harness36', version, skills: './codex/skills/', hooks: './codex/hooks/hooks.json', changed: true }), 'utf8');
+    const drifted = await observe(marketplaceName, cacheRoot, [active]);
+    assert.equal(drifted.status, 1, drifted.stdout);
+    assert.equal(JSON.parse(drifted.stdout.trim()).error_code, 'PLUGIN_IDENTITY_FAILED');
+    await writeFile(sourceManifest, previous);
+  }
+  assert.equal(await readFile(legacyFile, 'utf8'), 'existing legacy cache stays unchanged');
+});

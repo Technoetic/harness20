@@ -26,7 +26,7 @@ const expectedDeny = ruleId => ({
   hookSpecificOutput: {
     hookEventName: "PreToolUse",
     permissionDecision: "deny",
-    permissionDecisionReason: `Harness50 blocked this operation (rule: ${ruleId}).`
+    permissionDecisionReason: `Harness36 blocked this operation (rule: ${ruleId}).`
   }
 });
 

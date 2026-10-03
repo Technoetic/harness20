@@ -2,6 +2,7 @@
 param(
   [Parameter(Mandatory = $true)][string]$PluginRoot,
   [ValidateSet("Preflight", "AfterTrust")][string]$Mode = "Preflight",
+  [string]$MarketplaceName,
   [string]$NativeWorkspace,
   [string]$ImportWorkspace,
   [string]$ExpectedClaudeProgressSha256,
@@ -658,7 +659,7 @@ function Assert-ManifestAndVersions {
     }
   }
   if (
-    $manifest.name -cne "harness50" -or
+    $manifest.name -cne "harness36" -or
     $manifest.version -isnot [string] -or
     $manifest.version -cnotmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:\+[a-z0-9.-]+)?$' -or
     $manifest.skills -cne "./codex/skills/" -or
@@ -669,16 +670,16 @@ function Assert-ManifestAndVersions {
 
   $claudePath = Resolve-SafeFile $Root ".claude-plugin/plugin.json" "Claude manifest"
   $claude = Read-StrictJson $claudePath "Claude manifest"
-  if ($claude.name -cne "harness50" -or $claude.version -cne $manifest.version) {
+  if ($claude.name -cne $manifest.name -or $claude.version -cne $manifest.version) {
     Stop-Smoke "VERSION_MISMATCH" "The Claude and Codex manifest versions are not synchronized."
   }
 
   $marketplacePath = Resolve-SafeFile $Root ".claude-plugin/marketplace.json" "Marketplace manifest"
   $marketplace = Read-StrictJson $marketplacePath "Marketplace manifest"
   $entries = @($marketplace.plugins)
-  $matching = @($entries | Where-Object { $_.name -ceq "harness50" })
+  $matching = @($entries | Where-Object { $_.name -ceq $manifest.name })
   if (
-    $marketplace.name -cne "harness50" -or
+    $marketplace.name -cne $manifest.name -or
     $marketplace.metadata.version -cne $manifest.version -or
     $entries.Count -ne 1 -or
     $matching.Count -ne 1 -or
@@ -699,7 +700,7 @@ function Assert-Skills {
   param([Parameter(Mandatory = $true)][string]$Root)
 
   $skillsRoot = Resolve-SafeDirectory $Root "codex/skills" "Codex skills directory"
-  $expected = @("webapp", "harness50-status", "harness50-reset")
+  $expected = @("webapp", "harness36-status", "harness36-reset")
   $entries = @(Get-ChildItem -Force -LiteralPath $skillsRoot -ErrorAction Stop)
   Assert-ExactNames -Items $entries -Expected $expected -Label "Codex skills directory"
   foreach ($name in $expected) {
@@ -888,6 +889,15 @@ function Get-InstalledPluginRoot {
     [Parameter(Mandatory = $true)][string]$WorkingDirectory
   )
 
+  if ([string]::IsNullOrWhiteSpace($MarketplaceName) -or $MarketplaceName -cnotmatch '^[a-z0-9][a-z0-9_-]{0,63}$') {
+    Stop-Smoke "PARAMETER_INVALID" "AfterTrust requires an explicit safe MarketplaceName."
+  }
+  $pluginName = $script:Report.manifest.name
+  if ($pluginName -cne "harness36") {
+    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The validated package plugin identity is unexpected."
+  }
+  $expectedPluginId = $pluginName + "@" + $MarketplaceName
+
   if ($null -eq $script:CodexExecutable) {
     Stop-Smoke "CODEX_VERSION_FAILED" "The resolved Codex CLI executable is unavailable."
   }
@@ -914,60 +924,70 @@ function Get-InstalledPluginRoot {
         Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The Codex CLI installed-plugin evidence is malformed."
       }
     }
-    if ($entry.pluginId -ceq "harness50@personal" -or $entry.name -ceq "harness50") {
+    if ($entry.name -ceq $pluginName -or $entry.name -ceq "harness50") {
+      foreach ($activationField in @("installed", "enabled")) {
+        if (@($entryNames | Where-Object { $_ -ceq $activationField }).Count -ne 1 -or $entry.$activationField -isnot [bool]) {
+          Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The harness installed-plugin activation evidence is malformed."
+        }
+      }
+      if ($entry.pluginId -cne $expectedPluginId -and $entry.installed -and $entry.enabled) {
+        Stop-Smoke "PLUGIN_IDENTITY_FAILED" "Another harness installation is active; disable its hooks while preserving its cache."
+      }
+    }
+    if ($entry.pluginId -ceq $expectedPluginId -or $entry.name -ceq $pluginName) {
       $candidates += $entry
     }
   }
   if ($candidates.Count -ne 1) {
-    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The Codex CLI did not report one unambiguous installed harness50 plugin."
+    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The Codex CLI did not report one unambiguous installed harness36 plugin."
   }
   $plugin = $candidates[0]
   Assert-ExactProperties $plugin @(
     "pluginId", "name", "marketplaceName", "version", "installed", "enabled",
     "source", "installPolicy", "authPolicy"
-  ) @("marketplaceSource") "Installed harness50 plugin"
+  ) @("marketplaceSource") "Installed harness36 plugin"
   if (
-    $plugin.pluginId -cne "harness50@personal" -or
-    $plugin.name -cne "harness50" -or
-    $plugin.marketplaceName -cne "personal" -or
+    $plugin.pluginId -cne $expectedPluginId -or
+    $plugin.name -cne $pluginName -or
+    $plugin.marketplaceName -cne $MarketplaceName -or
     $plugin.version -cne $script:Report.manifest.version -or
     $plugin.installed -isnot [bool] -or -not $plugin.installed -or
     $plugin.enabled -isnot [bool] -or -not $plugin.enabled -or
     $plugin.installPolicy -cne "AVAILABLE" -or
     $plugin.authPolicy -cne "ON_INSTALL"
   ) {
-    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The active harness50 plugin identity is unexpected."
+    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The active harness36 plugin identity is unexpected."
   }
-  Assert-ExactProperties $plugin.source @("source", "path") @() "Installed harness50 plugin source"
+  Assert-ExactProperties $plugin.source @("source", "path") @() "Installed harness36 plugin source"
   if ($plugin.source.source -cne "local" -or -not (Test-FullyQualifiedFilesystemPath $plugin.source.path)) {
-    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The installed harness50 plugin source is not the expected local source."
+    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The installed harness36 plugin source is not the expected local source."
   }
-  $sourceRoot = Resolve-PhysicalDirectory $plugin.source.path "Installed harness50 source"
+  $sourceRoot = Resolve-PhysicalDirectory $plugin.source.path "Installed harness36 source"
   if (@(Get-PropertyNames $plugin | Where-Object { $_ -ceq "marketplaceSource" }).Count -eq 1) {
-    Assert-ExactProperties $plugin.marketplaceSource @("sourceType", "source") @() "Installed harness50 marketplace source"
+    Assert-ExactProperties $plugin.marketplaceSource @("sourceType", "source") @() "Installed harness36 marketplace source"
     if (
       $plugin.marketplaceSource.sourceType -cne "local" -or
       -not (Test-FullyQualifiedFilesystemPath $plugin.marketplaceSource.source)
     ) {
-      Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The installed harness50 marketplace source is malformed."
+      Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The installed harness36 marketplace source is malformed."
     }
-    $marketplaceRoot = Resolve-PhysicalDirectory $plugin.marketplaceSource.source "Installed harness50 marketplace source"
+    $marketplaceRoot = Resolve-PhysicalDirectory $plugin.marketplaceSource.source "Installed harness36 marketplace source"
     if (-not (Test-PathEqual $marketplaceRoot $sourceRoot)) {
-      Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The personal marketplace and local harness50 source disagree."
+      Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The selected marketplace and local harness36 source disagree."
     }
-    [void](Resolve-SafeFile $marketplaceRoot ".claude-plugin/marketplace.json" "Installed harness50 marketplace manifest")
+    [void](Resolve-SafeFile $marketplaceRoot ".claude-plugin/marketplace.json" "Installed harness36 marketplace manifest")
   }
-  $sourceManifest = Resolve-SafeFile $sourceRoot ".codex-plugin/plugin.json" "Installed harness50 source manifest"
-  $installedManifest = Resolve-SafeFile $RequestedRoot ".codex-plugin/plugin.json" "Installed harness50 manifest"
-  $sourceIdentity = Read-StrictJson $sourceManifest "Installed harness50 source manifest"
+  $sourceManifest = Resolve-SafeFile $sourceRoot ".codex-plugin/plugin.json" "Installed harness36 source manifest"
+  $installedManifest = Resolve-SafeFile $RequestedRoot ".codex-plugin/plugin.json" "Installed harness36 manifest"
+  $sourceIdentity = Read-StrictJson $sourceManifest "Installed harness36 source manifest"
   if (
-    $sourceIdentity.name -cne "harness50" -or
+    $sourceIdentity.name -cne $pluginName -or
     $sourceIdentity.version -cne $script:Report.manifest.version -or
     $sourceIdentity.skills -cne "./codex/skills/" -or
     $sourceIdentity.hooks -cne "./codex/hooks/hooks.json" -or
     (Get-Sha256 $sourceManifest) -cne (Get-Sha256 $installedManifest)
   ) {
-    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The installed harness50 source manifest does not match the active package."
+    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The installed harness36 source manifest does not match the active package."
   }
 
   $codexHomeInput = if ([string]::IsNullOrWhiteSpace($env:CODEX_HOME)) {
@@ -977,10 +997,10 @@ function Get-InstalledPluginRoot {
   }
   $codexHome = Resolve-PhysicalDirectory $codexHomeInput "Codex home"
   $expectedRoot = Resolve-PhysicalDirectory (
-    Join-Path $codexHome ("plugins/cache/personal/harness50/" + $script:Report.manifest.version)
-  ) "Active harness50 plugin root"
+    Join-Path $codexHome ("plugins/cache/" + $MarketplaceName + "/" + $pluginName + "/" + $script:Report.manifest.version)
+  ) "Active harness36 plugin root"
   if (-not (Test-PathEqual $RequestedRoot $expectedRoot)) {
-    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "PluginRoot is not the active Codex harness50 installation."
+    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "PluginRoot is not the active Codex harness36 installation."
   }
   return $expectedRoot
 }

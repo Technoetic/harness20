@@ -28,7 +28,7 @@ function singlyLinked(candidate) {
 function sensitive(candidate) {
   const p = candidate.replaceAll('\\', '/').toLowerCase();
   return within(candidate, physical(pluginRoot)) ||
-    /(^|\/)harness50(?:\/[^/]+)?\/(hooks(?:\/|$)|\.claude-plugin(?:\/|$))/.test(p) ||
+    /(^|\/)harness(?:36|50)(?:\/[^/]+)?\/(hooks(?:\/|$)|\.claude-plugin(?:\/|$))/.test(p) ||
     /(^|\/)(\.claude|\.codex|\.git)(\/|$)/.test(p) ||
     /(^|\/)(\.ssh|\.gnupg|\.aws|\.azure|\.kube)(\/|$)/.test(p) ||
     /(^|\/)(\.env(?:\.[^/]*)?|\.npmrc|\.pypirc|\.bashrc|\.bash_profile|\.zshrc|\.zprofile|\.profile|\.zshenv)$/.test(p) ||

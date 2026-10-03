@@ -1,9 +1,9 @@
 ---
-name: harness50-reset
-description: Use when a user invokes $harness50-reset or asks to stop the current Harness50 Codex workflow in a recoverable way.
+name: harness36-reset
+description: Use when a user invokes $harness36-reset or asks to stop the current Harness36 Codex workflow in a recoverable way.
 ---
 
-# Harness50 Reset
+# Harness36 Reset
 
 Reset ends Codex control of the current workflow without disturbing the work the workflow produced.
 
@@ -16,7 +16,7 @@ selected workflow; only a later explicit new start selects default36.
 
 ## Reset operation
 
-For `$harness50-reset`, Call only `reset` through the state manager to recoverably deactivate only Codex control metadata. If the manager returns an error, report it and stop without a filesystem fallback.
+For `$harness36-reset`, Call only `reset` through the state manager to recoverably deactivate only Codex control metadata. If the manager returns an error, report it and stop without a filesystem fallback.
 
 ## Preserved data and result
 

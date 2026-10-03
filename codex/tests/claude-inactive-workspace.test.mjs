@@ -372,12 +372,15 @@ testEachName('/webapp never overwrites a run with completed steps; natural langu
   assert.equal(skipped.length, 1, skipped.join('\n'));
   assert.match(skipped[0], /already records 1\/50 completed steps/);
   assert.deepEqual(bytes(), before);
+  const namespaced = run('webapp-trigger', prompt('/harness36:webapp other'));
+  assert.match(namespaced, /already records 1\/50 completed steps/);
+  assert.deepEqual(bytes(), before, 'new namespace preserves the existing 50-step workflow');
   // An active project: natural language reaches no hook that could restart it.
   assert.equal(run('webapp-trigger', prompt('회사 매출 대시보드 만들어줘')), '');
   assert.deepEqual(bytes(), before);
 });
 
-testEachName('a new /webapp topic replaces one without completed steps, including /harness50:webapp', (t, name) => {
+testEachName('a new /webapp topic replaces one without completed steps, including harness36 and harness50 namespaces', (t, name) => {
   const f = setup(t, name);
   const run = hookRunner(f);
   const prompt = text => ({ hook_event_name: 'UserPromptSubmit', prompt: text });
@@ -387,6 +390,11 @@ testEachName('a new /webapp topic replaces one without completed steps, includin
   assert.doesNotMatch(readFileSync(topicFile(f), 'utf8'), /alpha/);
   assert.match(run('webapp-trigger', prompt('/harness50:webapp gamma')), /<harness50-trigger>/);
   assert.match(readFileSync(topicFile(f), 'utf8'), /gamma/);
+  assert.match(run('webapp-trigger', prompt('/harness36:webapp delta')), /<harness50-trigger>/);
+  assert.match(readFileSync(topicFile(f), 'utf8'), /delta/);
+  const progress = JSON.parse(readFileSync(progressFile(f), 'utf8').replace(/^﻿/, ''));
+  assert.equal(progress.total_steps, 36);
+  assert.equal(progress.workflow_profile, 'research-free-36-v1');
 });
 
 testEachName('lsp-autofix in an active run starts only a project-local biome or stylelint', (t, name) => {

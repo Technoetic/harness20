@@ -463,8 +463,8 @@ testEachName('H6 the prompt guard prints only the PAUSED line for a paused run',
 
 test('H7 the prompt guard stays silent for the run control commands, paused or not', t => {
   const f = setup(t, NAMES[1], { plugin: true });
-  const control = ['/harness-pause 회의로 잠시 중단', '/harness50:harness-resume', '/harness-status', '  /harness-reset'];
-  const other = ['/harness-pauses', 'please /harness-pause', '/HARNESS-PAUSE'];
+  const control = ['/harness-pause 회의로 잠시 중단', '/harness50:harness-resume', '/harness36:harness-pause 회의', '/harness36:harness-resume', '/harness36:harness-status', '/harness36:harness-reset', '/harness-status', '  /harness-reset'];
+  const other = ['/harness-pauses', 'please /harness-pause', '/HARNESS-PAUSE', '/harness36:harness-resumes', '/Harness36:harness-status'];
   for (const variant of VARIANTS) {
     for (const paused of [false, true]) {
       f.write({ ...PROGRESS, ...(paused ? { paused: true, pause_reason: 'user-request' } : {}) });
@@ -722,7 +722,7 @@ testEachName('R3 /webapp alpha, three steps, /harness-reset, same-session Stop, 
   assert.equal(reset.status, 0);
   const afterReset = f.read();
   assert.ok(Date.parse(afterReset.run_started_at) >= Date.parse(alpha.run_started_at));
-  const done = 'harness50 리셋 완료 — 새 주제는 /webapp <주제>, 현재 주제를 1단계부터 다시 하려면 /harness-resume';
+  const done = 'harness36 리셋 완료 — 새 주제는 /webapp <주제>, 현재 주제를 1단계부터 다시 하려면 /harness-resume';
   say(done);
   // The Stop of the reset turn: the old completion lines stay behind the new boundary and the
   // user-request pause keeps Stop from continuing the old topic.
@@ -886,7 +886,7 @@ test('D3 the pause commands and the step documents describe the same procedure',
   for (const file of ['commands/harness-pause.md', 'commands/harness-resume.md']) {
     assert.ok(existsSync(join(repo, file)), file);
     const source = text(file);
-    assert.match(source, /^---\ndescription: harness50 /, file);
+    assert.match(source, /^---\ndescription: harness36 /, file);
     assert.ok(source.includes('scripts/harness-pause.mjs'), file);
     assert.ok(source.includes('.harness50-codex'), file);
   }

@@ -125,7 +125,7 @@ export const secretPath = arg => HARD_SECRET.test(arg) || (!ENV_TEMPLATE.test(ar
 const PERSISTENT_TARGET = new RegExp([
   String.raw`(?:^|[\\/])\.git[\\/](?:hooks(?:[\\/]|$)|config$)`,
   String.raw`(?:^|[\\/])\.claude[\\/]settings(?:\.local)?\.json$`,
-  String.raw`(?:^|[\\/])harness50(?:[\\/][^\\/]+)?[\\/](?:hooks|\.claude-plugin)(?:[\\/]|$)`,
+  String.raw`(?:^|[\\/])harness(?:36|50)(?:[\\/][^\\/]+)?[\\/](?:hooks|\.claude-plugin)(?:[\\/]|$)`,
   String.raw`(?:^|[\\/])\.(?:bashrc|bash_profile|zshrc|zprofile|profile|zshenv)$`,
   String.raw`(?:^|[\\/])\.ssh[\\/]authorized_keys2?$`,
   String.raw`(?:^|[\\/])\.config[\\/](?:systemd|autostart)(?:[\\/]|$)`,
@@ -335,7 +335,7 @@ const DANGEROUS_URL = [
 ];
 
 const BLOCK_LINES = [
-  'Harness50 checks the whole command text, including quoted strings and heredoc bodies, and this block cannot be approved from here.',
+  'Harness36 checks the whole command text, including quoted strings and heredoc bodies, and this block cannot be approved from here.',
   'If the match is only inside a commit message or PR/issue body, write that text to a file with the Write tool and pass the file: git commit -F <file>, gh pr create --body-file <file>.',
   'Do not move commands into a script to get past this check. If the command itself must run, ask the user to run it.'
 ];
@@ -364,7 +364,7 @@ function main(mode) {
   if (mode === 'permission' && event?.tool_name === 'WebFetch') {
     const url = event?.tool_input?.url;
     if (typeof url === 'string' && DANGEROUS_URL.some(pattern => pattern.test(url))) {
-      process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'deny', reason: 'harness50: PermissionRequest blocked - dangerous URL' } } }));
+      process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'deny', reason: 'harness36: PermissionRequest blocked - dangerous URL' } } }));
       return 2;
     }
     return 0;
@@ -379,13 +379,13 @@ function main(mode) {
       return 2;
     }
     if (verdict.level === 'ask') {
-      process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask', permissionDecisionReason: `harness50: ${verdict.rule} needs your confirmation (destructive-guard ask rule)` } }));
+      process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask', permissionDecisionReason: `harness36: ${verdict.rule} needs your confirmation (destructive-guard ask rule)` } }));
     }
     return 0;
   }
   if (mode === 'permission' && verdict.level === 'block') {
-    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'deny', reason: `harness50: PermissionRequest blocked - destructive command pattern (${verdict.rule}) (cross-plugin tamper protection)` } } }));
-    process.stderr.write(`Harness50 denied this permission request because the command text matches a destructive pattern (quoted strings and heredoc bodies included).\n${BLOCK_LINES.slice(1).join('\n')}\n`);
+    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'deny', reason: `harness36: PermissionRequest blocked - destructive command pattern (${verdict.rule}) (cross-plugin tamper protection)` } } }));
+    process.stderr.write(`Harness36 denied this permission request because the command text matches a destructive pattern (quoted strings and heredoc bodies included).\n${BLOCK_LINES.slice(1).join('\n')}\n`);
     return 2;
   }
   return 0;

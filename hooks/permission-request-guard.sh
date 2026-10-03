@@ -24,13 +24,13 @@ LIB="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/lib"
 # 1. Canonical and physical plugin protection.
 PROTECTION="$(printf '%s' "$RAW" | "$NODE" "$LIB/approval-policy.mjs" guard 2>/dev/null)"
 if [ "$PROTECTION" = protected ]; then
-  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny","reason":"harness50: protected or invalid path"}}}'
+  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny","reason":"harness36: protected or invalid path"}}}'
   exit 2
 fi
 
 # 2. The command catalog's block set and dangerous URLs. node's stderr is inherited.
 if [ ! -f "$LIB/command-guard.mjs" ]; then
-  echo 'Harness50: hooks/lib/command-guard.mjs is missing; permission-request-guard made no decision.' >&2
+  echo 'Harness36: hooks/lib/command-guard.mjs is missing; permission-request-guard made no decision.' >&2
   exit 1
 fi
 printf '%s' "$RAW" | "$NODE" "$LIB/command-guard.mjs" permission

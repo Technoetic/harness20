@@ -26,5 +26,5 @@ if (-not $node) { exit 0 }
 
 $eligibility = $raw | & $node (Join-Path $PSScriptRoot 'lib/approval-policy.mjs') auto 2>$null
 if ($LASTEXITCODE -ne 0 -or $eligibility -ne 'eligible') { exit 0 }
-[Console]::Out.Write('{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","permissionDecisionReason":"harness50 autopilot mode: eligible edit or WebSearch in an active run"}}')
+[Console]::Out.Write('{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","permissionDecisionReason":"harness36 autopilot mode: eligible edit or WebSearch in an active run"}}')
 exit 0
