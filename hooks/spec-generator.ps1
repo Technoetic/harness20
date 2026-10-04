@@ -42,7 +42,7 @@ $profileJson = @(& node (Join-Path $PSScriptRoot 'lib/workflow-profile.mjs') res
 if ($LASTEXITCODE -ne 0 -or $profileJson.Count -eq 0) { exit 0 }
 try { $selectedProfile = ($profileJson -join "`n") | ConvertFrom-Json -ErrorAction Stop } catch { exit 0 }
 $selectedArchive = Join-Path $projectRoot $selectedProfile.body_directory
-if ($selectedProfile.workflow_profile -eq 'research-free-36-v1') {
+if ($selectedProfile.workflow_profile -ne 'legacy-50-v1') {
     & node (Join-Path $PSScriptRoot 'lib/workflow-profile.mjs') spec (Join-Path $projectRoot '.') 2>$null
     exit 0
 }

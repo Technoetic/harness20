@@ -1,11 +1,20 @@
 {
   "name": "harness36",
-  "version": "3.0.0",
-  "description": "Web tutorial generator with a 36-step research-free autopilot for new runs and preserved legacy 50-step workflows. One prompt drives hooks, quality gates, and independent verification. Windows + macOS/Linux.",
+  "version": "3.1.0",
+  "description": "Web tutorial generator with a 20-step planning-first autopilot for new runs and preserved existing 36/50-step workflows. One prompt drives hooks, quality gates, and independent verification. Windows + macOS/Linux.",
   "author": {
     "name": "Technoetic"
   },
   "homepage": "https://github.com/Technoetic/harness36",
   "license": "MIT",
-  "keywords": ["harness", "tutorial", "autopilot", "step", "trust5", "moai-adk", "claude-code", "plugin"]
+  "keywords": [
+    "harness",
+    "tutorial",
+    "autopilot",
+    "step",
+    "trust5",
+    "moai-adk",
+    "claude-code",
+    "plugin"
+  ]
 }

@@ -24,14 +24,14 @@ disable-model-invocation: false
 ### 0단계: 필수 기준 확인
 
 호출자는 관리자가 선택한 `workflow_profile`, 현재 Step 번호와 전체 단계 수를 전달한다.
-새 `research-free-36-v1`은 36단계이며, 기존 `legacy-50-v1`만 50단계다.
+새 `planning-first-20-v1`은 20단계, 명시적 `research-free-36-v1`은 기존36단계, `legacy-50-v1`은 기존50단계다.
 호스트는 신뢰한 resolver/상태 관리자로 실제 메타데이터를 검증한 뒤 그 프로필과 전체 수를 전달한다.
 프로필 없는 정확한 schema-v1·total50 기록과 schema_version·workflow_profile을 생략한
 지원되는 이전 total50 기록은 신뢰한 관리자가 legacy50으로 정규화한다. 사용자에게 프로필을
 재확인하지 않고 검증된 결과를 사용한다. 실제 메타데이터가 없거나 불일치하면 추정하지 않고
 `INCOMPLETE`로 인계한다.
 새 실행의 비교 입력은 TOPIC과 사용자 제공 요구사항·자료, 18단계의
-`step_archive/step018_레이아웃설계_chunk1.md` 설계 계약, 현재 코드와 측정된 출력이다.
+`step_archive/step002_레이아웃설계_chunk1.md` 설계 계약(명시적 기존36은 `step_archive/step018_레이아웃설계_chunk1.md`), 현재 코드와 측정된 출력이다.
 제공 자료에 참조 이미지가 있으면 그 자료의 적용 범위와 계약을 기준으로 비교한다.
 제공되지 않은 외부 조사 청크·원본 사이트 캡처는 새 실행의 선행 입력이 아니다.
 27단계 레이아웃 검증도 이 방법으로 수행한다. 필수 API 계약이나 요구사항이 빠졌다면
@@ -44,7 +44,7 @@ disable-model-invocation: false
 
 ### 1단계: 구현물 스크린샷 촬영
 
-Step 3이 `step_archive/outputs/browser-backend.json`에 고정한 브라우저 백엔드(잠금 파일이 없으면 사용 가능한 백엔드: Playwright 또는 Aside CLI — `docs/BROWSER-TOOLS.md`의 절차표 참조)로 현재 구현 상태를 3가지 뷰포트(desktop 1920x1080, tablet 768x1024, mobile 390x844)로 캡처한다. Aside에서는 고정 탭 뷰포트 대신 해당 크기의 iframe 호스트 페이지와 `clip` 스크린샷을 쓴다.
+새20의 환경 Step 3(기존36·50은 원래 도구3)이 `step_archive/outputs/browser-backend.json`에 고정한 브라우저 백엔드(잠금 파일이 없으면 사용 가능한 백엔드: Playwright 또는 Aside CLI — `docs/BROWSER-TOOLS.md`의 절차표 참조)로 현재 구현 상태를 3가지 뷰포트(desktop 1920x1080, tablet 768x1024, mobile 390x844)로 캡처한다. Aside에서는 고정 탭 뷰포트 대신 해당 크기의 iframe 호스트 페이지와 `clip` 스크린샷을 쓴다.
 
 저장 경로: step_archive/screenshots/eval-rN-{viewport}.png
 
@@ -68,7 +68,7 @@ Playwright에서는 `fullPage: true`로 전체 페이지를 캡처한다. Aside�
 > `progress.json` 등 공유 workflow 상태를 직접 수정하지 않는다. 기존 workflow writer만 완료 상태를 반영한다.
 >
 > 1. 선택된 프로필의 기준 자료를 읽는다:
->    - 새36: TOPIC, 사용자 제공 요구사항·자료와 18단계 설계 계약 및 현재 코드/출력.
+>    - 새20: TOPIC, 사용자 제공 요구사항·자료와 2단계 설계 계약(기존36은18) 및 현재 코드/출력.
 >    - 명시적 legacy50: 해당 archived 본문이 요구하는 조사 청크와 step_archive/screenshots/research/ 원본 스크린샷.
 >    - 호출한 Step/SPEC의 필수 acceptance와 필수 검사 결과. 검사 명령·종료 코드·증거 경로를 확인한다.
 >
@@ -85,13 +85,13 @@ Playwright에서는 `fullPage: true`로 전체 페이지를 캡처한다. Aside�
 > 4. 필수 판정과 참고 점수를 분리한다:
 >    - 필수 검사·증거가 모두 통과하고 미해결 `Critical`/`Important` finding이 없을 때만 `PASS`다.
 >    - 필수 기준 위반은 `FAIL`이며, 필수 입력·증거·실행 기능 부재 또는 라운드 중단 조건 충족은 `INCOMPLETE`다.
->    - `Critical`/`Important` finding은 요구사항·기능·접근성·보안·선택된 디자인 토큰·제외 목록(새36의 18단계, legacy50의 30단계 `harness50-design-contract`, `docs/DESIGN-CONTRACT.md`)과 관찰 증거에 연결한다. 채택되지 않은 제외 항목 위반은 `Important`다. 계약 블록이 없는 이전 legacy 실행은 헌법 §11대로 계약을 복원하지 않고 §5의 수치만 기준으로 쓴다(`host` 제외 항목은 필수 기준이 아니다). 새36의 필수 계약 누락은 `INCOMPLETE`다.
+>    - `Critical`/`Important` finding은 요구사항·기능·접근성·보안·선택된 디자인 토큰·제외 목록(새20의2 / 기존36의18 / legacy50의30단계 `harness50-design-contract`, `docs/DESIGN-CONTRACT.md`)과 관찰 증거에 연결한다. 채택되지 않은 제외 항목 위반은 `Important`다. 계약 블록이 없는 이전 legacy 실행은 헌법 §11대로 계약을 복원하지 않고 §5의 수치만 기준으로 쓴다(`host` 제외 항목은 필수 기준이 아니다). 새20·기존36의 필수 계약 누락은 `INCOMPLETE`다.
 >    - 근거 없는 미관·선호 의견은 `advisory`다. 필수 실패를 참고 의견으로 강등하지 않는다.
 >    - 필수 finding마다 위치(소스 `file:line`, 또는 route·viewport·selector·스크린샷 파일과 영역), 기준 출처, 기대/관찰, 재현(route·viewport·선행 조작)을 모두 쓴다. 기준을 인용할 수 없는 지적은 `advisory`다.
 >
 >    참고 루브릭:
 >    - 기능 완성도 (0-10): 요구사항 대비 구현 비율
->    - 디자인 충실도 (0-10): 새36은 제공된 요구사항·자료와 설계 계약 대비 현재 출력의 일치도; legacy50은 archived 본문의 원본 참조 대비 일치도. 설계 계약 제외 항목에 해당하는 참조 요소는 감점하지 않는다
+>    - 디자인 충실도 (0-10): 새20·기존36은 제공된 요구사항·자료와 설계 계약 대비 현재 출력의 일치도; legacy50은 archived 본문의 원본 참조 대비 일치도. 설계 계약 제외 항목에 해당하는 참조 요소는 감점하지 않는다
 >    - 코드 품질 (0-10): 린팅/포매팅/타입 안전성
 >    - 성능 (0-10): 로드 시간, DOM 복잡도
 >

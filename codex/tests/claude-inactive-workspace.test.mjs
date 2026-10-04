@@ -338,9 +338,9 @@ testEachName('/webapp <topic> starts a run that the other hooks then follow', (t
   const progress = JSON.parse(readFileSync(progressFile(f), 'utf8').replace(/^﻿/, ''));
   assert.equal(progress.current_step, 1);
   assert.deepEqual(progress.completed_steps, []);
-  assert.equal(progress.total_steps, 36);
-  assert.equal(progress.workflow_profile, "research-free-36-v1");
-  assert.equal(readdirSync(join(f.project, 'step_archive', 'profiles', 'research-free-36-v1', 'archived')).filter(file => /^step\d{3}\.md$/.test(file)).length, 36);
+  assert.equal(progress.total_steps, 20);
+  assert.equal(progress.workflow_profile, "planning-first-20-v1");
+  assert.equal(readdirSync(join(f.project, 'step_archive', 'profiles', 'planning-first-20-v1', 'archived')).filter(file => /^step\d{3}\.md$/.test(file)).length, 20);
   assert.match(readFileSync(topicFile(f), 'utf8'), /fractions/);
 
   const loader = run('step-progress-loader', { hook_event_name: 'SessionStart', source: 'startup' });
@@ -393,8 +393,8 @@ testEachName('a new /webapp topic replaces one without completed steps, includin
   assert.match(run('webapp-trigger', prompt('/harness36:webapp delta')), /<harness50-trigger>/);
   assert.match(readFileSync(topicFile(f), 'utf8'), /delta/);
   const progress = JSON.parse(readFileSync(progressFile(f), 'utf8').replace(/^﻿/, ''));
-  assert.equal(progress.total_steps, 36);
-  assert.equal(progress.workflow_profile, 'research-free-36-v1');
+  assert.equal(progress.total_steps, 20);
+  assert.equal(progress.workflow_profile, 'planning-first-20-v1');
 });
 
 testEachName('lsp-autofix in an active run starts only a project-local biome or stylelint', (t, name) => {

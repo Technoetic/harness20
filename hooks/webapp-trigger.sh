@@ -77,6 +77,10 @@ fi
 
 # The shared helper validates every allowlisted source before copying.
 PROFILE_JSON="$(node "$PLUGIN_ROOT/hooks/lib/workflow-profile.mjs" bootstrap "$PROJECT_ROOT" 2>/dev/null)" || { echo '[HARNESS] Profile bootstrap failed; nothing was initialized.'; exit 0; }
+PROFILE_ID="$(printf '%s' "$PROFILE_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["workflow_profile"])' | tr -d '\r')"
+TOTAL_STEPS="$(printf '%s' "$PROFILE_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["total"])' | tr -d '\r')"
+BODY_DIRECTORY="$(printf '%s' "$PROFILE_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["body_directory"])' | tr -d '\r')"
+FINAL_STEP="$(printf '%03d' "$TOTAL_STEPS")"
 mkdir -p "$TOPIC_DIR"
 
 # H4 수정: html-bundler를 프로젝트로 복사 (step038에서 실행 가능하게)
@@ -87,26 +91,11 @@ for b in html-bundler.ps1 html-bundler.sh; do
   [ -f "$HOOK_DIR/$b" ] && cp "$HOOK_DIR/$b" "$TOOLS_DIR/$b"
 done
 
-# TOPIC.md
-TODAY="$(date '+%Y-%m-%d')"
-{
-  echo "---"
-  echo "created: $TODAY"
-  echo "session_prompt: |"
-  printf '%s\n' "$PROMPT" | sed 's/^/  /'
-  echo "---"
-  echo
-  echo "# 튜토리얼 주제"
-  echo
-  echo "본 TOPIC.md는 webapp-trigger hook이 자동 생성했다."
-  echo "step001 진입 시 session_prompt를 읽어 topic/audience/interactive/real_world_apps/constraints를 추출한다."
-  echo
-  echo "- raw_prompt: 위 session_prompt 블록 참조"
-  echo
-  echo "## 결정/사유 (NEW-WORK-규칙 3번)"
-  echo
-  echo "- 자동 추출 항목이 모호하면 step001이 즉시 결정·기록 후 진행 (질문 금지)"
-} >"$TOPIC_FILE"
+# Normalize and freeze the six-field contract before the first planning step.
+if ! printf '%s' "$RAW" | node "$PLUGIN_ROOT/hooks/lib/workflow-profile.mjs" topic "$PROJECT_ROOT" >/dev/null 2>&1; then
+  echo '[HARNESS] TOPIC contract initialization failed; no progress was initialized.'
+  exit 0
+fi
 log "TOPIC.md written"
 
 # progress.json
@@ -127,8 +116,8 @@ cat >"$PROGRESS_FILE" <<JSON
   "skipped_steps": [],
   "failed_steps": [],
   "schema_version": 2,
-  "workflow_profile": "research-free-36-v1",
-  "total_steps": 36,
+  "workflow_profile": "$PROFILE_ID",
+  "total_steps": $TOTAL_STEPS,
   "metrics": { "total_duration_minutes": 0, "total_sessions": 0, "steps_per_session_avg": 0 },
   "session_history": [],
   "last_updated": "$NOW"
@@ -137,26 +126,27 @@ JSON
 log "progress.json initialized"
 
 # system-reminder
-cat <<'REMINDER'
+cat <<REMINDER
 <harness50-trigger>
 WEBAPP TUTORIAL TRIGGER DETECTED
 
 Bootstrap complete:
   - step_archive/ ready
   - step_archive/TOPIC/TOPIC.md written with the user prompt
-  - step_archive/progress.json initialized (current_step=1, total=36)
-  - step_archive/profiles/research-free-36-v1/archived/step001.md ~ step036.md available
+  - step_archive/progress.json initialized (current_step=1, total=$TOTAL_STEPS)
+  - $BODY_DIRECTORY/step001.md ~ step$FINAL_STEP.md available
 
 ABSOLUTE OVERRIDE:
   Before addressing anything else, IMMEDIATELY:
-    1. Read step_archive/profiles/research-free-36-v1/archived/step001.md
+    1. Read $BODY_DIRECTORY/step001.md
     2. Execute its instructions in full (including TOPIC pickup from TOPIC.md)
-    3. On completion report 'Step 001/36 완료' and Read step002.md
-    4. Continue without user confirmation through step036
+    3. On completion report 'Step 001/$TOTAL_STEPS 완료' and Read step002.md
+    4. Continue without user confirmation through step$FINAL_STEP
 
+Missing essential input requires a required-input-missing named pause; never invent earlier completed work.
 Do NOT ask the user any clarifying questions.
 Do NOT pause for confirmation.
-Do NOT end the turn before step036 except by a named pause (harness-rules 2-1).
+Do NOT end the turn before step$FINAL_STEP except by a named pause (harness-rules 2-1).
 </harness50-trigger>
 REMINDER
 exit 0

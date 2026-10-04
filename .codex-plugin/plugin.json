@@ -1,12 +1,20 @@
 {
   "name": "harness36",
-  "version": "3.0.0",
-  "description": "Run the Harness36 web tutorial workflow in Codex with explicit progress receipts and normal Codex permissions.",
-  "author": { "name": "Technoetic" },
+  "version": "3.1.0",
+  "description": "Run the Harness36 planning-first twenty-step workflow in Codex with explicit progress receipts and normal permissions; preserve existing36/50 runs.",
+  "author": {
+    "name": "Technoetic"
+  },
   "homepage": "https://github.com/Technoetic/harness36",
   "repository": "https://github.com/Technoetic/harness36",
   "license": "MIT",
-  "keywords": ["harness", "tutorial", "codex", "claude-code", "plugin"],
+  "keywords": [
+    "harness",
+    "tutorial",
+    "codex",
+    "claude-code",
+    "plugin"
+  ],
   "skills": "./codex/skills/",
   "hooks": "./codex/hooks/hooks.json"
 }

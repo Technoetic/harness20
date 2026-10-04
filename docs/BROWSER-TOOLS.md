@@ -1,6 +1,6 @@
 # Browser verification backends
 
-Harness50 needs a real browser for the final output check (`scripts/verify-output.mjs`),
+Harness36 needs a real browser for the final output check (`scripts/verify-output.mjs`),
 for the E2E step and for the evaluator screenshots. Since 2.5.0 the verifier is a
 dispatcher with two interchangeable backends:
 
@@ -11,7 +11,7 @@ dispatcher with two interchangeable backends:
 
 Both backends produce the same schema-v3 `step_archive/outputs/browser-output.json`
 and the same four screenshots. The gate (`scripts/lib/browser-report.mjs`) reads named
-report fields only, so a passing report from either backend satisfies Steps 30–36. CI
+report fields only, so a passing report from either backend satisfies fresh Steps 14–20 (explicit old36/50 retain their original gates). CI
 keeps Playwright; the Aside backend exists so that a workstation without Playwright can
 still finish the curriculum with measured evidence.
 
@@ -68,8 +68,19 @@ Check with the tool hook: `bash hooks/validate-tools.sh aside` or
 
 ## Backend lock (Step 3)
 
-Step 3 probes once and records its choice inside the project, so later steps reuse it
-instead of re-running the `auto` order:
+Fresh planning-first20 environment Step 3 probes the actually available, permitted
+backend and records its choice inside the project. Planning Step 1 and design Step 2
+do not require a deleted browser preflight. Explicit research-free36 and legacy50
+keep their original tool Step 3 and environment Steps 19/31. Later steps reuse the
+selected backend instead of re-running the `auto` order. Replace `<selected>` with
+the explicitly permitted, observed backend; use `aside` on Aside-only machines:
+
+```text
+node scripts/verify-output.mjs --probe --backend <selected> --lock --workspace "<project-root>"
+```
+
+Explicit old36/50 bodies retain their original tool-Step-3 command below. This is
+compatibility notation; fresh20 uses the explicitly permitted backend above:
 
 ```text
 node scripts/verify-output.mjs --probe --lock --workspace "<project-root>"
@@ -127,7 +138,9 @@ other than `playwright`/`aside`, a non-string `tool_version`, an unparseable
 - **Changing backends is deliberate.** Rerun the Step 3 command with
   `--backend <name> --lock`. The same command repairs an invalid lock. A project started
   before the lock existed can record the backend named in
-  `step_archive/step003_playwright_test.md` this way (Claude Step 19 does so).
+  the original `step_archive/step003_playwright_test.md` this way only for old36/50
+  (their environment Steps 19/31 keep this recovery). Fresh20 records environment
+  and backend evidence in `step_archive/step003_환경준비.md`; it does not require that old file.
 - The lock prevents accidental switches. It is not a security boundary: deleting the
   file or passing an explicit backend bypasses it.
 
@@ -239,7 +252,7 @@ scheme, language, DPR and installed extensions**, and a reviewer must not treat 
 dark-scheme ko-KR shared-profile screenshot as equivalent to a light-scheme fresh-context
 capture. When both backends are available at Step 3, `auto` selects and locks
 `playwright`. Once a project is locked, keep the locked backend for all evidence,
-including the final Step 36 report, and do not install the other backend to replace it.
+including the fresh final Step 20 report (old36/50 retain final36/50), and do not install the other backend to replace it.
 
 ## 요약 (한국어)
 
@@ -250,7 +263,7 @@ including the final Step 36 report, and do not install the other backend to repl
 - `node scripts/verify-output.mjs --probe`로 가용 백엔드를 확인하고,
   `--backend auto|playwright|aside`(또는 환경변수 `HARNESS50_BROWSER_BACKEND`)로 선택한다.
   잠금 파일이 없을 때 auto는 Playwright → Aside 순서다.
-- Step 3은 `node scripts/verify-output.mjs --probe --lock --workspace "<project-root>"`로 선택을
+- 새20의 환경 준비 Step 3(기존36·50은 원래 도구3)은 `node scripts/verify-output.mjs --probe --backend <selected> --lock --workspace "<project-root>"`로 선택을
   `step_archive/outputs/browser-backend.json`에 고정한다. 그 뒤 `--backend` 없는 검증은 고정
   백엔드만 쓰고, 사용할 수 없으면 다른 백엔드로 넘어가지 않고 그 백엔드의 복구 방법만 안내한다.
   명시적 `--backend`/환경변수가 우선하며, 잘못된 잠금 파일은 실패로 처리한다(fail closed).

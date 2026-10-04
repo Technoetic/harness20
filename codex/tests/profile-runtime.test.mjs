@@ -23,7 +23,7 @@ import { hashFile } from './helpers/workspace.mjs';
 
 const profile = 'research-free-36-v1';
 const at = '2026-10-02T00:00:00.000Z';
-const initial = () => createInitialState({workflowId:'run', workspaceRoot:'C:/fixture',topicSha256:'a'.repeat(64),now:at});
+const initial = () => createInitialState({workflowId:'run', workspaceRoot:'C:/fixture',topicSha256:'a'.repeat(64),now:at,workflowProfile:profile});
 const receipt = step => ({schema_version:2,workflow_profile:profile,workflow_id:'run',step,attempt_id:`attempt-${step}`,provenance:'codex-verified',completed_at:at,summary:'Verified',evidence:[]});
 test('fresh state is strict explicit36 and every cursor respects36', () => {
  const state=initial(); assert.equal(state.schema_version,2); assert.equal(state.workflow_profile,profile); assert.equal(state.total_steps,36);
@@ -55,7 +55,7 @@ test('explicit36 Claude progress imports with profile and bounds',()=>{
  assert.throws(()=>normalizeClaudeProgress({total_steps:36,current_step:1,completed_steps:[]}));
 });
 test('public fresh init and begin expose selected trusted body and reject step37',async()=>{
- const workspaceRoot=await makeWorkspace();const state=await initWorkflow({workspaceRoot,topic:'Profile lifecycle',now:at});
+ const workspaceRoot=await makeWorkspace();const state=await initWorkflow({workspaceRoot,workflowProfile:profile,topic:'Profile lifecycle',now:at});
  assert.equal(state.total_steps,36);
  const begun=await beginStep({workspaceRoot,step:1,marker:state.continuation,now:at});assert.equal(begun.step_target,`codex/assets/profiles/${profile}/steps/step001.md`);
  const shown=await showWorkflow({workspaceRoot});assert.equal(shown.workflow_profile,profile);
@@ -65,7 +65,7 @@ test('public fresh init and begin expose selected trusted body and reject step37
 
 test('36 native lifecycle completes all36 receipts with measured milestones and terminal replay', async()=>{
  const workspaceRoot=await makeWorkspace();const pluginRoot=await makePluginFixture({workflowProfile:profile});
- let state=await initWorkflow({workspaceRoot,topic:'Native36 scheduling fixture'});
+ let state=await initWorkflow({workspaceRoot,workflowProfile:profile,topic:'Native36 scheduling fixture'});
  for(let step=1;step<=36;step++){
    const begun=await beginStep({workspaceRoot,step,marker:state.continuation});
    await prepareSchedulerMilestone(workspaceRoot,step,profile);
@@ -91,7 +91,7 @@ test('profile36 import preserves source bytes, sparse prefix and matching receip
 });
 test('profile36 receipt-first recovery, pause/resume and mixed-profile show/recovery isolation',async()=>{
  const workspaceRoot=await makeWorkspace();const pluginRoot=await makePluginFixture({workflowProfile:profile});
- const initial=await initWorkflow({workspaceRoot,topic:'Recovery fixture'});
+ const initial=await initWorkflow({workspaceRoot,workflowProfile:profile,topic:'Recovery fixture'});
  const begun=await beginStep({workspaceRoot,step:1,marker:initial.continuation});
  const args={workspaceRoot,pluginRoot,step:1,attemptId:begun.attempt.id,summary:'first',evidence:[{acceptance_id:'state-transition',kind:'check',ok:true,detail:'verified'}]};
  await completeStep(args);await writeStateAtomic(workspaceRoot,begun.state);
@@ -112,11 +112,11 @@ test('runtime profile contracts reject source drift and invalid dependency refer
  const other=await makePluginFixture({workflowProfile:profile});const path=join(other,`codex/assets/profiles/${profile}/steps/index.json`);const index=JSON.parse(await readFile(path,'utf8'));index.steps[0].requires=['step037'];await writeFile(path,JSON.stringify(index));
  await assert.rejects(()=>loadStepContract(other,1,profile),{code:'STEP_CONTRACT_INVALID'});
 });
-test('CLI defaults36 and session context reflects selected total',async()=>{
+test('CLI defaults20 and session context reflects selected total',async()=>{
  const workspaceRoot=await makeWorkspace();
  const result=await runCli(['init','--workspace',workspaceRoot,'--input','-'],{input:{topic:'Fresh public CLI36'}});
- assert.equal(result.code,0,result.stderr);const state=JSON.parse(result.stdout);assert.equal(state.total_steps,36);assert.equal(state.workflow_profile,profile);
- const hook=await handleSessionStart({}, {workspaceRoot});assert.match(hook.hookSpecificOutput.additionalContext,/0\/36 complete/);
+ assert.equal(result.code,0,result.stderr);const state=JSON.parse(result.stdout);assert.equal(state.total_steps,20);assert.equal(state.workflow_profile,'planning-first-20-v1');
+ const hook=await handleSessionStart({}, {workspaceRoot});assert.match(hook.hookSpecificOutput.additionalContext,/0\/20 complete/);
  const rejected=await runCli(['begin','--workspace',workspaceRoot,'--step','37','--input','-'],{input:{marker:state.continuation}});
  assert.notEqual(rejected.code,0);assert.equal(JSON.parse(rejected.stderr).error.code,'STEP_RANGE');
  await assert.rejects(()=>failStep({workspaceRoot,step:37,attemptId:'bad',reason:'bad',evidence:[]}),{code:'STEP_RANGE'});
@@ -126,7 +126,7 @@ test('schema2 importer rejects string counts and reset archives legacy without r
  const workspaceRoot=await makeWorkspace();const before=await initWorkflow({workspaceRoot,workflowProfile:'legacy-50-v1',topic:'Legacy reset'});
  const {backupPath}=await resetWorkflow({workspaceRoot});const archived=JSON.parse(await readFile(join(backupPath,'state.json'),'utf8'));
  assert.deepEqual(archived,before);assert.equal((await showWorkflow({workspaceRoot})).active,false);
- const fresh=await initWorkflow({workspaceRoot:await makeWorkspace(),topic:'Explicit fresh run after retained archive'});assert.equal(fresh.workflow_profile,profile);
+ const fresh=await initWorkflow({workspaceRoot:await makeWorkspace(),topic:'Explicit fresh run after retained archive'});assert.equal(fresh.workflow_profile,'planning-first-20-v1');
 });
 test('canonical final36 preserves console, screenshots, current HTML and six-matrix independent evidence',async()=>{
  const contract=await loadStepContract(resolve(import.meta.dirname,'../..'),36,profile);
@@ -160,7 +160,7 @@ test('schema2 replay cannot omit runtime reports even through a minimal contract
 });
 test('completion reads valid state before resolving contracts and rejects mixed receipt retry',async()=>{
  const workspaceRoot=await makeWorkspace();const pluginRoot=await makePluginFixture({workflowProfile:profile});
- const state=await initWorkflow({workspaceRoot,topic:'Profile binding fixture'});const begun=await beginStep({workspaceRoot,step:1,marker:state.continuation});
+ const state=await initWorkflow({workspaceRoot,workflowProfile:profile,topic:'Profile binding fixture'});const begun=await beginStep({workspaceRoot,step:1,marker:state.continuation});
  const args={workspaceRoot,pluginRoot,step:1,attemptId:begun.attempt.id,summary:'first',evidence:[{acceptance_id:'state-transition',kind:'check',ok:true,detail:'verified'}]};
  await completeStep(args);const path=join(pathsFor(workspaceRoot).receiptsDir,'step001.json');const receipt=JSON.parse(await readFile(path,'utf8'));receipt.schema_version=1;delete receipt.workflow_profile;await writeFile(path,JSON.stringify(receipt));
  await assert.rejects(()=>completeStep(args),{code:'RECEIPT_PROFILE_MISMATCH'});

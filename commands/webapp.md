@@ -1,5 +1,5 @@
 ---
-description: 웹앱 인터랙티브 튜토리얼 1회 입력 → 새36단계 자율주행, 기존50단계 호환. /webapp <주제>
+description: 웹앱 인터랙티브 튜토리얼 1회 입력 → 기획부터 새20단계 자율주행, 기존36·50단계 호환. /webapp <주제>
 argument-hint: <주제 한 줄>
 ---
 
@@ -26,21 +26,21 @@ Codex 단계부터 harness36 플러그인의 `codex/scripts/harness-state.mjs`(`
 1. **harness-rules skill 로드** — 본 세션의 절대 헌법.
    `Skill` 도구로 `harness36:harness-rules` 호출.
 
-2. **선택된 실행 확인** — 명시적인 `/webapp <주제>`의 `webapp-trigger`가 새 실행에 schema2·`research-free-36-v1`·total36을 만들고 원문 prompt를 TOPIC에 보존한다. `webapp trigger skipped`가 있으면 TOPIC·progress를 덮어쓰지 않고 안내만 전한다. 훅 실패로 진행 기록이 없으면 필수 도구 실패로 보고하고 가짜 progress를 직접 만들지 않는다.
+2. **선택된 실행 확인** — 명시적인 `/webapp <주제>`의 `webapp-trigger`가 새 실행에 schema2·`planning-first-20-v1`·total20을 만들고 원문 prompt를 TOPIC에 보존한다. `webapp trigger skipped`가 있으면 TOPIC·progress를 덮어쓰지 않고 안내만 전한다. 훅 실패로 진행 기록이 없으면 필수 도구 실패로 보고하고 가짜 progress를 직접 만들지 않는다.
 
    ```
    node "<plugin-root>/hooks/lib/workflow-profile.mjs" resolve "<project-root>"
    ```
 
-   성공 출력의 `workflow_profile`, `total`, `step_body`, `body_directory`, `milestones`를 사용한다. 실패하면 경로·프로필·총수를 추측하지 않는다. 기존 legacy50은 원래50 본문과 번호를 유지한다.
+   성공 출력의 `workflow_profile`, `total`, `step_body`, `body_directory`, `milestones`를 사용한다. 실패하면 경로·프로필·총수를 추측하지 않는다. 명시적 기존36과 legacy50은 원래36·50 본문과 번호를 유지한다. 첫 기획은 TOPIC과 명시 제공 자료를 검토하며 삭제된 선행 gate나 도구 보고서를 요구하지 않는다.
 
-3. **본문 Read** — 반환된 `step_body`를 읽는다. 새36의 경로는 `step_archive/profiles/research-free-36-v1/archived/stepNNN.md`다. legacy50은 검증된 archived/ 또는 flat 경로다. 새 본문을 legacy 경로에 복사하지 않는다.
+3. **본문 Read** — 반환된 `step_body`를 읽는다. 새20의 경로는 `step_archive/profiles/planning-first-20-v1/archived/stepNNN.md`다. 기존36은 `step_archive/profiles/research-free-36-v1/archived/stepNNN.md`, legacy50은 검증된 archived/ 또는 flat 경로다. 새 본문을 legacy 경로에 복사하지 않는다.
 
-   TOPIC의 constraints에는 두 프로필 모두 다음 기본 줄을 그대로 유지한다. 사용자 제외는 별도 줄에 원문으로 보존하며, 채택 예외는 선택된 설계 단계(new18 / legacy30)가 계약에 근거를 기록한다.
+   TOPIC의 constraints에는 세 프로필 모두 다음 기본 줄을 그대로 유지한다. 사용자 제외는 별도 줄에 원문으로 보존하며, 채택 예외는 선택된 설계 단계(새20의2 / 기존36의18 / legacy50의30)가 계약에 근거를 기록한다.
 
    - 디자인 제외(하네스 기본, 설계가 채택 사유를 기록하면 예외): 크림·오프화이트 페이지 바탕 / 제목 속 이탤릭 강조어 / 01·02·03 장식 번호 섹션 라벨 / 코드 밖 모노스페이스 라벨 / 알약형 버튼 / 맹목적 Inter·Roboto·Arial / 보라 계열 그라데이션 배경 / 무조건 중앙정렬 카드 / 과도한 border-radius / 획일적 단색 배경
 
-4. **연속 실행** — 본문 지시대로 실행 → `Step NNN/<total> 완료` 보고 → 같은 프로필의 다음 본문을 Read한다. 새36은 `Step 001/36 완료`부터 `Step 036/36 완료`, 기존50은 원래 `/50`을 사용한다. 선택된 최종 단계 전에 종료하려면 헌법 §2-1 명명된 멈춤을 기록한다. 최종 `quality-gate.mjs --inspect-final` 종료 코드0을 확인한 뒤 `node "<plugin-root>/scripts/final-summary.mjs" --workspace "<project-root>"`를1회 실행하고 완료 줄 뒤에 출력의 세 제목만 붙인다.
+4. **연속 실행** — 본문 지시대로 실행 → `Step NNN/<total> 완료` 보고 → 같은 프로필의 다음 본문을 Read한다. 새20은 `Step 001/20 완료`부터 `Step 020/20 완료`, 기존36은 원래 `/36`, 기존50은 원래 `/50`을 사용한다. 선택된 최종 단계 전에 종료하려면 헌법 §2-1 명명된 멈춤을 기록한다. 최종 `quality-gate.mjs --inspect-final` 종료 코드0을 확인한 뒤 `node "<plugin-root>/scripts/final-summary.mjs" --workspace "<project-root>"`를1회 실행하고 완료 줄 뒤에 출력의 세 제목만 붙인다.
 
 ## Jev-first 요청 라우팅
 
@@ -71,7 +71,7 @@ Score는 순서 있는 2–10개 기준의 가중 평점이다. Noul에 제공�
 
 ## Jev 체크포인트 라우팅
 
-new36은17·18·25·31·35단계, legacy50은16·24·25·30·37·45·49단계의 선택 근거가 준비되면 신뢰한 설치 플러그인의
+새20은1·2·9·15·19단계, 기존36은17·18·25·31·35단계, legacy50은16·24·25·30·37·45·49단계의 선택 근거가 준비되면 신뢰한 설치 플러그인의
 `scripts/jev-judge.mjs`와 `docs/jev-checkpoints.md`를 따른다. 현재 작업에서 Jev 사용과
 해당 발췌문의 외부 전송이 승인된 경우 자동 호출한다. 기존 승인이 범위를 포함하면
 재확인하지 않는다. 단계 도달이나 키 존재, workflow 시작 자체는 전송 승인이 아니다.
@@ -96,4 +96,4 @@ Jev 결과로 기존 필수 Acceptance·시각 검사·E2E·독립 검증·완�
 
 ## 다음 행동
 
-지금 즉시 step001부터 시작하라. 본 명령어는 이미 자율주행 진입 신호다.
+새 실행은 관리자가 선택한 step001 요구사항 기획부터 시작하라. 기존 실행은 반환된 현재 단계부터 이어간다. 본 명령어는 이미 자율주행 진입 신호다.

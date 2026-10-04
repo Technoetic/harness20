@@ -148,7 +148,7 @@ function assertExclusionJoin(step43, rules, label) {
   assert.match(s11[1], /선택된 디자인 토큰과 제외 목록은 위 표의 프로필별 설계 계약\(`harness50-design-contract`\)이고/, label);
   assert.match(s11[1], /계약 `exclude`에서 `adopted: false`인 항목의 위반은 최소 `Important`다\./, label);
   assert.match(s11[1], /계약이 없는 이전 legacy50 실행은 §5의 수치를 기준으로 쓴다\./, label);
-  assert.match(s11[1], /새36의 필수 계약 누락은 INCOMPLETE다\./, label);
+  assert.match(s11[1], /새20·기존36의 필수 계약 누락은 INCOMPLETE다\./, label);
 }
 
 test('V7 step 43 keeps design exclusions out of findings and section 11 names the design contract', () => {
@@ -161,7 +161,7 @@ test('V7 step 43 keeps design exclusions out of findings and section 11 names th
     noContract: [s43, rules.replace('위 표의 프로필별 설계 계약(`harness50-design-contract`)이고', '헌법 §5 값이고')],
     unadoptedAdvisory: [s43, rules.replace('위반은 최소 `Important`다.', '위반은 `advisory`다.')],
     noFallback: [s43, rules.replace(' 계약이 없는 이전 legacy50 실행은 §5의 수치를 기준으로 쓴다.', '')],
-    newContractOptional: [s43, rules.replace('새36의 필수 계약 누락은 INCOMPLETE다.', '새36의 필수 계약 누락은 PASS다.')]
+    newContractOptional: [s43, rules.replace('새20·기존36의 필수 계약 누락은 INCOMPLETE다.', '새20·기존36의 필수 계약 누락은 PASS다.')]
   };
   for (const [name, [mutatedStep, mutatedRules]] of Object.entries(mutations)) {
     assert.ok(mutatedStep !== s43 || mutatedRules !== rules, name);

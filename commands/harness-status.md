@@ -6,7 +6,7 @@ description: harness36 진행 상태 조회 — 현재 step / 완료 step 수 / 
 
 Codex 상태가 없고 progress가 있으면 신뢰한 설치 플러그인의
 `node "<plugin-root>/hooks/lib/workflow-profile.mjs" resolve "<project-root>"`로 프로필과
-본문 바인딩을 검증한다. 반환된 `total`(새36·legacy50)과 `next_step`을 기준으로
+본문 바인딩을 검증한다. 반환된 `total`(새20·기존36·legacy50)과 `next_step`을 기준으로
 `step_archive/progress.json`의 완료 수·멈춤 필드를 읽어 한 줄로 보고한다.
 불일치·손상은 1줄 오류로 보고하며 프로필을 추정하거나 상태를 수정하지 않는다.
 

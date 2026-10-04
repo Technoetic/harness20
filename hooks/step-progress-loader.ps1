@@ -113,9 +113,11 @@ if ($isPaused) {
 
 Write-Host "=== Step Progress Loader ==="
 
-# 기존 progress.json이 있어도 total_steps가 실제 파일 수와 다르면 경고
-# stepNNN.md 개수: flat + archived/ 둘 다 스캔 후 파일명 기준 unique (재가동 시 archived/ 이동 대응)
-$stepFiles = @(Get-ChildItem -LiteralPath $stepArchive -Filter "step???.md" -ErrorAction SilentlyContinue)
+# Count only the selected profile archive. Legacy runs also allow the historic flat layout.
+$stepFiles = @()
+if ($selectedProfile.workflow_profile -eq 'legacy-50-v1') {
+    $stepFiles += @(Get-ChildItem -LiteralPath $stepArchive -Filter "step???.md" -ErrorAction SilentlyContinue)
+}
 $archivedDir2 = $selectedArchive
 if (Test-Path -LiteralPath $archivedDir2) {
     $stepFiles += @(Get-ChildItem -LiteralPath $archivedDir2 -Filter "step???.md" -ErrorAction SilentlyContinue)

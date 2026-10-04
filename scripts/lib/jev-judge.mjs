@@ -2,7 +2,6 @@ import { open } from 'node:fs/promises';
 import { readSafe, physicalWorkspace, safePath, sha256 } from './quality-files.mjs';
 
 import { workflowContext, recheckWorkflowContext, evidenceDirectory } from './workflow-context.mjs';
-import { getWorkflowProfile, DEFAULT_WORKFLOW_PROFILE } from './workflow-profiles.mjs';
 
 const MODEL = 'jev-1.13.0';
 const ENDPOINT = 'https://api.typesafe.ai/v1/systemone';
@@ -26,7 +25,10 @@ const POLICY = Object.freeze({
   mandatory_abstention: true, probability_sum_tolerance: 1e-6, response_schema: 'exact-fields-v1',
 });
 const POLICY_HASH = sha256(JSON.stringify(POLICY));
-const PROFILE_POLICY_HASH = sha256(JSON.stringify({ ...POLICY, version: 2, workflow_profile: DEFAULT_WORKFLOW_PROFILE, steps: getWorkflowProfile(DEFAULT_WORKFLOW_PROFILE).milestones.jev }));
+function policyHash(context) {
+  return context.generation ? sha256(JSON.stringify({ ...POLICY, version: 2,
+    workflow_profile: context.profile.id, steps: context.profile.milestones.jev })) : POLICY_HASH;
+}
 
 function fail(code = 'invalid_input') {
   const error = new Error(code === 'invalid_input' ? 'Invalid Jev judgment input.' : 'Jev judgment could not be completed.');
@@ -142,7 +144,7 @@ async function bind(workspaceRoot, input) {
 }
 
 function summary(bound, status) {
-  return { status, role: 'advisory', step: bound.step, model: MODEL, policy_hash: bound.context?.generation ? PROFILE_POLICY_HASH : POLICY_HASH, ...bound.context?.binding,
+  return { status, role: 'advisory', step: bound.step, model: MODEL, policy_hash: policyHash(bound.context), ...bound.context?.binding,
     input_hash: bound.input_hash, request_hash: bound.request_hash, sources: bound.sources,
     question_count: bound.questions.length, questions: bound.questions, min_confidence: bound.min_confidence };
 }
@@ -297,7 +299,7 @@ function validateReport(report, context) {
     'sources', 'question_count', 'questions', 'min_confidence', 'created_at', 'results', 'usage', 'error_code'];
   if (context.generation) fields.push('workflow_profile', 'workflow_generation');
   if (!exact(report, fields) || report.schema_version !== (context.generation ? 2 : 1) || (context.generation && (report.workflow_profile !== context.profile.id || report.workflow_generation !== context.generation)) || report.role !== 'advisory' || !context.profile.milestones.jev.includes(report.step)
-      || report.model !== MODEL || report.policy_hash !== (context.generation ? PROFILE_POLICY_HASH : POLICY_HASH) || !['reviewed', 'needs_review', 'unverified'].includes(report.status)
+      || report.model !== MODEL || report.policy_hash !== policyHash(context) || !['reviewed', 'needs_review', 'unverified'].includes(report.status)
       || ![report.input_hash, report.request_hash].every(hash => typeof hash === 'string' && HASH.test(hash))
       || !probability(report.min_confidence) || typeof report.created_at !== 'string' || !Number.isFinite(Date.parse(report.created_at))
       || new Date(report.created_at).toISOString() !== report.created_at || !Array.isArray(report.questions)

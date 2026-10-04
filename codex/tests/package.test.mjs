@@ -461,12 +461,13 @@ function webappContractErrors(text) {
   validateManagerResource(errors, resources, "webapp resources");
   const stepReferences = resources.match(/[^\s`|]*stepNNN\.md/g) ?? [];
   const expectedStepReferences = [
+    "codex/assets/profiles/planning-first-20-v1/steps/stepNNN.md",
     "codex/assets/profiles/research-free-36-v1/steps/stepNNN.md",
     "codex/assets/steps/stepNNN.md"
   ];
   if (JSON.stringify(stepReferences) !== JSON.stringify(expectedStepReferences) ||
       !resources.includes("`begin.step_target`") || !resources.includes("relative to the plugin root")) {
-    errors.push("webapp resources must use manager-derived paths for both allowlisted profiles");
+    errors.push("webapp resources must use manager-derived paths for all three allowlisted profiles");
   }
   if (!resources.includes("relative to this SKILL.md")) {
     errors.push("webapp resources must resolve relative to SKILL.md");
@@ -822,7 +823,7 @@ test("Codex manifest isolates Codex skills and hooks", async () => {
     "utf8"
   ));
   assert.equal(manifest.name, "harness36");
-  assert.match(manifest.version, /^3\.0\.0(?:\+codex\.[a-z0-9-]+)?$/);
+  assert.match(manifest.version, /^3\.1\.0(?:\+codex\.[a-z0-9-]+)?$/);
   assert.equal(manifest.skills, "./codex/skills/");
   assert.equal(manifest.hooks, "./codex/hooks/hooks.json");
   assert.notEqual(manifest.hooks, "./hooks/hooks.json");
@@ -1041,10 +1042,10 @@ test("webapp storage contract rejects direct opening while accepting prohibition
   }
 });
 
-test("webapp manager-selected references cover physical36 and preserved50 regular resources", async () => {
+test("webapp manager-selected references cover fresh20 and preserved36/50 regular resources", async () => {
   const text = await readSkill("webapp");
   assert.deepEqual(webappContractErrors(text), []);
-  for (const [directory, count] of [["codex/assets/profiles/research-free-36-v1/steps", 36], ["codex/assets/steps", 50]]) {
+  for (const [directory, count] of [["codex/assets/profiles/planning-first-20-v1/steps", 20], ["codex/assets/profiles/research-free-36-v1/steps", 36], ["codex/assets/steps", 50]]) {
     await Promise.all(Array.from({ length: count }, (_, index) =>
       readRepo(`${directory}/step${String(index + 1).padStart(3, "0")}.md`)
     ));
@@ -1102,19 +1103,19 @@ test("package, Claude, Codex, and marketplace release versions are synchronized 
   const entry = marketplace.plugins.find(plugin => plugin.name === "harness36");
 
   assert.equal(claude.name, "harness36");
-  assert.equal(claude.version, "3.0.0");
+  assert.equal(claude.version, "3.1.0");
   assert.equal(packageJson.version, claude.version);
   assert.equal(packageLock.version, claude.version);
   assert.equal(packageLock.packages[""].version, claude.version);
   assert.equal(codex.name, "harness36");
   assert.equal(codex.version.split("+")[0], claude.version);
-  if (codex.version.includes("+")) assert.match(codex.version, /^3\.0\.0\+codex\.[a-z0-9-]+$/);
+  if (codex.version.includes("+")) assert.match(codex.version, /^3\.1\.0\+codex\.[a-z0-9-]+$/);
   assert.equal(codex.skills, "./codex/skills/");
   assert.equal(codex.hooks, "./codex/hooks/hooks.json");
   assert.equal(marketplace.name, "harness36");
-  assert.equal(marketplace.metadata.version, "3.0.0");
+  assert.equal(marketplace.metadata.version, "3.1.0");
   assert.equal(entry?.source, "./");
-  assert.equal(entry?.version, "3.0.0");
+  assert.equal(entry?.version, "3.1.0");
 
   const marketplaceRoot = new URL(".claude-plugin/marketplace.json", REPO_URL);
   const pluginSource = new URL(entry.source, REPO_URL);

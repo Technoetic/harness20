@@ -95,6 +95,7 @@ if ($preLine -ne 'issue') {
 $profileJson = @(& node (Join-Path $PSScriptRoot 'lib/workflow-profile.mjs') bootstrap (Join-Path $projectRoot '.') 2>$null)
 if ($LASTEXITCODE -ne 0 -or $profileJson.Count -eq 0) { Write-Output '[HARNESS] Profile bootstrap failed; nothing was initialized.'; exit 0 }
 $selectedProfile = ($profileJson -join "`n") | ConvertFrom-Json
+$finalStep = '{0:D3}' -f [int]$selectedProfile.total
 $archivedDir = Join-Path $projectRoot $selectedProfile.body_directory
 if (-not (Test-Path -LiteralPath $topicDir)) { New-Item -ItemType Directory -Path $topicDir -Force | Out-Null }
 
@@ -107,31 +108,12 @@ foreach ($b in @("html-bundler.ps1", "html-bundler.sh")) {
   if (Test-Path -LiteralPath $bSrc) { Copy-Item -LiteralPath $bSrc -Destination (Join-Path $toolsDir $b) -Force }
 }
 
-# 2) TOPIC.md 작성 (덮어쓰기 — 완료 기록이 없을 때의 신규 요청은 신규 주제)
-$today = Get-Date -Format "yyyy-MM-dd"
-$topicBody = @"
----
-created: $today
-session_prompt: |
-$(($prompt -split "`n" | ForEach-Object { "  $_" }) -join "`n")
----
-
-# 튜토리얼 주제
-
-본 TOPIC.md는 webapp-trigger hook이 자동 생성했다.
-step001이 진입 시 본 파일의 session_prompt를 읽어 topic/audience/interactive/real_world_apps/constraints를 추출한다.
-
-- raw_prompt: 위 session_prompt 블록 참조
-
-## 결정/사유 (NEW-WORK-규칙 3번)
-
-- 자동 추출 항목이 모호하면 step001이 즉시 결정·기록 후 진행 (질문 금지)
-"@
-$topicBody | Out-File -LiteralPath $topicFile -Encoding UTF8 -Force
-# BOM 제거
-$bytes = [System.IO.File]::ReadAllBytes($topicFile)
-if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
-  [System.IO.File]::WriteAllBytes($topicFile, $bytes[3..($bytes.Length-1)])
+# Normalize and freeze the six-field contract before the first planning step.
+$OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+$topicResult = @($harnessRaw | & node (Join-Path $PSScriptRoot 'lib/workflow-profile.mjs') topic (Join-Path $projectRoot '.') 2>$null)
+if ($LASTEXITCODE -ne 0) {
+  Write-Output '[HARNESS] TOPIC contract initialization failed; no progress was initialized.'
+  exit 0
 }
 Write-Log "TOPIC.md written"
 
@@ -166,18 +148,19 @@ Write-Output ""
 Write-Output "Bootstrap complete:"
 Write-Output "  - step_archive/ ready"
 Write-Output "  - step_archive/TOPIC/TOPIC.md written with the user prompt"
-Write-Output "  - step_archive/progress.json initialized (current_step=1, total=36)"
-Write-Output "  - step_archive/profiles/research-free-36-v1/archived/step001.md ~ step036.md available"
+Write-Output "  - step_archive/progress.json initialized (current_step=1, total=$($selectedProfile.total))"
+Write-Output "  - $($selectedProfile.body_directory)/step001.md ~ step$finalStep.md available"
 Write-Output ""
 Write-Output "ABSOLUTE OVERRIDE:"
 Write-Output "  Before addressing anything else, IMMEDIATELY:"
-Write-Output "    1. Read step_archive/profiles/research-free-36-v1/archived/step001.md"
+Write-Output "    1. Read $($selectedProfile.body_directory)/step001.md"
 Write-Output "    2. Execute its instructions in full (including TOPIC pickup from TOPIC.md)"
-Write-Output "    3. On completion report 'Step 001/36 완료' and Read step002.md"
-Write-Output "    4. Continue without user confirmation through step036"
+Write-Output "    3. On completion report 'Step 001/$($selectedProfile.total) 완료' and Read step002.md"
+Write-Output "    4. Continue without user confirmation through step$finalStep"
 Write-Output ""
+Write-Output "Missing essential input requires a required-input-missing named pause; never invent earlier completed work."
 Write-Output "Do NOT ask the user any clarifying questions."
 Write-Output "Do NOT pause for confirmation."
-Write-Output "Do NOT end the turn before step036 except by a named pause (harness-rules 2-1)."
+Write-Output "Do NOT end the turn before step$finalStep except by a named pause (harness-rules 2-1)."
 Write-Output "</harness50-trigger>"
 exit 0

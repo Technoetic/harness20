@@ -10,7 +10,7 @@ import { getWorkflowProfile } from '../../scripts/lib/workflow-profiles.mjs';
 const repo = fileURLToPath(new URL('../../', import.meta.url));
 
 test('public stage table matches retained runtime coordinates in both host guides', async () => {
-  const selected = getWorkflowProfile('research-free-36-v1');
+  const selected = getWorkflowProfile('planning-first-20-v1');
   for (const path of ['README.md', 'codex/README.md']) {
     const text = await readFile(join(repo, path), 'utf8');
     const table = text.match(/\| New \| Original \| Role \|\n([^]*?)(?=\n\n)/)?.[0];
@@ -32,9 +32,9 @@ test('public Jev example prepares the actual five new and seven legacy checkpoin
   const exampleRoot = await makeWorkspace();
   const scriptPath = join(exampleRoot, 'jev-examples.mjs');
   await writeFile(scriptPath, script, 'utf8');
-  for (const profile of ['research-free-36-v1', 'legacy-50-v1']) {
+  for (const profile of ['planning-first-20-v1', 'research-free-36-v1', 'legacy-50-v1']) {
     const workspace = await makeWorkspace();
-    const args = [scriptPath, repo, workspace, ...(profile === 'legacy-50-v1' ? ['--legacy'] : [])];
+    const args = [scriptPath, repo, workspace, ...(profile === 'legacy-50-v1' ? ['--legacy'] : profile === 'research-free-36-v1' ? ['--research-free'] : [])];
     const result = spawnSync(process.execPath, args, { encoding: 'utf8', timeout: 30000 });
     assert.ifError(result.error);
     assert.equal(result.status, 0, result.stderr || result.stdout);

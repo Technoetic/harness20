@@ -83,7 +83,8 @@ test('guide includes executable public examples for every checkpoint and protect
 });
 
 for (const { profile, total, checkpoints, flags } of [
-  { profile: 'research-free-36-v1', total: 36, checkpoints: [17, 18, 25, 31, 35], flags: [] },
+  { profile: 'planning-first-20-v1', total: 20, checkpoints: [1, 2, 9, 15, 19], flags: [] },
+  { profile: 'research-free-36-v1', total: 36, checkpoints: [17, 18, 25, 31, 35], flags: ['--research-free'] },
   { profile: 'legacy-50-v1', total: 50, checkpoints: [16, 24, 25, 30, 37, 45, 49], flags: ['--legacy'] }
 ]) test(`documented ${profile} inputs prepare offline in a missing workspace through the actual CLI`, async t => {
   const temporaryRoot = await realpath(tmpdir());

@@ -82,7 +82,8 @@ if isinstance(p,dict) and (('paused' in p and p['paused'] is not False) or p.get
 
 import glob
 # Report only (mirrors the .ps1 loader): rewriting total_steps could flip the run's activity.
-actual=len({os.path.basename(x) for d in [a_dir,os.path.dirname(a_dir)] for x in glob.glob(os.path.join(glob.escape(d),"step???.md"))})
+directories=[a_dir,os.path.dirname(a_dir)] if profile["workflow_profile"]=="legacy-50-v1" else [a_dir]
+actual=len({os.path.basename(x) for d in directories for x in glob.glob(os.path.join(glob.escape(d),"step???.md"))})
 p.setdefault("metrics",{"total_sessions":0,"total_duration_minutes":0,"steps_per_session_avg":0})
 p["metrics"]["total_sessions"]=int(p["metrics"].get("total_sessions",0))+1
 p["last_updated"]=datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")

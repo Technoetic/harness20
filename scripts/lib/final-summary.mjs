@@ -118,7 +118,7 @@ async function collectGate(root, out, context) {
 
 async function collectDeployment(root, out, context) {
   const files = [];
-  const start = context.profile.id === LEGACY_WORKFLOW_PROFILE ? 45 : 31;
+  const start = context.profile.milestones.e2e;
   const final = context.profile.milestones.final;
   const reportPattern = new RegExp(`^step0(?:${Array.from({length: final - start + 1}, (_, i) => start + i).join('|')})_.+\\.md$`);
   for (const [dir, pattern] of [['step_archive', reportPattern], ['step_archive/outputs', new RegExp(`^step${pad(final)}_.+\\.md$`)]]) {

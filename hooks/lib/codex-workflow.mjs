@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveWorkflowProfile } from '../../scripts/lib/workflow-profiles.mjs';
 
 export const CODEX_STATE_RELATIVE = 'step_archive/.harness50-codex/state.json';
 export const SCHEMA_VERSION = 1;
@@ -43,11 +44,10 @@ function isStep(value, count) {
 // { kind: 'valid', workflowId, status, step, completed }.
 export function summarizeState(state) {
   if (!isPlainObject(state)) return { kind: 'invalid' };
+  if (state.schema_version !== 1 && state.schema_version !== 2) return { kind: 'invalid' };
   let count;
-  if (state.schema_version === 1 && !Object.hasOwn(state, 'workflow_profile') && state.total_steps === 50) count = 50;
-  else if (state.schema_version === 2 && state.workflow_profile === 'research-free-36-v1' && state.total_steps === 36) count = 36;
-  else if (state.schema_version === 2 && state.workflow_profile === 'legacy-50-v1' && state.total_steps === 50) count = 50;
-  else return { kind: 'invalid' };
+  try { count = resolveWorkflowProfile(state).stepCount; }
+  catch { return { kind: 'invalid' }; }
   if (typeof state.workflow_id !== 'string' || !WORKFLOW_ID.test(state.workflow_id)) return { kind: 'invalid' };
   if (!STATUSES.includes(state.status)) return { kind: 'invalid' };
   const done = state.completed_steps;

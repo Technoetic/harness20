@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { HarnessError } from "./lib/errors.mjs";
 
 import {
-  DEFAULT_WORKFLOW_PROFILE, LEGACY_WORKFLOW_PROFILE, getWorkflowProfile,
+  DEFAULT_WORKFLOW_PROFILE, LEGACY_WORKFLOW_PROFILE, WORKFLOW_PROFILE_IDS, getWorkflowProfile,
   originalStepNumber, resolveWorkflowProfile, stepPhase
 } from "../../scripts/lib/workflow-profiles.mjs";
 
@@ -563,7 +563,7 @@ export async function validateStepBatch(repoRoot, numbers, profileId = LEGACY_WO
 }
 
 export async function validateAllProfiles(repoRoot) {
-  return Promise.all([LEGACY_WORKFLOW_PROFILE, DEFAULT_WORKFLOW_PROFILE]
+  return Promise.all(WORKFLOW_PROFILE_IDS
     .map(profileId => validateRepositoryParity(repoRoot, profileId)));
 }
 

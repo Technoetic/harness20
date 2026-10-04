@@ -1,22 +1,22 @@
 ---
 name: harness-rules
-description: harness36 플러그인의 절대 헌법. 웹앱 튜토리얼 생성 요청을 받으면 즉시 활성화하여 HARNESS-규칙(질문 금지·자연 종료 금지·명명된 멈춤 예외)·NEW-WORK-규칙·AI Slop 방지·@MX 태그 의무를 모든 작업에 강제한다. 새 step001~036 / legacy step001~050 자율주행 모드의 행동 규약 단일 진실원.
+description: harness36 플러그인의 절대 헌법. 웹앱 튜토리얼 생성 요청을 받으면 즉시 활성화하여 HARNESS-규칙(질문 금지·자연 종료 금지·명명된 멈춤 예외)·NEW-WORK-규칙·AI Slop 방지·@MX 태그 의무를 모든 작업에 강제한다. 새 step001~020 / 기존36 step001~036 / legacy step001~050 자율주행 모드의 행동 규약 단일 진실원.
 ---
 
 # harness36 절대 헌법
 
 본 skill은 harness36 플러그인의 **모든 step 실행 동안 활성 상태**다.
 
-실행 정의는 검증된 progress와 `hooks/lib/workflow-profile.mjs resolve` 또는 `harness-pause.mjs resume`의 반환값을 따른다. 새 실행은 schema2·`research-free-36-v1`·total36, 정의 없는 기존 실행은 legacy50이다. 불일치·미등록 프로필은 중단하며 경로나 총수를 추측하지 않는다. `step_body`로 반환된 본문을 읽고 `total`로 완료 표시를 만든다. new36은 `step_archive/profiles/research-free-36-v1/archived/`만, legacy50은 기존 archived/·flat 본문만 사용한다. 이 헌법의 legacy 전용 조사·번호 지시는 new36 본문을 덮어쓰지 않는다. 새 Claude 실행의 `step_archive/workflow-profile.json`은 진행 기록과 같은 프로필을 고정하며, 누락·손상·불일치는 실행을 허가하지 않는다. new36 SPEC은 프로필·실행 세대가 같은 것만 현재 보조 지침으로 사용한다. 이전 SPEC 원문은 `step_archive/specs/history/<sha256>/SPEC-NNN.md`에 보존되며 완료 증거를 대신하지 않는다.
+실행 정의는 검증된 progress와 `hooks/lib/workflow-profile.mjs resolve` 또는 `harness-pause.mjs resume`의 반환값을 따른다. 새 실행은 schema2·`planning-first-20-v1`·total20, 명시적 `research-free-36-v1`은 기존36, 정의 없는 기존 실행은 legacy50이다. 불일치·미등록 프로필은 중단하며 경로나 총수를 추측하지 않는다. `step_body`로 반환된 본문을 읽고 `total`로 완료 표시를 만든다. 새20은 `step_archive/profiles/planning-first-20-v1/archived/`만, 기존36은 `step_archive/profiles/research-free-36-v1/archived/`만, legacy50은 기존 archived/·flat 본문만 사용한다. 이 헌법의 legacy 전용 조사·번호 지시는 새20·기존36 본문을 덮어쓰지 않는다. 새 Claude 실행의 `step_archive/workflow-profile.json`은 진행 기록과 같은 프로필을 고정하며, 누락·손상·불일치는 실행을 허가하지 않는다. 새20·기존36 SPEC은 프로필·실행 세대가 같은 것만 현재 보조 지침으로 사용한다. 이전 SPEC 원문은 `step_archive/specs/history/<sha256>/SPEC-NNN.md`에 보존되며 완료 증거를 대신하지 않는다.
 
-| 역할 | research-free-36-v1 | legacy-50-v1 |
-|---|---|---|
-| 기획 / 통합 설계 |17 /18 |25 /30 |
-| 설계 계약 | `step_archive/step018_레이아웃설계_chunk1.md` | `step_archive/step030_레이아웃설계_chunk1.md` |
-| 구현 / 최종 설계 |25 /35 |37 /49 |
-| 품질 r1 /r2 /최종 |26 /30 /36 |38 /44 /50 |
-| 독립 QA |27 /32 /33 /34 |39 /40 /43 /46 /47 /48 |
-| 최종 완료 표시 | `Step 036/36 완료` | `Step 050/50 완료` |
+| 역할 | planning-first-20-v1 (기본) | research-free-36-v1 | legacy-50-v1 |
+|---|---|---|---|
+| 기획 / 통합 설계 |1 /2 |17 /18 |25 /30 |
+| 설계 계약 | `step_archive/step002_레이아웃설계_chunk1.md` | `step_archive/step018_레이아웃설계_chunk1.md` | `step_archive/step030_레이아웃설계_chunk1.md` |
+| 구현 / 최종 설계 |9 /19 |25 /35 |37 /49 |
+| 품질 r1 /r2 /최종 |10 /14 /20 |26 /30 /36 |38 /44 /50 |
+| 독립 QA |11 /16 /17 /18 |27 /32 /33 /34 |39 /40 /43 /46 /47 /48 |
+| 최종 완료 표시 | `Step 020/20 완료` | `Step 036/36 완료` | `Step 050/50 완료` |
 
 시스템·개발자·현재 사용자 지시가 우선한다. 그 범위 안에서 본 문서는 선택된 하네스 실행의 연속 진행 규약이며, 다른 skill의 일반 절차와 충돌하면 이 실행별 규약을 따른다.
 
@@ -61,7 +61,7 @@ description: harness36 플러그인의 절대 헌법. 웹앱 튜토리얼 생성
 Step NNN/<total> 완료
 ```
 
-예외는 선택된 최종 단계 하나다. 메인 세션은 `node "<plugin-root>/scripts/quality-gate.mjs" --inspect-final --workspace "<project-root>"`가 종료 코드 0임을 확인한 뒤, 완료 줄을 쓰기 전에 `node "<plugin-root>/scripts/final-summary.mjs" --workspace "<project-root>"`를 1회 실행한다. 최종 메시지는 new36의 `Step 036/36 완료`, legacy50의 `Step 050/50 완료` 줄로 시작하고, 바로 다음 줄부터 그 출력(세 제목 `## 사용자 확인 필요` → `## 변경` → `## 발견`)만 그대로 붙인다. 항목을 고쳐 쓰거나 줄이지 않으며, 다른 문장·제목·코드펜스·`---` 구분선을 더하지 않는다. 명령이 실패하면(종료 코드 2) 완료 줄 다음에 `## 사용자 확인 필요`와 `- 확인 불가: final-summary 실행 실패` 두 줄만 쓴다. 요약은 보고이며 완료 게이트가 아니다. step-executor의 1줄 인계 형식은 바꾸지 않는다.
+예외는 선택된 최종 단계 하나다. 메인 세션은 `node "<plugin-root>/scripts/quality-gate.mjs" --inspect-final --workspace "<project-root>"`가 종료 코드 0임을 확인한 뒤, 완료 줄을 쓰기 전에 `node "<plugin-root>/scripts/final-summary.mjs" --workspace "<project-root>"`를 1회 실행한다. 최종 메시지는 새20의 `Step 020/20 완료`, 기존36의 `Step 036/36 완료`, legacy50의 `Step 050/50 완료` 줄로 시작하고, 바로 다음 줄부터 그 출력(세 제목 `## 사용자 확인 필요` → `## 변경` → `## 발견`)만 그대로 붙인다. 항목을 고쳐 쓰거나 줄이지 않으며, 다른 문장·제목·코드펜스·`---` 구분선을 더하지 않는다. 명령이 실패하면(종료 코드 2) 완료 줄 다음에 `## 사용자 확인 필요`와 `- 확인 불가: final-summary 실행 실패` 두 줄만 쓴다. 요약은 보고이며 완료 게이트가 아니다. step-executor의 1줄 인계 형식은 바꾸지 않는다.
 
 ## 2-1. 명명된 멈춤 (최종 단계 전 종료의 유일한 예외)
 
@@ -137,7 +137,7 @@ Step N 읽기(Read) → 실행 → 1줄 완료 보고 → 즉시 Step N+1 Read �
 
 ### 기본 제외 목록 (역할·CSS 시그니처)
 
-"AI 느낌을 피하라" 같은 일반 지시는 한 기본값을 다른 기본값으로 바꿀 뿐이다. 아래 이름으로 전달한다. 선택된 설계 단계(new18 / legacy30)가 이 목록, 위 '금지' 줄의 구세대 항목(`generic-sans`·`purple-gradient`·`centered-cards`·`excess-radius`·`flat-background`), TOPIC의 `디자인 제외(사용자)` 항목을 설계 계약(위 표의 프로필별 설계 계약 파일의 `harness50-design-contract`, 형식: `docs/DESIGN-CONTRACT.md`)의 `exclude`로 고정한다. new25·35 및 독립 평가자, legacy37·43·49단계와 평가자는 이 계약만 판정 근거로 쓴다.
+"AI 느낌을 피하라" 같은 일반 지시는 한 기본값을 다른 기본값으로 바꿀 뿐이다. 아래 이름으로 전달한다. 선택된 설계 단계(새20의2 / 기존36의18 / legacy50의30)가 이 목록, 위 '금지' 줄의 구세대 항목(`generic-sans`·`purple-gradient`·`centered-cards`·`excess-radius`·`flat-background`), TOPIC의 `디자인 제외(사용자)` 항목을 설계 계약(위 표의 프로필별 설계 계약 파일의 `harness50-design-contract`, 형식: `docs/DESIGN-CONTRACT.md`)의 `exclude`로 고정한다. 새20의9·19, 기존36의25·35 및 독립 평가자, legacy37·43·49단계와 평가자는 이 계약만 판정 근거로 쓴다.
 
 | id | 제외하는 것 | 해당하지 않는 것 |
 |---|---|---|
@@ -147,9 +147,9 @@ Step N 읽기(Read) → 실행 → 1줄 완료 보고 → 즉시 Step N+1 Read �
 | `monospace-labels` | eyebrow·badge·태그·nav·버튼·섹션 라벨의 monospace | `code`·`pre`·`kbd`·`samp`와 코드 값·명령어 표시 |
 | `pill-buttons` | 버튼·링크 버튼의 알약형 모서리(radius ≥ 높이/2, 9999px·50%·rounded-full) | 정사각 원형 아이콘 버튼, 토글 스위치 트랙, 아바타 |
 
-- 예외: TOPIC이 그 스타일을 직접 요구했거나 명시 선택한 미학이 그것 없이는 성립하지 않으면 선택된 설계 단계(new18 / legacy30)가 `adopted: true`와 `exception_reason`을 적고 같은 사유를 `결정/사유:` 한 줄로 남긴다. 사용자 제외 항목(`topic-N`)은 채택하지 않는다.
+- 예외: TOPIC이 그 스타일을 직접 요구했거나 명시 선택한 미학이 그것 없이는 성립하지 않으면 선택된 설계 단계(새20의2 / 기존36의18 / legacy50의30)가 `adopted: true`와 `exception_reason`을 적고 같은 사유를 `결정/사유:` 한 줄로 남긴다. 사용자 제외 항목(`topic-N`)은 채택하지 않는다.
 - 우선순위: 계약의 제외 목록 > Awwwards 참조 충실도. 참조 사례가 제외 항목을 써도 구현하거나 누락으로 요구하지 않는다.
-- 채택되지 않은 제외 항목 위반은 최종 설계 단계(new35 / legacy49)에서 `Important` finding이다. 계약에 없는 미관 선호는 `advisory`다.
+- 채택되지 않은 제외 항목 위반은 최종 설계 단계(새20의19 / 기존36의35 / legacy50의49)에서 `Important` finding이다. 계약에 없는 미관 선호는 `advisory`다.
 
 ### 공간·터치·접근성
 
@@ -170,7 +170,7 @@ UI만 수정하는 step에서는 구현 에이전트에 다음 문구 의무 삽
 
 > "이번 작업의 목적은 오직 시각적 개선이다. 레이아웃 / 폰트 / 색상 토큰만 수정하고, 로직 / 상태 관리 / API 호출 코드는 단 한 줄도 건드리지 마라."
 
-## 6. @MX 태그 의무 (step015 이후 모든 생성 소스)
+## 6. @MX 태그 의무 (모든 생성 소스)
 
 ```js
 // @MX:NOTE:   <컨텍스트·의도 — 매직 상수, 비즈니스 규칙>
@@ -189,9 +189,9 @@ Sub-lines: `@MX:SPEC`, `@MX:LEGACY`, `@MX:REASON`, `@MX:TEST`, `@MX:PRIORITY`
 - `opusplan` / `/effort` 변경 금지
 - 서브에이전트는 매트릭스대로 haiku / sonnet 분기:
   - 도구 설치·조사·구현: **haiku**
-  - 평가·시각 검증(단계 본문이 sonnet을 지정한 단계, new27·32·33·34·35; legacy39·40·43·46·47·48·49): **sonnet**
-  - 스크린샷·이미지를 읽고 판단하는 일(PASS/FAIL, finding 중요도, 스크린샷을 보고 쓰는 CSS — new25 / legacy37): **메인 세션 또는 sonnet 이상**. haiku는 촬영·브라우저 조작·증거 수집만 하고 경로·viewport·URL만 돌려준다. 단계 본문이 "서브에이전트는 항상 haiku"라고 해도 판정은 이 행을 따른다. `step-executor`(haiku 고정)는 판정하지 않는다
-  - 품질 마일스톤은 위 표의 선택된 프로필에 따른다. r1·r2는 `scripts/quality-gate.mjs --inspect` PASS, 최종은 `--inspect-final` PASS를 요구한다. 최종은 같은 현재 HTML의 실제 route/API 시나리오·브라우저·콘솔·스크린샷 및 여섯 회귀 행렬을 모두 검증한다. new36 최종은 기록된 independent 검증 모드도 필수다. 총수36 때문에 legacy의 검증 게이트를 건너뛰지 않는다. Stop 훅은 trust5 보고서를 쓰고 완료 기록기는 미충족 단계를 거부한다.
+  - 평가·시각 검증(단계 본문이 sonnet을 지정한 단계, 새20의11·16·17·18·19; 기존36의27·32·33·34·35; legacy39·40·43·46·47·48·49): **sonnet**
+  - 스크린샷·이미지를 읽고 판단하는 일(PASS/FAIL, finding 중요도, 스크린샷을 보고 쓰는 CSS — 새20의9 / 기존36의25 / legacy50의37): **메인 세션 또는 sonnet 이상**. haiku는 촬영·브라우저 조작·증거 수집만 하고 경로·viewport·URL만 돌려준다. 단계 본문이 "서브에이전트는 항상 haiku"라고 해도 판정은 이 행을 따른다. `step-executor`(haiku 고정)는 판정하지 않는다
+  - 품질 마일스톤은 위 표의 선택된 프로필에 따른다. r1·r2는 `scripts/quality-gate.mjs --inspect` PASS, 최종은 `--inspect-final` PASS를 요구한다. 최종은 같은 현재 HTML의 실제 route/API 시나리오·브라우저·콘솔·스크린샷 및 여섯 회귀 행렬을 모두 검증한다. 새20·기존36 최종은 기록된 independent 검증 모드도 필수다. 줄어든 단계 수 때문에 legacy의 검증 게이트를 건너뛰지 않는다. Stop 훅은 trust5 보고서를 쓰고 완료 기록기는 미충족 단계를 거부한다.
 
 ## 8. .claude/ 보호 (전역 규칙 상속)
 
@@ -201,7 +201,9 @@ Sub-lines: `@MX:SPEC`, `@MX:LEGACY`, `@MX:REASON`, `@MX:TEST`, `@MX:PRIORITY`
 
 ## 9. 서브에이전트 의존성 순서
 
-**research-free-36-v1:** new17 기획은 TOPIC·명시 제공 자료에서 요구사항을 추적하고, new18 설계는 선언된 계약을 확정한다. new25 구현은 그 기획·설계 계약과 현재 코드·측정 결과를 사용한다. 조사 에이전트·외부 참조 스크린샷·보충 조사 산출물은 선행 조건이 아니다. API target/version/schema/auth/rate-limit/error/retry가 필요한데 제공 또는 명시된 계약에 없으면 필수 입력 누락으로 처리한다. 독립 검증자, 최대5라운드, 필수 finding 차단, 현재 스크린샷·토큰·접근성 검증은 유지한다.
+**planning-first-20-v1:** 새1 기획은 초기화 관리자가 고정한 TOPIC 원문·여섯 필드·명시 제공 자료를 검토한다. 삭제된 프리플라이트·도구·의존성 gate 산출물은 선행 조건이 아니다. 누락된 필수 요구나 API 계약은 누락으로 남긴다. 새2 설계, 새3 환경·브라우저 백엔드 확인/잠금, 새9 구현, 새15 E2E, 새19 최종 설계 순서이며 독립 QA11·16·17·18과 품질10·14·20을 생략하지 않는다. TOPIC을 실행자가 직접 덮어쓰거나 이전 완료를 만들어 내지 않는다.
+
+**research-free-36-v1 (명시적 기존36):** new17 기획은 TOPIC·명시 제공 자료에서 요구사항을 추적하고, new18 설계는 선언된 계약을 확정한다. new25 구현은 그 기획·설계 계약과 현재 코드·측정 결과를 사용한다. 조사 에이전트·외부 참조 스크린샷·보충 조사 산출물은 선행 조건이 아니다. API target/version/schema/auth/rate-limit/error/retry가 필요한데 제공 또는 명시된 계약에 없으면 필수 입력 누락으로 처리한다. 독립 검증자, 최대5라운드, 필수 finding 차단, 현재 스크린샷·토큰·접근성 검증은 유지한다.
 
 **legacy-50-v1 전용:** 조사 에이전트 실행 → 전체 완료 대기 → 조사 결과 종합 → 구현 순서를 유지한다. 구현 프롬프트에 조사 파일 경로·조사 기반 디자인 요구사항·출력 경로와 UTF-8/LF·`step_archive/step030_레이아웃설계_chunk1.md`의 설계 계약을 포함한다.
 
@@ -209,14 +211,14 @@ Sub-lines: `@MX:SPEC`, `@MX:LEGACY`, `@MX:REASON`, `@MX:TEST`, `@MX:PRIORITY`
 
 ## 10. 브라우저 검증 백엔드 고정
 
-- step003이 `step_archive/outputs/browser-backend.json`에 고정한 백엔드(`selected`)를 끝까지 유지한다. `--backend` 없는 `verify-output`은 그 백엔드만 쓰며, 사용할 수 없으면 다른 백엔드로 넘어가지 않는다.
+- 새20의 환경 준비 step003, 기존36·50의 원래 도구 step003이 `step_archive/outputs/browser-backend.json`에 고정한 백엔드(`selected`)를 끝까지 유지한다. `--backend` 없는 `verify-output`은 그 백엔드만 쓰며, 사용할 수 없으면 다른 백엔드로 넘어가지 않는다.
 - 다른 백엔드의 package나 browser binary를 설치하지 않는다. 예: Aside로 고정된 프로젝트에서 Playwright나 Chromium을 설치하지 않는다. 고정 백엔드를 사용할 수 없다는 오류가 나면 그 백엔드만 복구한다.
-- 잠금 파일이 없는 진행 중 프로젝트는 `step_archive/step003_playwright_test.md`의 selected 값으로 검증 체크아웃에서 `node scripts/verify-output.mjs --probe --backend <selected> --lock --workspace "<project-root>"`를 한 번 실행해 고정한다.
+- 잠금 파일이 없는 기존36·50 진행 중 프로젝트만 `step_archive/step003_playwright_test.md`의 selected 값으로 검증 체크아웃에서 `node scripts/verify-output.mjs --probe --backend <selected> --lock --workspace "<project-root>"`를 한 번 실행해 고정한다.
 - 백엔드 변경은 사용자가 요청할 때만 `--backend <name> --lock`으로 다시 고정한다. 상세: `docs/BROWSER-TOOLS.md` "Backend lock (Step 3)".
 
 ## 11. 검증 판정과 finding 형식
 
-- 검증자는 필수 기준(설계 명세, 선택된 디자인 토큰, 필수 acceptance, 기능·접근성·보안)을 어긴 finding만 `Critical`/`Important`로 기록한다. 필수 검사 실패나 미해결 필수 finding이 있으면 `FAIL`이다. 인용할 기준이 없는 미관·선호 의견은 `advisory`이며, advisory만으로 `FAIL`이나 추가 라운드를 만들지 않는다. 선택된 디자인 토큰과 제외 목록은 위 표의 프로필별 설계 계약(`harness50-design-contract`)이고, 계약 `exclude`에서 `adopted: false`인 항목의 위반은 최소 `Important`다. 계약이 없는 이전 legacy50 실행은 §5의 수치를 기준으로 쓴다. 새36의 필수 계약 누락은 INCOMPLETE다. 이 실행에서는 계약을 복원하지 않으며, §5 '기본 제외 목록'(`host` 5종)은 필수 기준이 아니다(`docs/DESIGN-CONTRACT.md` "Legacy workspaces without a contract"의 Claude 항목).
+- 검증자는 필수 기준(설계 명세, 선택된 디자인 토큰, 필수 acceptance, 기능·접근성·보안)을 어긴 finding만 `Critical`/`Important`로 기록한다. 필수 검사 실패나 미해결 필수 finding이 있으면 `FAIL`이다. 인용할 기준이 없는 미관·선호 의견은 `advisory`이며, advisory만으로 `FAIL`이나 추가 라운드를 만들지 않는다. 선택된 디자인 토큰과 제외 목록은 위 표의 프로필별 설계 계약(`harness50-design-contract`)이고, 계약 `exclude`에서 `adopted: false`인 항목의 위반은 최소 `Important`다. 계약이 없는 이전 legacy50 실행은 §5의 수치를 기준으로 쓴다. 새20·기존36의 필수 계약 누락은 INCOMPLETE다. 이 실행에서는 계약을 복원하지 않으며, §5 '기본 제외 목록'(`host` 5종)은 필수 기준이 아니다(`docs/DESIGN-CONTRACT.md` "Legacy workspaces without a contract"의 Claude 항목).
 - 필수 finding마다 위치(소스 `file:line`, 또는 route·viewport·selector·스크린샷 파일과 영역), 어긴 기준의 출처, 기대값과 관찰값, 재현 방법(route·viewport·선행 조작)을 쓴다. 스크린샷 영역과 viewport는 언제나 쓸 수 있으므로 위치를 못 찾았다는 이유로 필수 finding을 `advisory`로 낮추지 않는다.
 - 이전 버전 단계 본문의 "사소한 위화감도 놓치지 않는다"와 "부족한 부분이 있으면 FAIL"은 관찰을 빠짐없이 적으라는 뜻으로 읽는다. 판정은 이 절을 따른다.
 

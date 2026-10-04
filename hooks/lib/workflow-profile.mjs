@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 import { physicalWorkspace, readSafe, writeSafe } from '../../scripts/lib/quality-files.mjs';
 import { defaultWorkflowProfile, resolveWorkflowProfile } from '../../scripts/lib/workflow-profiles.mjs';
 import { archiveDirectory, claudeStepBody } from '../../scripts/lib/claude-profile.mjs';
 import { workflowContext, recheckWorkflowContext } from '../../scripts/lib/workflow-context.mjs';
 
 import { publishProfileSpecs } from '../../scripts/lib/claude-spec.mjs';
+import { hasCompleteTopicContract, prepareTopicContract } from '../../scripts/lib/topic-contract.mjs';
+import { codexOwned } from './harness-activity.mjs';
 
 const [command, workspace] = process.argv.slice(2);
 try {
@@ -29,6 +32,24 @@ try {
     for (const body of bodies) await writeSafe(root, body.destination, body.bytes);
     await writeSafe(root, 'step_archive/workflow-profile.json', JSON.stringify({ schema_version: 2, workflow_profile: profile.id, total_steps: profile.stepCount }) + '\n');
     console.log(JSON.stringify({ workflow_profile: profile.id, total: profile.stepCount, body_directory: archiveDirectory(profile) }));
+  } else if (command === 'topic') {
+    const bytes = readFileSync(0);
+    if (bytes.length > 1024 * 1024) throw new Error('Oversized request');
+    const event = JSON.parse(bytes.toString('utf8').replace(/^\uFEFF/, ''));
+    if (!event || Array.isArray(event) || typeof event.prompt !== 'string' || !event.prompt.trim()) throw new Error('Missing explicit request');
+    const topic = prepareTopicContract(event.prompt);
+    if (!hasCompleteTopicContract(topic)) throw new Error('Incomplete topic contract');
+    // Bootstrap may have selected a new binding for an existing zero-completion run.
+    // Recheck the original record's count and history without reinterpreting that binding.
+    if (codexOwned(root)) throw new Error('Codex owns this workspace');
+    try {
+      const previous = JSON.parse((await readSafe(root, 'step_archive/progress.json', 1024 * 1024)).toString('utf8').replace(/^\uFEFF/, ''));
+      resolveWorkflowProfile(previous);
+      if (!Array.isArray(previous.completed_steps) || previous.completed_steps.length !== 0) throw new Error('Existing completion history');
+    } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    if (codexOwned(root)) throw new Error('Codex owns this workspace');
+    await writeSafe(root, 'step_archive/TOPIC/TOPIC.md', topic);
+    console.log('TOPIC contract initialized.');
   } else if (command === 'spec') {
     console.log(`SPEC generated: ${await publishProfileSpecs(root)}`);
   } else if (command === 'resolve') {
