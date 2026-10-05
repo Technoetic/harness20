@@ -8,7 +8,7 @@ This report covers local harness36 hardening against the user's supplied 122-pag
 - `assumptions`: the user's repeated request authorizes finishing applicable local code hardening and verification. Native host permissions remain authoritative. A Jev answer is advisory, not authority or measured evidence. Default planning20 and historical 36/50 execution history stay intact.
 - `unresolved`: current native browser adapters cannot provide verified all-transport host network isolation, so generated-output execution is unavailable and rejects before artifact serving/navigation. Provider monetary/output-token ceilings and arbitrary child OS/network restrictions require host enforcement. CI, Node 22, Linux/macOS execution, public release and installed-cache updates are not claimed by this local run. Vector/embedding/semantic-cache/model-training capabilities are absent, with an explicit future integration gate. Browser measurement reports remain unsigned evidence, not independent host-isolation attestation.
 - `next_safe_action`: retain the verified local commit and raw evidence. To enable generated-output verification, implement a supported native host egress adapter and independently replay TCP/UDP/preconnect/fresh-frame attacks before enabling it. Current plugin code has no artifact/workspace/CLI/environment opt-out.
-- `verified_by`: independent root/input/supply, Jev, runtime and output replays are preserved below. Final all-backend gate: Codex `/root/owasp_runtime`, 37/37 contract replay plus 3/3 additional environment/lock/invalid-lock attempts; zero backend loads, availability probes or execution. Codex `/root/owasp_external` independently reviewed common/direct gate placement. Complete-suite reconciliation: Codex `/root/owasp_external`, normal complete V5 exit 0, exact TAP totals and all 485 before/after/current physical hashes matched. Final vault record review remains pending.
+- `verified_by`: independent root/input/supply, Jev, runtime and output replays are preserved below. Final all-backend gate: Codex `/root/owasp_runtime`, 37/37 contract replay plus 3/3 additional environment/lock/invalid-lock attempts; zero backend loads, availability probes or execution. Codex `/root/owasp_external` independently reviewed common/direct gate placement. Complete-suite reconciliation: Codex `/root/owasp_external`, 2026-10-05T18:19:22.902328Z, normal complete V5 exit 0, exact TAP totals and all 485 before/after/current physical hashes matched. Final eight applied/staged vault records: Codex `/root/owasp_outputs`, 2026-10-05T18:26:49.662887Z, historical-body preservation, exact patch/index bytes and actual staged validator exit 0.
 
 ## Implemented controls
 
@@ -64,6 +64,16 @@ The complete raw TAP SHA256 is `12aae0b493a73898e9046aeb1067ee164628bc384eb4bb2d
 Syntax checks passed for all 56 changed MJS modules and the four changed Bash scripts. Dependency audit, all 106 indexed steps and whitespace checks passed. Historical 174 files and PORTING remained byte-identical. Bash syntax is not a Linux/macOS native execution or CI result.
 
 Only this verification report and completion-plan documentation may change after the frozen complete suite. Commit integrity compares every committed blob with physical source and permits only Git's UTF-8 CRLF normalization; all runtime bytes must still match the final whole snapshot.
+
+## Local record closure
+
+Primary source commit: `259812d22b7729a40bc0826b2ced74c8e75f0a13`, exactly 77 owned paths. Independent primary commit audit reconciles all 485 committed blobs with physical files: 463 byte-identical and 22 UTF-8 CRLF normalization only, with zero mismatches and a clean source worktree. Runtime files remain identical to the frozen complete suite; only this report and completion-plan documentation changed afterward.
+
+NS vault commit: `0299b1df3ee134140de002e9aed2fc297a90e03a`, exactly eight owned Markdown records. The full verification note, ADR-038, handoff, task, index, hot context, log and existing harness note were added/partially updated. An independent actor compared the applied/staged bytes and preserved historical bodies, and reran `python 00-meta/scripts/vault_healthcheck.py --vault . --staged` and staged whitespace checks with exit 0. The normal commit also ran its configured pre-commit hook; no hook bypass or remote NS push occurred. The eight owned records are clean after commit; unrelated pre-existing vault changes were preserved, so the entire vault is not claimed clean.
+
+MemoryHub `remember` succeeded with one ingestion and memory update triggered. Public/main and known installed 3.0.0 metadata were observed separately; this task did not publish or update installed caches. Local preparation stays 3.1.0.
+
+Closure evidence: `source-primary-commit.json`, `independent-source-primary-commit-review.json`, `source-commit-integrity.json`, `ns-final-commit.json`, `outputs-independent-ns-filled-patch-review.json`, `outputs-independent-ns-applied-staged-review.json`, `outputs-independent-ns-staged-validator.log` and `memory-final-commit.json`.
 
 ## Raw evidence
 
