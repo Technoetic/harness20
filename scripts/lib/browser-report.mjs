@@ -1,4 +1,5 @@
 import { validateRouteManifest } from './route-contract.mjs';
+import { parseStrictJson } from './strict-json.mjs';
 
 function passingMetrics(value) {
   return value?.pass === true && Array.isArray(value.errors) && value.errors.length === 0 && value.blocked_requests === 0 &&
@@ -17,7 +18,7 @@ function validNavigationProbe(value, unavailable) {
 export function readBrowserReportBytes(bytes, expectedRouting) {
   if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > 1024 * 1024) throw new Error('Browser report exceeds its size limit');
   let report;
-  try { report = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
+  try { report = parseStrictJson(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
   catch { throw new Error('Browser report must be valid UTF-8 JSON'); }
   if (report?.schema_version !== 3 || report.verdict !== 'PASS' || report.error ||
     report.artifact_path !== 'dist/index.html' || !/^[a-f0-9]{64}$/.test(report.artifact_sha256 ?? '') ||

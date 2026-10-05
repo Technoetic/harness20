@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { after } from 'node:test';
+import { tmpdir } from 'node:os';
 // The step 50 completion report (scripts/final-summary.mjs, docs/FINAL-SUMMARY.md): three fixed
 // headings, read-only sources, one write, generic CLI failures and the documents that call it.
 import test from 'node:test';
@@ -80,7 +83,9 @@ const judgeInput = (step, path, excerpt) => ({ schema_version: 1, step, sources:
 const judgeAnswer = (choice, confidence) => ({ model: 'jev-1.13.0', answers: { claim: { type: 'choice', choice,
   probabilities: { supported: .1, unsupported: .1, unknown: .1, [choice]: .8 }, confidence } },
   usage: { input_tokens: 1, output_tokens: 1 } });
-const answering = value => ({ allowNetwork: true, apiKey: 'synthetic-judgment-key-only',
+const budgetFixture = mkdtempSync(join(tmpdir(), 'harness36-jev-summary-budget-'));
+after(() => rmSync(budgetFixture, { recursive: true, force: true }));
+const answering = value => ({ allowNetwork: true, budgetRoot: mkdtempSync(join(budgetFixture, 'call-')), apiKey: 'synthetic-judgment-key-only',
   fetchImpl: async () => new Response(JSON.stringify(value), { status: 200 }) });
 
 test('T1 complete workspace: three fixed headings, stdout equals the file, deterministic, evidence unchanged', async () => {

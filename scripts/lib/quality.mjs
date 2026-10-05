@@ -3,20 +3,33 @@ import { unlink } from 'node:fs/promises';
 import { physicalWorkspace, safePath, readSafe, writeSafe, sourceFingerprint, sha256 } from './quality-files.mjs';
 
 import { workflowContext, recheckWorkflowContext } from './workflow-context.mjs';
+import { parseStrictJson } from './strict-json.mjs';
+import { unsafeJevText } from './sensitive-data.mjs';
 
 export const REPORT_PATH = 'step_archive/outputs/quality-gate.json';
 const CONFIG_PATH = 'harness50.quality.json';
 const CHECKS = ['test', 'lint', 'typecheck', 'security'];
 const METRICS = ['lines', 'statements', 'functions', 'branches'];
 const MAX_TIMEOUT = 120000;
+const MAX_TOTAL_TIMEOUT = 4 * MAX_TIMEOUT;
+// Commands are explicitly configured project programs, not OS-sandboxed code. They
+// must not silently receive the agent host's API keys or runtime loader overrides.
+const CHILD_ENV_KEYS = new Set(['PATH', 'PATHEXT', 'SYSTEMROOT', 'WINDIR', 'SYSTEMDRIVE', 'COMSPEC', 'TEMP', 'TMP', 'TMPDIR',
+  'LANG', 'LC_ALL', 'LC_CTYPE', 'TZ', 'CI', 'NO_COLOR', 'FORCE_COLOR', 'TERM']);
+export function commandEnvironment(parent = process.env) {
+  return Object.fromEntries(Object.entries(parent).filter(([name, value]) => CHILD_ENV_KEYS.has(name.toUpperCase()) && typeof value === 'string'));
+}
 
 function parseConfig(bytes) {
-  const value = JSON.parse(bytes.toString('utf8'));
+  const value = parseStrictJson(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
   if (value?.schema_version !== 1 || !value.checks || CHECKS.some(name => {
     const command = value.checks[name]?.command;
     return !Array.isArray(command) || command.length === 0 || command.length > 64 || command.some(arg => typeof arg !== 'string' || !arg || arg.includes('\0') || arg.length > 8192);
   }) || typeof value.coverage?.path !== 'string' || !value.coverage.path.startsWith('coverage/') || !Number.isFinite(value.coverage.minimum) || value.coverage.minimum < 85 || value.coverage.minimum > 100) {
     throw new Error('Invalid quality config: four check argv arrays, a coverage/ report path and coverage minimum >= 85 required');
+  }
+  for (const name of CHECKS) {
+    if (unsafeJevText(value.checks[name].command.join(' '))) throw new Error('Quality command contains sensitive or ambiguous argument text; use host-managed credentials');
   }
   return value;
 }
@@ -39,7 +52,7 @@ function runCommand(command, cwd, timeoutMs) {
     try {
       // No shell expansion. Windows .cmd files must be replaced with their Node CLI entry point.
       child = spawn(command[0] === 'node' ? process.execPath : command[0], command.slice(1), {
-        cwd, shell: false, windowsHide: true, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe']
+        cwd, env: commandEnvironment(), shell: false, windowsHide: true, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe']
       });
       const count = bytes => {
         outputBytes += bytes.length;
@@ -58,7 +71,7 @@ function commandPass(check) {
 }
 
 function coverageResult(bytes, minimum) {
-  const summary = JSON.parse(bytes.toString('utf8'));
+  const summary = parseStrictJson(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
   const metrics = {};
   for (const name of METRICS) {
     const item = summary?.total?.[name];
@@ -69,8 +82,19 @@ function coverageResult(bytes, minimum) {
   return { generated_by: 'test', minimum, metrics, pass: METRICS.every(name => metrics[name] >= minimum), sha256: sha256(bytes) };
 }
 
-export async function runQualityGate(workspaceRoot, { timeoutMs = MAX_TIMEOUT } = {}) {
+export async function prepareQualityGate(workspaceRoot) {
+  const root = await physicalWorkspace(workspaceRoot);
+  const bytes = await readSafe(root, CONFIG_PATH, 65536);
+  const config = parseConfig(bytes);
+  return { schema_version: 1, action: 'execute-quality-config', config_path: CONFIG_PATH, config_sha256: sha256(bytes),
+    checks: config.checks, coverage: config.coverage, environment_keys: Object.keys(commandEnvironment()).sort(), shell: false,
+    os_sandbox: false, requires_native_host_authorization: true, command_timeout_ms: MAX_TIMEOUT, total_timeout_ms: MAX_TOTAL_TIMEOUT,
+    source: await sourceFingerprint(root) };
+}
+
+export async function runQualityGate(workspaceRoot, { timeoutMs = MAX_TIMEOUT, totalTimeoutMs = MAX_TOTAL_TIMEOUT, approvedConfigSha256 } = {}) {
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_TIMEOUT) throw new Error('Invalid command timeout');
+  if (!Number.isInteger(totalTimeoutMs) || totalTimeoutMs < 1 || totalTimeoutMs > MAX_TOTAL_TIMEOUT) throw new Error('Invalid total quality timeout');
   const root = await physicalWorkspace(workspaceRoot);
   const context = await workflowContext(root);
   const report = { schema_version: context.generation ? 2 : 1, ...context.binding, generated_at: new Date().toISOString(), verdict: 'FAIL', checks: {}, coverage: null };
@@ -78,17 +102,29 @@ export async function runQualityGate(workspaceRoot, { timeoutMs = MAX_TIMEOUT } 
     const configBytes = await readSafe(root, CONFIG_PATH, 65536);
     const config = parseConfig(configBytes);
     report.config_sha256 = sha256(configBytes);
+    if (approvedConfigSha256 !== undefined && (!/^[a-f0-9]{64}$/.test(approvedConfigSha256) || approvedConfigSha256 !== report.config_sha256)) throw new Error('Approved quality config hash does not match the current config; execution stopped');
+    if (approvedConfigSha256 !== undefined) report.approved_config_sha256 = approvedConfigSha256;
     const before = await sourceFingerprint(root);
+    const deadline = Date.now() + totalTimeoutMs;
+    report.execution_boundary = { shell: false, environment: 'allowlist', os_sandbox: false, total_timeout_ms: totalTimeoutMs };
+    const recheckInputs = async () => {
+      if (sha256(await readSafe(root, CONFIG_PATH, 65536)) !== report.config_sha256) throw new Error('Quality config changed during checks; execution stopped');
+      if ((await sourceFingerprint(root)).sha256 !== before.sha256) throw new Error('Source changed during quality checks; execution stopped');
+      await recheckWorkflowContext(root, context);
+      if (Date.now() >= deadline) throw new Error('Total quality execution budget exceeded');
+    };
     // A previous run's report cannot establish what this test invocation covered.
     // Only generated files under coverage/ are eligible for this cleanup.
     const coveragePath = await safePath(root, config.coverage.path, { createParents: true });
     await unlink(coveragePath).catch(error => { if (error.code !== 'ENOENT') throw error; });
     for (const name of CHECKS) {
-      report.checks[name] = await runCommand(config.checks[name].command, root, timeoutMs);
+      await recheckInputs();
+      report.checks[name] = await runCommand(config.checks[name].command, root, Math.min(timeoutMs, deadline - Date.now()));
       if (name === 'test') {
         try { report.coverage = coverageResult(await readSafe(root, config.coverage.path), config.coverage.minimum); }
         catch (error) { report.error = `Test did not produce valid fresh coverage: ${error.message}`; }
       }
+      await recheckInputs();
     }
     report.source = await sourceFingerprint(root);
     if (before.sha256 !== report.source.sha256) throw new Error('Source changed during quality checks; rerun on stable input');
@@ -104,7 +140,7 @@ export async function inspectQualityReport(workspaceRoot, options = {}) {
   try {
     const root = await physicalWorkspace(workspaceRoot);
     const context = await workflowContext(root, options);
-    const report = JSON.parse((await readSafe(root, REPORT_PATH)).toString('utf8'));
+    const report = parseStrictJson(new TextDecoder('utf-8', { fatal: true }).decode(await readSafe(root, REPORT_PATH)));
     const configBytes = await readSafe(root, CONFIG_PATH, 65536);
     const config = parseConfig(configBytes);
     if ((report.schema_version !== (context.generation ? 2 : 1) || (context.generation && (report.workflow_profile !== context.profile.id || report.workflow_generation !== context.generation))) || report.verdict !== 'PASS' || report.error || report.config_sha256 !== sha256(configBytes) || !Number.isFinite(Date.parse(report.generated_at)) || CHECKS.some(name => !commandPass(report.checks?.[name]) || JSON.stringify(report.checks[name].command) !== JSON.stringify(config.checks[name].command))) throw new Error('Quality report does not contain four successful configured checks');

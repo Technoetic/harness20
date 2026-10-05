@@ -47,7 +47,7 @@ export function hostPage(width, height) {
   return '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>harness50 host</title><link rel="icon" href="data:,">' +
     `<style>html,body{margin:0;padding:0;overflow:hidden;background:#fff}iframe{display:block;border:0;width:${width}px;height:${height}px}</style>` +
     '<script>(function(){var n=0;document.addEventListener(\'securitypolicyviolation\',function(){n++;document.documentElement.dataset.h50blocked=String(n);});})();</script>' +
-    '</head><body><iframe id="app" title="application"></iframe></body></html>';
+    '</head><body><iframe id="app" title="application" sandbox="allow-scripts allow-same-origin" referrerpolicy="no-referrer"></iframe></body></html>';
 }
 
 export const BLANK_PAGE = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>blank</title><link rel="icon" href="data:,"></head><body></body></html>';
@@ -65,20 +65,26 @@ function routingLiteral(routing) {
 
 // One chunk = one `aside repl` call = one Playwright `withPage` unit: the initial-entry unit or
 // one route unit, for one scenario and one viewport. The result line is prefixed with __H50__.
-export function chunkScript({ routing, unavailable, origin, width, height, unit, routeIndex, shotName, entryPath, unknownPath }) {
+export function chunkScript({ routing, unavailable, origin, hostOrigin, width, height, unit, routeIndex, shotName, entryPath, unknownPath }) {
+  const appUrl = new URL(origin), hostUrl = new URL(hostOrigin);
+  if (appUrl.protocol !== 'http:' || hostUrl.protocol !== 'http:' || !/^127\.(?:\d{1,3}\.){2}\d{1,3}$/.test(appUrl.hostname)
+      || hostUrl.hostname !== '127.0.0.1' || appUrl.hostname === hostUrl.hostname) throw new Error('Aside execution requires distinct loopback cookie hosts');
   const script = `
 const T0 = Date.now(); const timings = {}; const lap = k => { timings[k] = Date.now() - T0; };
 const R = ${routingLiteral(routing)};
 const U = ${literal(unavailable)}; const O = ${literal(origin)}; const W = ${literal(width)}; const H = ${literal(height)};
+const HOST_ORIGIN = ${literal(hostOrigin)};
 const UNIT = ${literal(unit)}; const ROUTE_INDEX = ${literal(routeIndex)}; const SHOT = ${literal(shotName)};
 const PREFIX = ${literal(HARNESS_PREFIX)}; const ENTRY = O + ${literal(entryPath)}; const UNKNOWN_PATH = ${literal(unknownPath)};
-const HOST = O + PREFIX + 'host.html?w=' + W + '&h=' + H; const BLANK = O + PREFIX + 'blank.html'; const AXE = O + PREFIX + 'axe.min.js';
+const HOST = HOST_ORIGIN + PREFIX + 'host.html?w=' + W + '&h=' + H; const BLANK = HOST_ORIGIN + PREFIX + 'blank.html'; const AXE = HOST_ORIGIN + PREFIX + 'axe.min.js';
 const href = path => R.mode === 'hash' ? ENTRY + '#' + path : O + path;
 const fallback = R.routes.find(route => route.id === R.fallback);
 const out = { errors: [], blocked: 0 }; let page = null; let env = null; let axeSource = null;
 const fail = message => { throw new Error(message); };
-const isApp = frame => { const url = frame.url(); return url.indexOf(O + '/') === 0 && url.indexOf(PREFIX) < 0; };
-const isBlank = frame => frame.url() === BLANK;
+// Aside leaves cross-origin frame.url() cached at about:blank. The frame's
+// isolated-world location is authoritative and remains accessible through CDP.
+const isApp = async frame => { try { const url = await frame.evaluate(() => location.href); return url.indexOf(O + '/') === 0 && url.indexOf(PREFIX) < 0; } catch (error) { return false; } };
+const isBlank = async frame => { try { return await frame.evaluate(() => location.href) === BLANK; } catch (error) { return false; } };
 const complete = () => document.readyState === 'complete';
 const settled = () => document.readyState === 'complete' && !!document.documentElement.dataset.h50;
 const fresh = () => document.readyState === 'complete' && !!document.documentElement.dataset.h50 && !document.documentElement.dataset.h50old;
@@ -86,7 +92,7 @@ async function find(match, predicate, what) {
   const started = Date.now();
   while (Date.now() - started < 10000) {
     for (const frame of page.frames()) {
-      if (!match(frame)) continue;
+      if (!(await match(frame))) continue;
       try { if (await frame.evaluate(predicate)) return frame; } catch (error) {}
     }
     await sleep(100);
@@ -127,7 +133,7 @@ async function reload(frame) {
   const started = Date.now();
   while (Date.now() - started < 1000) {
     for (const candidate of page.frames()) {
-      if (!isApp(candidate)) continue;
+      if (!(await isApp(candidate))) continue;
       try { if (await candidate.evaluate(fresh)) { timings.reload_mode = 'reload'; return candidate; } } catch (error) {}
     }
     await sleep(100);
@@ -135,7 +141,7 @@ async function reload(frame) {
   timings.reload_mode = 'cold-entry';
   await page.evaluate(target => {
     const old = document.getElementById('app'), next = document.createElement('iframe');
-    next.id = 'app'; next.title = 'application'; old.replaceWith(next); next.src = target;
+    next.id = 'app'; next.title = 'application'; next.setAttribute('sandbox','allow-scripts allow-same-origin'); next.referrerPolicy = 'no-referrer'; old.replaceWith(next); next.src = target;
   }, url);
   return find(isApp, fresh, 'Application frame');
 }
@@ -223,10 +229,35 @@ const LINK = args => {
   return null;
 };
 const UNTAG = () => { for (const tagged of document.querySelectorAll('[data-h50-link]')) tagged.removeAttribute('data-h50-link'); };
+// Only this chunk's fresh randomized app origin is eligible. Never touch the
+// host origin or any user tab. Cleanup has a separate short ceiling and the
+// CLI call remains under its own aggregate/per-chunk host deadline.
+async function cleanupFreshStorage() {
+  for (const frame of page.frames()) {
+    if (!(await isApp(frame))) continue;
+    const clear = frame.evaluate(async expected => {
+      if (location.origin !== expected) return false;
+      try { localStorage.clear(); sessionStorage.clear(); } catch (error) {}
+      for (const cookie of document.cookie.split(';')) {
+        const name = cookie.split('=')[0].trim();
+        if (name) { document.cookie = name + '=; Max-Age=0; Path=/'; document.cookie = name + '=; Max-Age=0'; }
+      }
+      if (typeof caches !== 'undefined') { for (const name of await caches.keys()) await caches.delete(name); }
+      if (typeof indexedDB !== 'undefined' && typeof indexedDB.databases === 'function') {
+        for (const db of await indexedDB.databases()) if (db.name) await new Promise(resolve => {
+          const request = indexedDB.deleteDatabase(db.name); request.onsuccess = request.onerror = request.onblocked = () => resolve();
+        });
+      }
+      return true;
+    }, O).catch(() => false);
+    await clear;
+  }
+}
 async function click(frame, target) {
-  let clicked = false;
-  try { await frame.locator('[data-h50-link]').first().click({ timeout: 5000 }); clicked = true; } catch (error) {}
-  if (!clicked && (await frame.evaluate(() => location.href)) !== href(target.path)) {
+  try { await frame.locator('[data-h50-link]').first().click({ timeout: 5000 }); } catch (error) {}
+  // A successful locator call in Aside can target the frame's cached pre-navigation
+  // document. Confirm the actual URL before accepting the click as an action.
+  if ((await frame.evaluate(() => location.href)) !== href(target.path)) {
     await frame.evaluate(() => { document.querySelector('[data-h50-link]').click(); });
   }
   try { await frame.evaluate(UNTAG); } catch (error) {}
@@ -296,7 +327,7 @@ await (async () => {
   } catch (error) {
     report = { ok: false, error: String(error && error.message || error), timings };
   } finally {
-    if (page) { try { await closeTab(page); } catch (error) {} }
+    if (page) { try { await Promise.race([cleanupFreshStorage(), sleep(15000)]); } catch (error) {} try { await closeTab(page); } catch (error) {} }
   }
   lap('close'); report.timings = timings;
   console.log('__H50__' + JSON.stringify(report));

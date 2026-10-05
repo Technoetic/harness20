@@ -34,6 +34,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
+import { parseStrictJson } from '../../scripts/lib/strict-json.mjs';
+import { TOOL_INPUT_LIMIT, inspectToolPolicy, inspectShellBoundary, toolContent, readBoundedStdin } from '../../scripts/lib/tool-policy.mjs';
 
 export const MAX_COMMAND_CHARS = 256 * 1024;
 export const MAX_CONTENT_CHARS = 1024 * 1024;
@@ -125,7 +128,7 @@ export const secretPath = arg => HARD_SECRET.test(arg) || (!ENV_TEMPLATE.test(ar
 const PERSISTENT_TARGET = new RegExp([
   String.raw`(?:^|[\\/])\.git[\\/](?:hooks(?:[\\/]|$)|config$)`,
   String.raw`(?:^|[\\/])\.claude[\\/]settings(?:\.local)?\.json$`,
-  String.raw`(?:^|[\\/])harness(?:36|50)(?:[\\/][^\\/]+)?[\\/](?:hooks|\.claude-plugin)(?:[\\/]|$)`,
+  String.raw`(?:^|[\\/])harness(?:20|36|50)(?:[\\/][^\\/]+)?[\\/](?:hooks|\.claude-plugin)(?:[\\/]|$)`,
   String.raw`(?:^|[\\/])\.(?:bashrc|bash_profile|zshrc|zprofile|profile|zshenv)$`,
   String.raw`(?:^|[\\/])\.ssh[\\/]authorized_keys2?$`,
   String.raw`(?:^|[\\/])\.config[\\/](?:systemd|autostart)(?:[\\/]|$)`,
@@ -310,6 +313,8 @@ export function inspectCommand(command) {
   const hits = [];
   for (const segment of segments(text)) { blockHits(segment, hits); askHits(segment, hits); }
   lineHits(text, hits);
+  const boundary = inspectShellBoundary(command);
+  if (boundary && boundary !== 'malformed-input') hits.push({ level: 'block', rule: boundary });
   let best = { level: 'pass', rule: null };
   for (const h of hits) if (RANK[h.level] > RANK[best.level]) best = h;
   return best;
@@ -325,17 +330,10 @@ export function contentNeedsPrompt(text) {
   return false;
 }
 
-// WebFetch URLs permission-request-guard denies: local and private hosts, cloud metadata services,
-// executable downloads and file URLs. Case-insensitive, like the PowerShell -match they replace.
-const DANGEROUS_URL = [
-  /^https?:\/\/(?:localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|172\.(?:1[6-9]|2[0-9]|3[01])\.)/i,
-  /^https?:\/\/(?:169\.254\.169\.254|metadata\.google\.internal|metadata\.azure\.com)/i,
-  /\.(?:sh|ps1|bat|cmd|exe|dll|so|dylib|msi)(?:\?|$)/i,
-  /^file:\/\//i
-];
+// URL and file-tool arguments are parsed by the shared deterministic tool policy.
 
 const BLOCK_LINES = [
-  'Harness36 checks the whole command text, including quoted strings and heredoc bodies, and this block cannot be approved from here.',
+  'Harness20 checks the whole command text, including quoted strings and heredoc bodies, and this block cannot be approved from here.',
   'If the match is only inside a commit message or PR/issue body, write that text to a file with the Write tool and pass the file: git commit -F <file>, gh pr create --body-file <file>.',
   'Do not move commands into a script to get past this check. If the command itself must run, ask the user to run it.'
 ];
@@ -343,49 +341,73 @@ const BLOCK_LINES = [
 // a log that cannot be written never changes the decision.
 const LOG_FILE = path.join(path.dirname(path.dirname(fileURLToPath(import.meta.url))), 'destructive-guard.log');
 function logDecision(verdict, command) {
+  let descriptor;
   try {
     const now = new Date();
     const two = value => String(value).padStart(2, '0');
     const stamp = `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())} ${two(now.getHours())}:${two(now.getMinutes())}:${two(now.getSeconds())}`;
-    const shown = String(command).slice(0, 500).replace(/[\r\n]/g, ' ');
-    fs.appendFileSync(LOG_FILE, `[${stamp}] ${verdict.level === 'block' ? 'BLOCKED' : 'ASK'} rule=${verdict.rule} command=${shown}\n`, 'utf8');
-  } catch {}
+    const digest = createHash('sha256').update(String(command)).digest('hex');
+    const line = `[${stamp}] ${verdict.level === 'block' ? 'BLOCKED' : 'ASK'} rule=${verdict.rule} command_sha256=${digest}\n`;
+    const prior = fs.lstatSync(LOG_FILE, { throwIfNoEntry: false });
+    if (prior && (!prior.isFile() || prior.nlink !== 1 || prior.size + Buffer.byteLength(line) > TOOL_INPUT_LIMIT)) return;
+    descriptor = fs.openSync(LOG_FILE, fs.constants.O_WRONLY | fs.constants.O_CREAT | (fs.constants.O_NOFOLLOW ?? 0), 0o600);
+    const info = fs.fstatSync(descriptor);
+    if (!info.isFile() || info.nlink !== 1 || info.size + Buffer.byteLength(line) > TOOL_INPUT_LIMIT ||
+        prior && (info.ino !== prior.ino || info.dev !== prior.dev)) return;
+    // An explicit bounded position prevents concurrent writers from growing an
+    // append-only file past the ceiling. Telemetry may overlap under contention;
+    // it is best effort and never controls the deny decision.
+    fs.writeSync(descriptor, line, info.size, 'utf8');
+  } catch {} finally { if (descriptor !== undefined) try { fs.closeSync(descriptor); } catch {} }
 }
 
 function main(mode) {
   let event;
-  try { event = JSON.parse(fs.readFileSync(0, 'utf8').replace(/^\uFEFF/, '')); } catch { return 0; }
+  try {
+    const raw = readBoundedStdin();
+    if (raw.length > TOOL_INPUT_LIMIT) throw Error('input too large');
+    event = parseStrictJson(new TextDecoder('utf-8', { fatal: true }).decode(raw).replace(/^\uFEFF/, ''));
+    if (!event || typeof event !== 'object' || Array.isArray(event)) throw Error('invalid event');
+  } catch {
+    if (['pretool','permission'].includes(mode)) {
+      process.stderr.write('BLOCKED: Harness20 rejected malformed or oversized tool input.\n');
+      return 2;
+    }
+    process.stdout.write('prompt');
+    return 0;
+  }
   if (mode === 'content') {
     const input = event?.tool_input || {};
-    const texts = [input.new_string, ...(Array.isArray(input.edits) ? input.edits.map(e => e?.new_string) : [])];
+    const texts = toolContent(input);
     process.stdout.write(texts.some(contentNeedsPrompt) ? 'prompt' : 'clean');
     return 0;
   }
-  if (mode === 'permission' && event?.tool_name === 'WebFetch') {
-    const url = event?.tool_input?.url;
-    if (typeof url === 'string' && DANGEROUS_URL.some(pattern => pattern.test(url))) {
-      process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'deny', reason: 'harness36: PermissionRequest blocked - dangerous URL' } } }));
-      return 2;
-    }
-    return 0;
+  const policy = inspectToolPolicy(event, { workspaceRoot: process.env.CLAUDE_PROJECT_DIR || event.cwd || process.cwd() });
+  if (policy.supported && policy.rule) {
+    const reason = `harness20: blocked unsafe tool input (${policy.rule})`;
+    process.stdout.write(JSON.stringify({ hookSpecificOutput: mode === 'permission'
+      ? { hookEventName: 'PermissionRequest', decision: { behavior: 'deny', reason } }
+      : { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } }));
+    return 2;
   }
   if (event?.tool_name !== 'Bash') return 0;
   const command = event?.tool_input?.command;
-  const verdict = inspectCommand(command);
+  const boundary = inspectShellBoundary(command);
+  const verdict = boundary === 'malformed-input' ? { level: 'block', rule: boundary } : inspectCommand(command);
   if (mode === 'pretool') {
     if (verdict.level !== 'pass') logDecision(verdict, command);
     if (verdict.level === 'block') {
-      process.stderr.write(`BLOCKED: Destructive command detected\nRule: ${verdict.rule}\nCommand: ${command}\n${BLOCK_LINES.join('\n')}\n`);
+      process.stderr.write(`BLOCKED: Destructive command detected\nRule: ${verdict.rule}\nCommand SHA256: ${createHash('sha256').update(String(command)).digest('hex')}\n${BLOCK_LINES.join('\n')}\n`);
       return 2;
     }
     if (verdict.level === 'ask') {
-      process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask', permissionDecisionReason: `harness36: ${verdict.rule} needs your confirmation (destructive-guard ask rule)` } }));
+      process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask', permissionDecisionReason: `harness20: ${verdict.rule} needs your confirmation (destructive-guard ask rule)` } }));
     }
     return 0;
   }
   if (mode === 'permission' && verdict.level === 'block') {
-    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'deny', reason: `harness36: PermissionRequest blocked - destructive command pattern (${verdict.rule}) (cross-plugin tamper protection)` } } }));
-    process.stderr.write(`Harness36 denied this permission request because the command text matches a destructive pattern (quoted strings and heredoc bodies included).\n${BLOCK_LINES.slice(1).join('\n')}\n`);
+    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'deny', reason: `harness20: PermissionRequest blocked - destructive command pattern (${verdict.rule}) (cross-plugin tamper protection)` } } }));
+    process.stderr.write(`Harness20 denied this permission request because the command text matches a destructive pattern (quoted strings and heredoc bodies included).\n${BLOCK_LINES.slice(1).join('\n')}\n`);
     return 2;
   }
   return 0;

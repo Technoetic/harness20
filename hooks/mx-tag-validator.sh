@@ -35,7 +35,7 @@ CUR="$(python3 -c 'import json,sys;print(int(json.load(open(sys.argv[1],encoding
 [ "$CUR" -lt 15 ] && exit 0
 
 case "$FP" in
-  */step_archive/*|*/.claude/*|*/node_modules/*|*/.git/*|*/plugins/harness36/*|*/plugins/harness50/*) exit 0 ;;
+  */step_archive/*|*/.claude/*|*/node_modules/*|*/.git/*|*/plugins/harness20/*|*/plugins/harness36/*|*/plugins/harness50/*) exit 0 ;;
 esac
 [ -f "$FP" ] || exit 0
 

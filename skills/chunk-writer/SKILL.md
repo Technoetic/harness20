@@ -16,7 +16,7 @@ disable-model-invocation: false
 
 `stepNNN_<주제>_chunkN.md` (NNN은 3자리 step 번호, N은 1부터 증가)
 
-예: step001_context전략_chunk1.md, step035_파일인덱스_chunk2.md
+예: 새20 step001_요구사항기획_chunk1.md, step004_파일인덱스_chunk2.md (기존36·50은 선택된 본문의 원래 이름 유지)
 
 ### 저장 경로
 - 기본: step_archive/

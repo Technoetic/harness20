@@ -22,7 +22,7 @@ test('constants keep the documented values', () => {
   assert.deepEqual([...ACTIVE_STATUSES], ['active', 'running', 'in_progress']);
   assert.equal(MAX_PROGRESS_BYTES, 1024 * 1024);
   assert.ok(Object.isFrozen(HOOK_GATES));
-  assert.deepEqual([...GUARD_PHASES], ['active', 'paused', 'finished', 'codex', 'drift']);
+  assert.deepEqual([...GUARD_PHASES], ['active', 'paused', 'finished', 'codex', 'drift', 'invalid', 'stopped', 'stale']);
   assert.ok(Object.isFrozen(GUARD_PHASES));
 });
 
@@ -195,8 +195,8 @@ const PHASES = ['absent', 'stale', 'paused', 'stopped', 'invalid', 'finished', '
 // The two guards run only where a Harness50 run is established; elsewhere the host decides. In a
 // drift run only the progress writer of the step hooks starts, to put the cursor back.
 const EXPECTED = {
-  'destructive-guard': ['paused', 'finished', 'codex', 'active', 'drift'],
-  'permission-request-guard': ['paused', 'finished', 'codex', 'active', 'drift'],
+  'destructive-guard': ['paused', 'finished', 'codex', 'active', 'drift', 'invalid', 'stopped', 'stale'],
+  'permission-request-guard': ['paused', 'finished', 'codex', 'active', 'drift', 'invalid', 'stopped', 'stale'],
   'webapp-trigger': [],
   'step-progress-loader': ['paused', 'codex', 'active'],
   'trust5-validator': ['finished', 'active'],
@@ -256,13 +256,13 @@ test('shouldRunHook: broken events start no hook; unknown names use the active g
   assert.equal(shouldRunHook('auto-approve', Buffer.from(JSON.stringify({ cwd: active })), { CLAUDE_PROJECT_DIR: '' }, absent), true);
 });
 
-test('EXPLICIT_WEBAPP accepts only a first-line /webapp command with a topic', () => {
-  for (const prompt of ['/webapp fractions', '  /webapp x', '\t/webapp x', '/harness36:webapp x', '/harness50:webapp x', '/webapp x\n더', '/webapp 논문 트렌드']) {
+test('harness20 EXPLICIT_WEBAPP accepts only a first-line command with a topic and preserves legacy aliases', () => {
+  for (const prompt of ['/webapp fractions', '  /webapp x', '\t/webapp x', '/harness20:webapp x', '/harness36:webapp x', '/harness50:webapp x', '/webapp x\n더', '/webapp 논문 트렌드']) {
     assert.equal(EXPLICIT_WEBAPP.test(prompt), true, JSON.stringify(prompt));
   }
   for (const prompt of ['/webapp', '/webapp   ', '/webappx y', '/WEBAPP x', 'please /webapp x', '\n/webapp x', '/webapp\nx',
     '웹앱 튜토리얼 만들어줘', '회사 매출 대시보드 만들어줘', '@step_archive/archived/step001.md 절대 복종', 'webapp 생성',
-    '인터렉티브 필수', '/other:webapp x', '/harness36:webapp', '/harness36:webappx y', '/Harness36:webapp x', '/harness360:webapp x', '\n/harness36:webapp x']) {
+    '인터렉티브 필수', '/other:webapp x', '/harness20:webapp', '/harness20:webappx y', '/Harness20:webapp x', '/harness200:webapp x', '\n/harness20:webapp x', '/harness36:webapp', '/harness36:webappx y', '/Harness36:webapp x', '/harness360:webapp x', '\n/harness36:webapp x']) {
     assert.equal(EXPLICIT_WEBAPP.test(prompt), false, JSON.stringify(prompt));
   }
 });

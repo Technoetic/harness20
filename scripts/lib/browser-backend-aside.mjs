@@ -1,5 +1,5 @@
 // Aside backend for scripts/verify-output.mjs (see the dispatcher for the contract).
-// Runs the same unit sequence as the Playwright backend inside the user's Aside Browser through
+// Describes the same unit sequence inside the user's Aside Browser through
 // `aside repl`: one CLI call ("chunk") per scenario x viewport x unit, each against a fresh
 // 127.0.0.1 origin (fresh storage) that serves the artifact with an injected bridge script.
 // Measured constraints (docs/BROWSER-TOOLS.md): no file://, 120 s per call, output only inside
@@ -8,8 +8,10 @@ import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { readFile, unlink } from 'node:fs/promises';
 import { createServer } from 'node:http';
-import { createRequire } from 'node:module';
 import { isAbsolute, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { readSafe, sha256 } from './quality-files.mjs';
+import { requireHostNetworkIsolation as requireNativeIsolation, testOnly as isolationTestOnly } from './host-network-isolation.mjs';
 import { BLANK_PAGE, HARNESS_PREFIX, bridgeScript, chunkScript, hostPage } from './aside/page-scripts.mjs';
 
 const ASIDE = 'aside';
@@ -17,17 +19,42 @@ const DEADLINE = 'Browser verification exceeded its deadline';
 const MISSING_ASIDE = 'Browser tools missing: install the Aside CLI (aside --version) and start the Aside app';
 const MISSING_AXE = 'Browser tools missing: run npm ci in the plugin checkout (axe-core)';
 const RESULT_PREFIX = '__H50__';
-// Like Playwright's route abort: nothing may load from the network, including same-origin
-// subresources; data:/blob: never leave the page (Playwright does not intercept them either).
-// No base-uri/form-action directives: Playwright polices neither (a `<base>` element is a
-// contract-permitted head child), and a form submission still ends in a blocked request.
-const CSP_APP = "default-src data: blob:; script-src 'unsafe-inline' 'unsafe-eval' data: blob:; style-src 'unsafe-inline' data: blob:; connect-src data: blob:";
-const CSP_HOST = "default-src 'none'; frame-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:";
+const AXE_SHA256 = 'c24f097bd2f451d4f933e8bc7d8d539f8672a2ebcb5cc9f9f3eec8ca9470a0c1';
+const MAX_TOTAL_MS = 600000;
+export function createAsideBudget(timeoutMs, now = Date.now) {
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 120000 || typeof now !== 'function') throw new Error('Invalid Aside execution budget');
+  const deadline = now() + MAX_TOTAL_MS;
+  return Object.freeze({ total_timeout_ms: MAX_TOTAL_MS, remaining: () => {
+    const remaining = deadline - now();
+    if (remaining <= 0) throw new Error('Aside aggregate verification budget exceeded');
+    return Math.min(timeoutMs, remaining);
+  } });
+}
+// HTTP CSP is imposed by the host response, never generated markup. It does not
+// block all transports: WebRTC STUN and preconnect bypass it in current Aside.
+// Native execution therefore stays disabled until a verified per-tab host egress
+// adapter exists. No browser constructor masking or workspace attestation can
+// establish that capability.
+// Browser sandbox and a distinct randomized loopback host bound the application's
+// effects while retaining same-origin storage and Navigation API within the app.
+const CSP_APP = "default-src data: blob:; script-src 'unsafe-inline' 'unsafe-eval' data: blob:; style-src 'unsafe-inline' data: blob:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; sandbox allow-scripts allow-same-origin";
+const CSP_HOST = "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; object-src 'none'; worker-src 'none'";
+const PERMISSIONS_POLICY = 'accelerometer=(), camera=(), clipboard-read=(), clipboard-write=(), display-capture=(), geolocation=(), gyroscope=(), hid=(), microphone=(), payment=(), publickey-credentials-create=(), publickey-credentials-get=(), serial=(), usb=()';
 
 function exec(args, { timeout, maxBuffer = 16 * 1024 * 1024 } = {}) {
   return new Promise(resolve => {
     execFile(ASIDE, args, { windowsHide: true, maxBuffer, timeout, encoding: 'utf8' }, (error, stdout, stderr) => resolve({ error, stdout: stdout ?? '', stderr: stderr ?? '' }));
   });
+}
+
+export const testOnly = Object.freeze({
+  registerFakeExecutor(execute) {
+    if (typeof execute !== 'function' || execute === exec) throw new Error('Expected a trusted fake unit-test executor');
+    return isolationTestOnly.registerFakeAsideExecutor(execute);
+  }
+});
+function requireHostNetworkIsolation(execute) {
+  requireNativeIsolation('aside', { execute });
 }
 
 export async function available() {
@@ -45,9 +72,16 @@ export async function toolVersion() {
   } catch { return null; }
 }
 
+export function verifyAxeBytes(bytes) {
+  if (!Buffer.isBuffer(bytes) || bytes.length > 2 * 1024 * 1024 || sha256(bytes) !== AXE_SHA256) throw new Error('axe-core pinned content integrity check failed');
+  return bytes;
+}
+
 async function loadAxe() {
-  try { return await readFile(createRequire(import.meta.url).resolve('axe-core/axe.min.js')); }
+  let bytes;
+  try { bytes = await readSafe(fileURLToPath(new URL('../../', import.meta.url)), 'node_modules/axe-core/axe.min.js', 2 * 1024 * 1024); }
   catch { throw new Error(MISSING_AXE); }
+  return verifyAxeBytes(bytes);
 }
 
 // Places the bridge right after <head …> (else after <html …>, else first) without parsing
@@ -69,31 +103,53 @@ function inject(bytes, bridge) {
   return Buffer.concat([bytes.subarray(0, at), Buffer.from(bridge, 'utf8'), bytes.subarray(at)]);
 }
 
-function startServer({ document, allowed, axe }) {
-  const state = { blocked: 0 };
+export async function startVerificationServers({ document, allowed, axe }, { execute = exec, testBindHost } = {}) {
+  requireHostNetworkIsolation(execute);
+  // The existing registered-fake gate must succeed before this portable unit
+  // fixture option is inspected. No native adapter can use it to open a server.
+  if (testBindHost !== undefined && testBindHost !== 'localhost') throw new Error('Invalid trusted HTTP fixture bind host');
+  const state = { blocked: 0, application_requests: 0, host_requests: 0 };
   const html = (response, body, csp) => {
-    response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': csp, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-length': Buffer.byteLength(body) });
+    response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': csp, 'permissions-policy': PERMISSIONS_POLICY,
+      'referrer-policy': 'no-referrer', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-length': Buffer.byteLength(body) });
     response.end(body);
   };
-  const server = createServer((request, response) => {
+  // Cookie scope ignores ports. A fresh IP host, not merely a fresh port, avoids
+  // sharing the user's localhost cookies with generated JavaScript.
+  const ipBytes = randomBytes(3);
+  const appHost = testBindHost ?? `127.${ipBytes[0] || 2}.${ipBytes[1] || 2}.${ipBytes[2] || 2}`;
+  let hostOrigin, origin;
+  const denied = response => { state.blocked++; response.writeHead(404, { 'cache-control': 'no-store' }); response.end(); };
+  const handler = application => (request, response) => {
+    if (application) state.application_requests++; else state.host_requests++;
     let url;
     try { url = new URL(request.url, 'http://127.0.0.1'); } catch { url = null; }
     const pathname = url?.pathname, size = name => Math.min(4096, Math.max(1, Math.trunc(Number(url.searchParams.get(name))) || 1));
-    if (!url || request.method !== 'GET') { state.blocked++; response.writeHead(404); response.end(); }
-    else if (pathname === `${HARNESS_PREFIX}host.html`) html(response, hostPage(size('w'), size('h')), CSP_HOST);
-    else if (pathname === `${HARNESS_PREFIX}blank.html`) html(response, BLANK_PAGE, CSP_HOST);
+    if (!url || request.method !== 'GET' || request.headers.host !== new URL(application ? origin : hostOrigin).host) return denied(response);
+    if (application) {
+      if (!url.search && allowed.has(pathname)) html(response, document, `${CSP_APP}; frame-ancestors ${hostOrigin}`);
+      else denied(response);
+    } else if (pathname === `${HARNESS_PREFIX}host.html`) html(response, hostPage(size('w'), size('h')), `${CSP_HOST}; frame-src 'self' ${origin}`);
+    else if (pathname === `${HARNESS_PREFIX}blank.html`) html(response, BLANK_PAGE, `${CSP_HOST}; frame-src 'none'`);
     else if (pathname === `${HARNESS_PREFIX}axe.min.js`) { response.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store', 'content-length': axe.length }); response.end(axe); }
-    else if (!url.search && allowed.has(pathname)) html(response, document, CSP_APP);
-    else { state.blocked++; response.writeHead(404, { 'cache-control': 'no-store' }); response.end(); }
+    else denied(response);
+  };
+  const appServer = createServer(handler(true)), hostServer = createServer(handler(false));
+  const close = server => new Promise(done => {
+    server.closeAllConnections();
+    if (!server.listening) return done();
+    server.close(() => done());
   });
-  server.on('connection', socket => socket.setNoDelay(true));
-  return new Promise((resolve, reject) => {
+  const listen = (server, host) => new Promise((resolve, reject) => {
+    server.on('connection', socket => socket.setNoDelay(true));
     server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => resolve({
-      origin: `http://127.0.0.1:${server.address().port}`, state,
-      close: () => new Promise(done => { server.closeAllConnections(); server.close(() => done()); })
-    }));
+    server.listen(0, host, () => resolve(`http://${host}:${server.address().port}`));
   });
+  try {
+    origin = await listen(appServer, appHost);
+    hostOrigin = await listen(hostServer, '127.0.0.1');
+    return { origin, hostOrigin, state, close: () => Promise.all([close(appServer), close(hostServer)]) };
+  } catch (error) { await Promise.all([close(appServer), close(hostServer)]); throw error; }
 }
 
 const stripAnsi = text => text.replace(/\x1b\[[0-9;]*m/g, '');
@@ -126,11 +182,23 @@ async function screenshotBytes(sessionDir, name) {
   return bytes;
 }
 
-export async function run(ctx) {
+// Dependency seams are for trusted host tests only. Artifact bytes/JSON never
+// select an executor, a clock, a dependency loader or a larger budget.
+export async function run(ctx, { execute = exec, now = Date.now, readAxe = loadAxe, getToolVersion = toolVersion } = {}) {
   const { root, bytes, routing, report, timeoutMs, viewports, origin: contractOrigin, routeUrl, passes, screenshotPath, writeSafe, ROUTE_ENTRY_PATH, UNKNOWN_ROUTE_PATH } = ctx;
-  const axe = await loadAxe();
-  const tool_version = await toolVersion();
-  report.environment = { backend: 'aside', isolation: 'shared-profile', deadline_scope: 'chunk', viewport_mode: 'iframe', screenshot_mode: 'viewport-clip',
+  const budget = createAsideBudget(timeoutMs, now);
+  try { requireHostNetworkIsolation(execute); }
+  catch (error) {
+    if (report) report.environment = { backend: 'aside', isolation: 'unsupported', network_isolation: 'missing-host-all-transport-egress',
+      total_timeout_ms: budget.total_timeout_ms, cleanup_timeout_ms: 15000 };
+    throw error;
+  }
+  const axe = await readAxe();
+  budget.remaining();
+  const tool_version = await getToolVersion();
+  budget.remaining();
+  report.environment = { backend: 'aside', isolation: 'cross-origin-sandbox-in-shared-profile', deadline_scope: 'aggregate-and-chunk', total_timeout_ms: budget.total_timeout_ms,
+    cleanup_timeout_ms: 15000, viewport_mode: 'iframe', screenshot_mode: 'viewport-clip',
     browser: null, dpr: null, color_scheme: null, reduced_motion: null, language: null, tool_version };
   const allowed = new Set([ROUTE_ENTRY_PATH, ...(routing.mode === 'history' ? [...routing.routes.map(route => route.path), UNKNOWN_ROUTE_PATH] : [])]);
   const documents = { available: inject(bytes, bridgeScript(false)), unavailable: inject(bytes, bridgeScript(true)) };
@@ -142,13 +210,15 @@ export async function run(ctx) {
   // deadline_scope is 'chunk': timeoutMs bounds each CLI call. Measured: a chunk killed at the
   // deadline leaves its tab visible for about 40 s until the Aside daemon reaps the session.
   async function chunk({ unavailable, viewport, unit, routeIndex, shotName }) {
-    const server = await startServer({ document: unavailable ? documents.unavailable : documents.available, allowed, axe });
+    budget.remaining();
+    const server = await startVerificationServers({ document: unavailable ? documents.unavailable : documents.available, allowed, axe }, { execute });
     const started = Date.now();
     try {
       // The dispatcher's ORIGIN/routeUrl name the routes; this chunk serves them from its own origin.
-      const script = chunkScript({ routing, unavailable, origin: server.origin, width: viewport.width, height: viewport.height, unit, routeIndex, shotName,
+      const script = chunkScript({ routing, unavailable, origin: server.origin, hostOrigin: server.hostOrigin, width: viewport.width, height: viewport.height, unit, routeIndex, shotName,
         entryPath: ROUTE_ENTRY_PATH, unknownPath: UNKNOWN_ROUTE_PATH });
-      const { error, stdout, stderr } = await exec(['repl', script], { timeout: timeoutMs });
+      const { error, stdout, stderr } = await execute(['repl', script], { timeout: budget.remaining() });
+      budget.remaining();
       if (error?.killed) throw new Error(DEADLINE);
       const result = parseResult(stdout);
       if (process.env.HARNESS50_ASIDE_DEBUG) process.stderr.write(`[aside] ${unit}${routeIndex >= 0 ? `#${routeIndex}` : ''} exit=${error?.code ?? 0} stdout=${JSON.stringify(stripAnsi(stdout).slice(-1500))} stderr=${JSON.stringify(stderr.slice(0, 500))}\n`);

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { parseStrictJson } from './strict-json.mjs';
 import { open, unlink } from 'node:fs/promises';
 import { physicalWorkspace, safePath, readSafe, writeSafe, sha256 } from './quality-files.mjs';
 
@@ -81,7 +82,7 @@ async function sameFiles(root, captured, kind) {
 }
 async function json(root, path) {
   const data = await readSafe(root, path, LIMIT);
-  return { value: JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(data)), digest: sha256(data) };
+  return { value: parseStrictJson(new TextDecoder('utf-8', { fatal: true }).decode(data)), digest: sha256(data) };
 }
 async function writeOnce(root, path, data) {
   require(data.length <= LIMIT);

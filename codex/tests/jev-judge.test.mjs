@@ -1,3 +1,5 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { after } from 'node:test';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -20,6 +22,9 @@ const inspect = (...args) => call('inspectJevJudgment', ...args);
 const sourcePath = 'step_archive/step016_claims.md';
 const excerpt = 'The proposal includes a year filter.';
 const instructions = 'Does the selected evidence support the year-filter claim?';
+const budgetFixture = mkdtempSync(join(tmpdir(), 'harness36-jev-synthetic-budget-'));
+after(() => rmSync(budgetFixture, { recursive: true, force: true }));
+const freshBudget = () => mkdtempSync(join(budgetFixture, 'call-'));
 const key = 'synthetic-judgment-key-only';
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const input = () => ({ schema_version: 1, step: 16,
@@ -33,7 +38,7 @@ const response = () => ({ model: 'jev-1.13.0', answers: { claim: {
   type: 'choice', choice: 'supported', probabilities: { supported: .9, unsupported: .05, unknown: .05 }, confidence: .9,
 } }, usage: { input_tokens: 32, output_tokens: 5 } });
 const json = value => new Response(JSON.stringify(value), { status: 200 });
-const opts = fetchImpl => ({ allowNetwork: true, apiKey: key, fetchImpl });
+const opts = fetchImpl => ({ allowNetwork: true, apiKey: key, fetchImpl, budgetRoot: freshBudget() });
 
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), 'harness50-jev-judge-'));
@@ -324,7 +329,7 @@ test('timeout aborts hung fetch and hung response body', async t => {
 test('source snapshots before sending and after body completion prevent raced judgments', async t => {
   const root = await fixture(t);
   let calls = 0;
-  const options = { allowNetwork: true, fetchImpl: async () => { calls++; return json(response()); },
+  const options = { allowNetwork: true, budgetRoot: freshBudget(), fetchImpl: async () => { calls++; return json(response()); },
     get apiKey() { writeFileSync(join(root, sourcePath), excerpt + '\nChanged before sending.'); return key; } };
   const before = await run(root, input(), options);
   assert.equal(before.error_code, 'input_changed'); assert.equal(calls, 0);

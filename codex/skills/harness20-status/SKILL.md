@@ -1,9 +1,9 @@
 ---
-name: harness36-status
-description: Use when a user invokes $harness36-status or asks to inspect a Harness36 Codex workflow without changing it.
+name: harness20-status
+description: Use when a user invokes $harness20-status or asks to inspect a Harness20 Codex workflow without changing it.
 ---
 
-# Harness36 Status
+# Harness20 Status
 
 Status is a single observation. It never repairs, imports, resumes, resets, or advances work.
 
@@ -11,12 +11,12 @@ Status is a single observation. It never repairs, imports, resumes, resets, or a
 
 Resolve `../../scripts/harness-state.mjs` relative to this SKILL.md, not from the current working directory. Pass the current project directory as the workspace.
 
-Report the manager-selected `workflow_profile` and `total_steps`; fresh36 and legacy50
-keep distinct denominators. Never infer them from a step number.
+Report the manager-selected `workflow_profile` and `total_steps`; fresh20, explicit research-free36 and legacy50
+keep their selected 20/36/50 denominators. Never infer them from a step number.
 
 ## Status operation
 
-For `$harness36-status`, Call only `show` through the state manager. Treat the result as strictly read-only and report it without a follow-up state operation.
+For `$harness20-status`, Call only `show` through the state manager. Treat the result as strictly read-only and report it without a follow-up state operation.
 
 ## Report
 

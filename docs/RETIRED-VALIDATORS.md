@@ -7,12 +7,12 @@ harness50의 옛 step 본문은 아래 `*-validator.ps1` / `*-checker.ps1` 스�
 
 - `mx-tag-validator.ps1` / `.sh` (PostToolUse 바인딩)
 - `trust5-validator.ps1` / `.sh` (Stop 바인딩)
-- `html-bundler.ps1` / `.sh` (새36의 step026, legacy50의 step038에서 호출, 부트스트랩 시 `step_archive/tools/`로 복사)
+- `html-bundler.ps1` / `.sh` (새20의 step010, 기존36의 step026, legacy50의 step038에서 호출, 부트스트랩 시 `step_archive/tools/`로 복사)
 
 ## 정책 (약속-실제 정합, 2026-07 평가 반영)
 
 - **현재 step 본문**은 아래 검증기를 지시하지 않는다. 대응 CLI를 직접 확인한다
-  (8~15단계는 `npx --no-install <bin> --version` 등). 선택 도구(jscpd·semgrep·tokei·madge)를
+  (현재 환경 준비3에서 실제 가용 도구를 확인하고, 기존36·50의 8~15단계는 `npx --no-install <bin> --version` 등). 선택 도구(jscpd·semgrep·tokei·madge)를
   쓸 수 없으면 `SKIP`과 사유를 기록한다. 청크 규칙(500줄 이하, BOM 없음)도 직접 확인한다.
 - **업그레이드 전 실행의 옛 본문**: `webapp-trigger`는 없는 본문만 `step_archive/archived/`로
   복사하고 `/harness-reset`도 archived/를 보존한다. 그래서 업그레이드 전에 복사된 옛 본문은

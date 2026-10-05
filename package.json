@@ -1,12 +1,13 @@
 {
-  "name": "harness36-validation",
-  "version": "3.0.0",
+  "name": "harness20-validation",
+  "version": "4.0.0",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
+    "verify:security": "node scripts/security-audit.mjs",
     "test": "node --test --test-concurrency=4 --test-timeout=600000 codex/tests/*.test.mjs",
     "test:browser": "npm --prefix browser-verifier test",
     "verify:output": "node scripts/verify-output.mjs"

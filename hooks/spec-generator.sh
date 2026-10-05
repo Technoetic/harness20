@@ -28,7 +28,7 @@ ARCHIVED_DIR="$PROJECT_ROOT/$(printf '%s' "$H50_PROFILE" | python3 -c 'import js
 
 command -v python3 >/dev/null 2>&1 || exit 0
 
-if [ "$(printf '%s' "$H50_PROFILE" | python3 -c 'import json,sys; print(json.load(sys.stdin)["workflow_profile"])' | tr -d '\r')" = "research-free-36-v1" ]; then
+if [ "$(printf '%s' "$H50_PROFILE" | python3 -c 'import json,sys; print(json.load(sys.stdin)["workflow_profile"])' | tr -d '\r')" != "legacy-50-v1" ]; then
   node "$(dirname "${BASH_SOURCE[0]}")/lib/workflow-profile.mjs" spec "$PROJECT_ROOT" 2>/dev/null || true
   exit 0
 fi

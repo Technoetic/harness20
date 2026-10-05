@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -10,6 +10,17 @@ import { verifyOutput } from '../../scripts/verify-output.mjs';
 import { routeManifestScript } from '../../codex/tests/helpers/routing.mjs';
 
 const browserOptions = { backend: 'playwright', ...(process.env.HARNESS50_BROWSER_PATH ? { executablePath: process.env.HARNESS50_BROWSER_PATH } : {}) };
+
+// Native adapters currently lack verified all-transport host isolation. These
+// tests prove refusal, not browser measurements or a fictional supported host.
+async function assertUnsupported(report, root) {
+  assert.equal(report.verdict, 'FAIL', JSON.stringify(report));
+  assert.match(report.error, /verified per-tab host network isolation is required/);
+  assert.equal(report.environment?.network_isolation, 'missing-host-all-transport-egress');
+  assert.deepEqual(report.viewports, []);
+  assert.deepEqual(report.compatibility.navigation_api_unavailable.viewports, []);
+  await assert.rejects(access(join(root, 'step_archive', 'screenshots')), { code: 'ENOENT' });
+}
 
 test('browser CLI invoked through a directory alias rejects a missing artifact', async () => {
   const root = await makeWorkspace();
@@ -27,39 +38,31 @@ async function fixture(body) {
   return root;
 }
 
-test('Chromium validates a working document at desktop and mobile sizes', async () => {
+test('native verification refuses a working document without host network isolation', async () => {
   const root = await fixture('<p>Explore an accessible interactive example.</p><button onclick="this.textContent=\'Activated\'">Activate</button>');
   const report = await verifyOutput(root, browserOptions);
-  assert.equal(report.verdict, 'PASS', JSON.stringify(report));
-  assert.equal(report.viewports.length, 2);
-  for (const viewport of report.viewports) assert.ok((await readFile(join(root, viewport.screenshot))).length > 100);
+  await assertUnsupported(report, root);
   assert.match(report.artifact_sha256, /^[a-f0-9]{64}$/);
   assert.equal(report.schema_version, 3);
-  assert.equal(report.viewports[0].routes[0].navigation.status, 'not-applicable');
 });
 
-test('runtime errors, inaccessible controls and unavailable network dependencies fail', async () => {
+test('runtime-error and network-dependency artifact is refused before browser execution', async () => {
   const root = await fixture('<button></button><script>throw new Error("fixture failure")</script><script src="https://example.invalid/dependency.js"></script>');
   const report = await verifyOutput(root, browserOptions);
-  assert.equal(report.verdict, 'FAIL');
-  assert.ok(report.viewports.some(view => view.errors.length > 0));
-  assert.ok(report.viewports.some(view => view.violations.some(item => item.id === 'button-name')));
-  assert.ok(report.viewports.some(view => view.blocked_requests > 0));
+  await assertUnsupported(report, root);
 });
 
-test('mobile overflow is a measurable failure', async () => {
+test('overflow artifact is refused without fabricated measurements', async () => {
   const root = await fixture('<p style="width:1000px">Overflow</p>');
   const report = await verifyOutput(root, browserOptions);
-  assert.equal(report.verdict, 'FAIL');
-  assert.equal(report.viewports.find(item => item.name === 'mobile').horizontal_overflow, true);
+  await assertUnsupported(report, root);
 });
 
-test('a nonterminating page is closed by the verification deadline', { timeout: 20000 }, async () => {
+test('a nonterminating page is refused before its script can stall a browser', { timeout: 20000 }, async () => {
   const root = await fixture('<script>while (true) {}</script>');
   const started = Date.now();
   const report = await verifyOutput(root, { ...browserOptions, timeoutMs: 1000 });
-  assert.equal(report.verdict, 'FAIL');
-  assert.ok(report.error);
+  await assertUnsupported(report, root);
   assert.ok(Date.now() - started < 15000, 'browser deadline did not bound the stalled page');
 });
 
@@ -103,74 +106,50 @@ async function routingFixture(mode = 'hash', fault = '') {
   return root;
 }
 
-for (const mode of ['hash', 'history']) test(`${mode} routing verifies cold entry, reload, real links and back/forward for every screen`, async () => {
+for (const mode of ['hash', 'history']) test(`${mode} routing artifact is refused without host network isolation`, async () => {
   const root = await routingFixture(mode);
   const report = await verifyOutput(root, browserOptions);
-  assert.equal(report.verdict,'PASS',JSON.stringify(report));
+  await assertUnsupported(report, root);
   assert.equal(report.schema_version,3);
-  const fallbackViews=report.compatibility.navigation_api_unavailable.viewports;
-  assert.equal(fallbackViews.length,2);
-  for(const view of [...report.viewports,...fallbackViews]){
-    assert.deepEqual(view.routes.map(route=>route.id),['home','orders','settings']);
-    assert.equal(view.initial_entry,true);assert.equal(view.unknown_fallback,true);
-    for(const route of view.routes){assert.equal(route.direct_entry,true);assert.equal(route.reload,true);assert.equal(route.navigation.status,'pass');assert.equal(route.navigation.back,true);assert.equal(route.navigation.forward,true);}
-  }
-  for(const view of fallbackViews){
-    assert.deepEqual(view.navigation_api,{available:false,property_present:false});
-    assert.equal(view.screenshot,`step_archive/screenshots/verified-navigation-api-unavailable-${view.name}.png`);
-    assert.ok((await readFile(join(root,view.screenshot))).length>100);
-    for(const route of view.routes)assert.deepEqual(route.navigation_api,{available:false,property_present:false});
-  }
 });
 
-test('a native-capable app with broken unavailable-API fallback cannot pass verification',async()=>{
-  const report=await verifyOutput(await routingFixture('history','fallback-url-less'),browserOptions);
-  assert.equal(report.verdict,'FAIL',JSON.stringify(report));
-  assert.equal(report.viewports.length,2);
-  assert.ok(report.viewports.every(view=>view.pass&&view.navigation_api.available));
-  assert.match(report.error,/navigation|screen/i);
+test('broken fallback app is refused before native or unavailable-API execution',async()=>{
+  const root=await routingFixture('history','fallback-url-less');
+  await assertUnsupported(await verifyOutput(root,browserOptions),root);
 });
 
-test('API absence is rechecked after reload even when the property value is undefined',async()=>{
-  const report=await verifyOutput(await routingFixture('history','restore-api-on-reload'),browserOptions);
-  assert.equal(report.verdict,'FAIL',JSON.stringify(report));
-  assert.equal(report.viewports.length,2);
-  assert.ok(report.viewports.every(view=>view.pass));
-  assert.match(report.error,/absence could not be verified/);
+test('API-restoring artifact is refused before browser execution',async()=>{
+  const root=await routingFixture('history','restore-api-on-reload');
+  await assertUnsupported(await verifyOutput(root,browserOptions),root);
 });
 
-test('a partial native Navigation API is reported as present but unavailable',async()=>{
+test('partial native Navigation API artifacts are refused without measurements',async()=>{
   for(const partial of ['{navigate(){},addEventListener(){},currentEntry:null}','{navigate(){},currentEntry:{}}']){
     const root=await fixture(`<script>if("navigation" in window)Object.defineProperty(window,"navigation",{value:${partial}})</script>`);
     const report=await verifyOutput(root,browserOptions);
-    assert.equal(report.verdict,'PASS',JSON.stringify(report));
-    for(const view of report.viewports)assert.deepEqual(view.navigation_api,{available:false,property_present:true});
+    await assertUnsupported(report,root);
   }
 });
 
-test('route JSON property order does not change screen identity',async()=>{
-  const report=await verifyOutput(await routingFixture('hash','property-order'),browserOptions);
-  assert.equal(report.verdict,'PASS',JSON.stringify(report));
+test('valid route JSON property ordering cannot bypass host isolation',async()=>{
+  const root=await routingFixture('hash','property-order');
+  await assertUnsupported(await verifyOutput(root,browserOptions),root);
 });
 
-for(const fault of ['url-less','direct','reload','history','unknown','duplicate-root','omitted-root'])test(`route verifier rejects ${fault} application behavior`,async()=>{
-  const report=await verifyOutput(await routingFixture('hash',fault),{...browserOptions,timeoutMs:20000});
-  assert.equal(report.verdict,'FAIL',JSON.stringify(report));
+for(const fault of ['url-less','direct','reload','history','unknown','duplicate-root','omitted-root'])test(`route artifact ${fault} is refused before application behavior`,async()=>{
+  const root=await routingFixture('hash',fault);
+  await assertUnsupported(await verifyOutput(root,{...browserOptions,timeoutMs:20000}),root);
 });
 
-test('errors, overflow, accessibility and network are checked on non-initial screens',async()=>{
-  const report=await verifyOutput(await routingFixture('hash','route-errors'),browserOptions);
-  assert.equal(report.verdict,'FAIL');
-  const orders=report.viewports[0].routes.find(route=>route.id==='orders');
-  assert.equal(orders.horizontal_overflow,true);
-  assert.ok(orders.violations.some(item=>item.id==='button-name'));
-  assert.ok(orders.errors.length>0);assert.ok(orders.blocked_requests>0);
+test('non-initial-screen network and error artifact is refused before execution',async()=>{
+  const root=await routingFixture('hash','route-errors');
+  await assertUnsupported(await verifyOutput(root,browserOptions),root);
 });
 
-test('the shipped three-screen example passes the measured verifier',async()=>{
+test('the shipped three-screen example receives an honest unsupported result',async()=>{
   const root=await makeWorkspace();await mkdir(join(root,'dist'));
   await writeFile(join(root,'dist/index.html'),await readFile(new URL('../../examples/routed-single-file.html',import.meta.url)));
   const report=await verifyOutput(root,browserOptions);
-  assert.equal(report.verdict,'PASS',JSON.stringify(report));
+  await assertUnsupported(report,root);
   assert.deepEqual(report.routing.routes.map(route=>route.id),['home','orders','settings']);
 });

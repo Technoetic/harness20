@@ -10,18 +10,27 @@ import { readRun } from '../../hooks/lib/harness-activity.mjs';
 const repo = fileURLToPath(new URL('../../', import.meta.url));
 const dispatcher = path.join(repo, 'hooks/run-hook.mjs');
 const activity = path.join(repo, 'hooks/lib/harness-activity.mjs');
+function copyDispatcher(target) {
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.copyFileSync(dispatcher, target);
+  const shared = path.resolve(path.dirname(target), '../scripts/lib');
+  fs.mkdirSync(shared, { recursive: true });
+  for (const name of ['strict-json.mjs', 'tool-policy.mjs', 'sensitive-data.mjs']) {
+    fs.copyFileSync(path.join(repo, 'scripts/lib', name), path.join(shared, name));
+  }
+}
 function copyActivity(target) {
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.copyFileSync(activity, target);
   const shared = path.resolve(path.dirname(target), '../../scripts/lib');
   fs.mkdirSync(shared, { recursive: true });
-  for (const name of ['workflow-profiles.mjs', 'claude-profile.mjs']) fs.copyFileSync(path.join(repo, 'scripts/lib', name), path.join(shared, name));
+  for (const name of ['workflow-profiles.mjs', 'claude-profile.mjs', 'workflow-security.mjs', 'quality-files.mjs', 'strict-json.mjs']) fs.copyFileSync(path.join(repo, 'scripts/lib', name), path.join(shared, name));
 }
 const expected = {
   SessionStart: [['', 'step-progress-loader', 30]],
   UserPromptSubmit: [['', 'webapp-trigger', 10], ['', 'step-obedience-guard', 5]],
-  PreToolUse: [['Bash', 'destructive-guard', 5], ['Write|Edit|MultiEdit|NotebookEdit|WebSearch', 'auto-approve', 3]],
-  PermissionRequest: [['Bash|Write|Edit|MultiEdit|NotebookEdit|WebFetch|WebSearch', 'permission-request-guard', 5]],
+  PreToolUse: [['Bash|Read|Write|Edit|MultiEdit|NotebookEdit|WebFetch|WebSearch', 'destructive-guard', 5], ['Write|Edit|MultiEdit|NotebookEdit|WebSearch', 'auto-approve', 3]],
+  PermissionRequest: [['Bash|Read|Write|Edit|MultiEdit|NotebookEdit|WebFetch|WebSearch', 'permission-request-guard', 5]],
   PostToolUse: [['Write|Edit', 'mx-tag-validator', 10], ['Write|Edit', 'lsp-autofix', 30]],
   Stop: [['', 'stop-advance', 45], ['', 'spec-generator', 15], ['', 'trust5-validator', 60]],
 };
@@ -49,7 +58,7 @@ test('dispatcher rejects missing, unknown, traversal, and extra hook arguments',
 test('dispatcher runs only native shell and preserves stdin, output, and exit code', async () => {
   const root = path.join(await makeWorkspace(), 'hooks');
   fs.mkdirSync(root);
-  fs.copyFileSync(dispatcher, path.join(root, 'run-hook.mjs'));
+  copyDispatcher(path.join(root, 'run-hook.mjs'));
   fs.mkdirSync(path.join(root, 'lib'));
   copyActivity(path.join(root, 'lib', 'harness-activity.mjs'));
   const windows = process.platform === 'win32';
@@ -114,7 +123,7 @@ async function gatedDispatcher({ withLib = true } = {}) {
   const root = await makeWorkspace();
   const hooks = path.join(root, 'plugin', 'hooks');
   fs.mkdirSync(hooks, { recursive: true });
-  fs.copyFileSync(dispatcher, path.join(hooks, 'run-hook.mjs'));
+  copyDispatcher(path.join(hooks, 'run-hook.mjs'));
   if (withLib) {
     fs.mkdirSync(path.join(hooks, 'lib'));
     copyActivity(path.join(hooks, 'lib', 'harness-activity.mjs'));
@@ -380,8 +389,8 @@ test('stop-advance: a forwarded SIGTERM during the writer starts no further part
 // Watchdog fixtures use hooks the dispatcher always starts (the two guards), so a copy of
 // run-hook.mjs without hooks/lib next to it still spawns them.
 async function dispatcherCopy(fixtures) {
-  const root = await makeWorkspace();
-  fs.copyFileSync(dispatcher, path.join(root, 'run-hook.mjs'));
+  const root = path.join(await makeWorkspace(), 'hooks');
+  copyDispatcher(path.join(root, 'run-hook.mjs'));
   for (const [file, text] of Object.entries(fixtures)) fs.writeFileSync(path.join(root, file), text);
   return root;
 }
@@ -409,7 +418,7 @@ test('dispatcher stops a hook that outlives its budget and leaves no child', asy
   const elapsed = Date.now() - started;
   assert.ok(ended(pidFile), 'the hook process is still running');
   assert.equal(result.error, undefined);
-  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.status, 2, result.stderr);
   assert.equal(result.stdout, '');
   assert.match(result.stderr, /permission-request-guard did not finish within 4\.5 s/);
   assert.ok(elapsed < 10000, `returned after ${elapsed} ms`);
@@ -433,7 +442,7 @@ test('stdin that never ends cannot hold a hook past its budget', async () => {
       new Promise(resolve => child.once('close', resolve)),
       new Promise(resolve => { timer = setTimeout(() => resolve('still running'), 10000); })
     ]);
-    assert.equal(code, 1, stderr);
+    assert.equal(code, 2, stderr);
     assert.equal(stdout, '');
     assert.match(stderr, /destructive-guard did not finish within 4\.5 s/);
   } finally {
@@ -443,11 +452,10 @@ test('stdin that never ends cannot hold a hook past its budget', async () => {
   }
 });
 test('the watchdog also ends processes the PowerShell hook started', { skip: process.platform !== 'win32' }, async () => {
-  const root = await makeWorkspace();
+  const root = await dispatcherCopy({});
   const pidFile = path.join(root, 'grandchild.pid');
   const node = process.execPath.replaceAll("'", "''");
   const script = `require('fs').writeFileSync('${pidFile.replaceAll('\\', '/')}', String(process.pid)); setTimeout(() => {}, 60000)`;
-  fs.copyFileSync(dispatcher, path.join(root, 'run-hook.mjs'));
   fs.writeFileSync(path.join(root, 'permission-request-guard.ps1'),
     `$raw = [Console]::In.ReadToEnd()\n$x = $raw | & '${node}' -e "${script}" 2>$null\n`);
   const started = Date.now();
@@ -455,7 +463,7 @@ test('the watchdog also ends processes the PowerShell hook started', { skip: pro
   const elapsed = Date.now() - started;
   assert.ok(ended(pidFile), 'the node started by PowerShell is still running');
   assert.equal(result.error, undefined);
-  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.status, 2, result.stderr);
   assert.match(result.stderr, /permission-request-guard did not finish within 4\.5 s/);
   // Without the tree kill the node started by PowerShell keeps the output pipe open for 20 s.
   assert.ok(elapsed < 10000, `returned after ${elapsed} ms`);

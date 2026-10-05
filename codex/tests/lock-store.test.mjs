@@ -84,19 +84,80 @@ function startLockActor(root, mode) {
 }
 
 async function stopLockActor(actor) {
-  if (actor.child.connected) {
-    actor.child.send({ type: "release" });
-  }
   // An actor that never reaches its release point would otherwise keep the test waiting forever.
   const grace = setTimeout(() => {
     if (actor.child.exitCode === null && actor.child.signalCode === null) actor.child.kill();
   }, 5000);
   try {
-    await actor.exited;
+    const release = new Promise((resolve, reject) => {
+      if (!actor.child.connected) return resolve();
+      actor.child.send({ type: "release" }, error => {
+        // The losing actor may close IPC between connected and send. A callback keeps
+        // that cleanup race from becoming an unhandled error or rejecting once(exit).
+        if (error && error.code !== "EPIPE" && error.code !== "ERR_IPC_CHANNEL_CLOSED") {
+          reject(error);
+        } else {
+          resolve();
+        }
+      });
+    });
+    const [released, exited] = await Promise.allSettled([release, actor.exited]);
+    if (exited.status === "rejected") throw exited.reason;
+    if (released.status === "rejected") throw released.reason;
   } finally {
     clearTimeout(grace);
   }
 }
+
+async function startDisconnectingCleanupActor(callbackErrorCode) {
+  const child = spawn(process.execPath, ["-e", `
+    process.on("message", () => {});
+    process.on("disconnect", () => process.exit(0));
+    process.send({ type: "ready" });
+  `], { stdio: ["ignore", "ignore", "inherit", "ipc"] });
+  let exitObserved = false;
+  const exited = once(child, "exit").then(result => {
+    exitObserved = true;
+    return result;
+  });
+  await nextMessage(child, message => message?.type === "ready");
+  const nativeSend = child.send.bind(child);
+  child.send = (message, callback) => {
+    // Reproduce the real race after cleanup reads connected and before native send uses IPC.
+    child.disconnect();
+    if (callbackErrorCode && typeof callback === "function") {
+      return nativeSend(message, error => {
+        // A native closed-channel send is deterministic on every OS; exercise the other
+        // callback codes through this narrow seam without replacing the actual child exit.
+        callback(error ? Object.assign(error, { code: callbackErrorCode }) : error);
+      });
+    }
+    return nativeSend(message, callback);
+  };
+  return { child, exited, exitObserved: () => exitObserved };
+}
+
+test("actor cleanup tolerates IPC closing after its connected check and waits for exit", async () => {
+  const actor = await startDisconnectingCleanupActor();
+  assert.equal(actor.child.connected, true);
+  await stopLockActor(actor);
+  assert.equal(actor.exitObserved(), true);
+  assert.equal(actor.child.exitCode, 0);
+});
+
+test("actor cleanup tolerates a broken-pipe send callback and waits for exit", async () => {
+  const actor = await startDisconnectingCleanupActor("EPIPE");
+  await stopLockActor(actor);
+  assert.equal(actor.exitObserved(), true);
+  assert.equal(actor.child.exitCode, 0);
+});
+
+test("actor cleanup propagates unexpected send errors after waiting for exit", async () => {
+  const actor = await startDisconnectingCleanupActor("ECONNRESET");
+  await assert.rejects(stopLockActor(actor), { code: "ECONNRESET" });
+  assert.equal(actor.exitObserved(), true);
+  assert.equal(actor.child.exitCode, 0);
+});
 
 async function runConcurrentMutators({ root, count }) {
   const children = Array.from({ length: count }, () => fork(childMutatePath, [root], {

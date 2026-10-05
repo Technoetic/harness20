@@ -112,8 +112,10 @@ for (const workflowProfile of ['legacy-50-v1', profile]) {
     const root = await candidate();
     await assessment(root, 27);
     const state = createInitialState({ workflowProfile, workflowId: 'valid-owner', workspaceRoot: root,
-      topicSha256: 'a'.repeat(64), now: '2026-10-02T01:00:00.000Z' });
+      topicSha256: (await import('../../scripts/lib/quality-files.mjs')).sha256('Synthetic approved scope.'), now: '2026-10-02T01:00:00.000Z' });
     validateState(state);
+    await mkdir(join(root,'step_archive/TOPIC'),{recursive:true});
+    await writeFile(join(root,'step_archive/TOPIC/TOPIC.md'),'Synthetic approved scope.');
     await mkdir(join(root, 'step_archive/.harness50-codex'), { recursive: true });
     await writeFile(join(root, 'step_archive/.harness50-codex/state.json'), JSON.stringify(state));
     await writeFile(join(root, 'step_archive/progress.json'), 'null');
@@ -140,8 +142,10 @@ test('generic Jev helper accepts new planning17 and rejects removed old checkpoi
 });
 test('Codex workflow_id isolates QA across fresh generations and profile option mismatches fail closed', async () => {
   const root = await candidate();
-  const state = { schema_version: 2, workflow_profile: profile, total_steps: 36,
-    workflow_id: '00000000-0000-4000-8000-000000000001' };
+  const state = createInitialState({workflowProfile:profile,workflowId:'00000000-0000-4000-8000-000000000001',workspaceRoot:root,
+    topicSha256:(await import('../../scripts/lib/quality-files.mjs')).sha256('Synthetic approved scope.'),now:'2026-10-06T00:00:00.000Z'});
+  await mkdir(join(root,'step_archive/TOPIC'),{recursive:true});
+  await writeFile(join(root,'step_archive/TOPIC/TOPIC.md'),'Synthetic approved scope.');
   await mkdir(join(root, 'step_archive/.harness50-codex'), { recursive: true });
   const writeState = value => writeFile(join(root, 'step_archive/.harness50-codex/state.json'), JSON.stringify(value));
   await writeState(state); await assessment(root, 27);

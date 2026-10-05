@@ -1,6 +1,6 @@
 ﻿# webapp-trigger.ps1 — UserPromptSubmit hook
 # /webapp 명시 명령만 발급, 완료 기록이 있는 progress는 덮어쓰지 않음.
-# 첫 줄이 `/webapp <주제>` 또는 `/harness36:webapp <주제>`인 prompt에서만 (기존 harness50 namespace 호환):
+# 첫 줄이 `/webapp <주제>` 또는 `/harness20:webapp <주제>`인 prompt에서만 (기존 harness50 namespace 호환):
 #   1) step_archive/ 부트스트랩 (없으면 생성, step001~050 복사)
 #   2) TOPIC/TOPIC.md 작성 (사용자 prompt 원문 보존)
 #   3) progress.json 초기화 (current_step=1)
@@ -52,9 +52,9 @@ try { $j = $raw | ConvertFrom-Json } catch { exit 0 }
 $prompt = [string]$j.prompt
 if (-not $prompt) { exit 0 }
 
-# 트리거 — 첫 줄의 명시 명령 `/webapp <주제>` 또는 `/harness36:webapp <주제>`만 (기존 harness50 호환, 대소문자 구분).
+# 트리거 — 첫 줄의 명시 명령 `/webapp <주제>` 또는 `/harness20:webapp <주제>`만 (기존 harness50 호환, 대소문자 구분).
 # 자연어 요청은 자동 시작하지 않는다. lib/harness-activity.mjs의 EXPLICIT_WEBAPP와 같은 규칙.
-if (-not ($prompt -cmatch '^[ \t]*/(harness(36|50):)?webapp[ \t]+\S')) { exit 0 }
+if (-not ($prompt -cmatch '^[ \t]*/(harness(20|36|50):)?webapp[ \t]+\S')) { exit 0 }
 
 Write-Log "TRIGGER matched. prompt head: $($prompt.Substring(0,[Math]::Min(80,$prompt.Length)))"
 
@@ -70,7 +70,7 @@ if (Test-Path -LiteralPath $codexState) {
       if ($codexOut.Count -gt 0) { $codexLine = [string]$codexOut[0] }
     } catch {}
   }
-  if (-not $codexLine) { $codexLine = "[HARNESS] WARNING: step_archive/.harness50-codex/state.json exists but is unreadable or incomplete - Claude hooks will not create progress.json or block Stop here. Inspect it with the harness36 plugin's codex/scripts/harness-state.mjs show and ask the user before repairing or resetting it." }
+  if (-not $codexLine) { $codexLine = "[HARNESS] WARNING: step_archive/.harness50-codex/state.json exists but is unreadable or incomplete - Claude hooks will not create progress.json or block Stop here. Inspect it with the harness20 plugin's codex/scripts/harness-state.mjs show and ask the user before repairing or resetting it." }
   Write-Output "[HARNESS] webapp trigger skipped: a Codex workflow owns this workspace, so step_archive/TOPIC/TOPIC.md and progress.json were left unchanged. Resume that workflow, or use a separate workspace for a different topic."
   Write-Output $codexLine
   exit 0
@@ -95,6 +95,7 @@ if ($preLine -ne 'issue') {
 $profileJson = @(& node (Join-Path $PSScriptRoot 'lib/workflow-profile.mjs') bootstrap (Join-Path $projectRoot '.') 2>$null)
 if ($LASTEXITCODE -ne 0 -or $profileJson.Count -eq 0) { Write-Output '[HARNESS] Profile bootstrap failed; nothing was initialized.'; exit 0 }
 $selectedProfile = ($profileJson -join "`n") | ConvertFrom-Json
+$finalStep = '{0:D3}' -f [int]$selectedProfile.total
 $archivedDir = Join-Path $projectRoot $selectedProfile.body_directory
 if (-not (Test-Path -LiteralPath $topicDir)) { New-Item -ItemType Directory -Path $topicDir -Force | Out-Null }
 
@@ -107,31 +108,12 @@ foreach ($b in @("html-bundler.ps1", "html-bundler.sh")) {
   if (Test-Path -LiteralPath $bSrc) { Copy-Item -LiteralPath $bSrc -Destination (Join-Path $toolsDir $b) -Force }
 }
 
-# 2) TOPIC.md 작성 (덮어쓰기 — 완료 기록이 없을 때의 신규 요청은 신규 주제)
-$today = Get-Date -Format "yyyy-MM-dd"
-$topicBody = @"
----
-created: $today
-session_prompt: |
-$(($prompt -split "`n" | ForEach-Object { "  $_" }) -join "`n")
----
-
-# 튜토리얼 주제
-
-본 TOPIC.md는 webapp-trigger hook이 자동 생성했다.
-step001이 진입 시 본 파일의 session_prompt를 읽어 topic/audience/interactive/real_world_apps/constraints를 추출한다.
-
-- raw_prompt: 위 session_prompt 블록 참조
-
-## 결정/사유 (NEW-WORK-규칙 3번)
-
-- 자동 추출 항목이 모호하면 step001이 즉시 결정·기록 후 진행 (질문 금지)
-"@
-$topicBody | Out-File -LiteralPath $topicFile -Encoding UTF8 -Force
-# BOM 제거
-$bytes = [System.IO.File]::ReadAllBytes($topicFile)
-if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
-  [System.IO.File]::WriteAllBytes($topicFile, $bytes[3..($bytes.Length-1)])
+# Normalize and freeze the six-field contract before the first planning step.
+$OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+$topicResult = @($harnessRaw | & node (Join-Path $PSScriptRoot 'lib/workflow-profile.mjs') topic (Join-Path $projectRoot '.') 2>$null)
+if ($LASTEXITCODE -ne 0) {
+  Write-Output '[HARNESS] TOPIC contract initialization failed; no progress was initialized.'
+  exit 0
 }
 Write-Log "TOPIC.md written"
 
@@ -166,18 +148,19 @@ Write-Output ""
 Write-Output "Bootstrap complete:"
 Write-Output "  - step_archive/ ready"
 Write-Output "  - step_archive/TOPIC/TOPIC.md written with the user prompt"
-Write-Output "  - step_archive/progress.json initialized (current_step=1, total=36)"
-Write-Output "  - step_archive/profiles/research-free-36-v1/archived/step001.md ~ step036.md available"
+Write-Output "  - step_archive/progress.json initialized (current_step=1, total=$($selectedProfile.total))"
+Write-Output "  - $($selectedProfile.body_directory)/step001.md ~ step$finalStep.md available"
 Write-Output ""
 Write-Output "ABSOLUTE OVERRIDE:"
 Write-Output "  Before addressing anything else, IMMEDIATELY:"
-Write-Output "    1. Read step_archive/profiles/research-free-36-v1/archived/step001.md"
+Write-Output "    1. Read $($selectedProfile.body_directory)/step001.md"
 Write-Output "    2. Execute its instructions in full (including TOPIC pickup from TOPIC.md)"
-Write-Output "    3. On completion report 'Step 001/36 완료' and Read step002.md"
-Write-Output "    4. Continue without user confirmation through step036"
+Write-Output "    3. On completion report 'Step 001/$($selectedProfile.total) 완료' and Read step002.md"
+Write-Output "    4. Continue without user confirmation through step$finalStep"
 Write-Output ""
+Write-Output "Missing essential input requires a required-input-missing named pause; never invent earlier completed work."
 Write-Output "Do NOT ask the user any clarifying questions."
 Write-Output "Do NOT pause for confirmation."
-Write-Output "Do NOT end the turn before step036 except by a named pause (harness-rules 2-1)."
+Write-Output "Do NOT end the turn before step$finalStep except by a named pause (harness-rules 2-1)."
 Write-Output "</harness50-trigger>"
 exit 0

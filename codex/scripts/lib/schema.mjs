@@ -1,4 +1,5 @@
 import { HarnessError } from "./errors.mjs";
+import { parseStrictJson } from '../../../scripts/lib/strict-json.mjs';
 
 import { DEFAULT_WORKFLOW_PROFILE, LEGACY_WORKFLOW_PROFILE, getWorkflowProfile, resolveWorkflowProfile } from "../../../scripts/lib/workflow-profiles.mjs";
 const STATUSES = new Set(["running", "paused", "blocked", "completed"]);
@@ -233,7 +234,7 @@ export function parseState(raw) {
     throw new HarnessError("STATE_PARSE_ERROR", "state JSON must be a string");
   }
   try {
-    return validateState(JSON.parse(raw));
+    return validateState(parseStrictJson(raw));
   } catch (error) {
     if (error instanceof HarnessError) throw error;
     throw new HarnessError("STATE_PARSE_ERROR", "state JSON is invalid", {

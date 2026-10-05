@@ -3,6 +3,8 @@ import { spawn, spawnSync } from 'node:child_process';
 import { constants } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseStrictJson } from '../scripts/lib/strict-json.mjs';
+import { TOOL_INPUT_LIMIT } from '../scripts/lib/tool-policy.mjs';
 
 // Each budget (milliseconds) must stay below the same hook's timeout in hooks/hooks.json. The parts
 // of a sequence are not registered there; the sequence's budget covers every part's budget plus up
@@ -19,10 +21,12 @@ const budgets = {"step-progress-loader":28000,"webapp-trigger":9000,"step-obedie
 const sequences = {"stop-advance":["step-progress-writer","step-auto-continue"]};
 const args = process.argv.slice(2);
 if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
-  console.error('Harness36: expected one registered hook name');
+  console.error('Harness20: expected one registered hook name');
   process.exitCode = 64;
 } else {
   const name = args[0];
+  const guardHook = name === 'destructive-guard' || name === 'permission-request-guard';
+  const failureStatus = guardHook ? 2 : 1;
   const windows = process.platform === 'win32';
   const script = join(dirname(fileURLToPath(import.meta.url)), name + (windows ? '.ps1' : '.sh'));
   let child = null;
@@ -40,13 +44,13 @@ if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
   // Armed before the hook starts, so the budget also covers any work done before spawn.
   const watchdog = setTimeout(() => {
     timedOut = true;
-    console.error(`Harness36: ${name} did not finish within ${budgets[name] / 1000} s and was stopped without a decision.`);
-    if (!child) process.exit(1);
+    console.error(`Harness20: ${name} did not finish within ${budgets[name] / 1000} s and was ${guardHook ? 'blocked' : 'stopped without a decision'}.`);
+    if (!child) process.exit(failureStatus);
     // A node started by PowerShell is outside Node's job object and inherits the hook's output
     // handles, so end the whole tree while PowerShell is still its root.
     if (windows) spawnSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true, timeout: 2000 });
     signalChild('SIGKILL');
-    setTimeout(() => process.exit(1), 1000).unref();
+    setTimeout(() => process.exit(failureStatus), 1000).unref();
   }, budgets[name]);
   for (const signal of ['SIGINT', 'SIGTERM']) {
     process.on(signal, () => {
@@ -58,8 +62,26 @@ if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
   // The whole event is read before the activity gate, still under the watchdog: a caller that
   // never closes stdin is stopped by the budget above.
   const chunks = [];
-  for await (const chunk of process.stdin) chunks.push(chunk);
+  let bytes = 0;
+  for await (const chunk of process.stdin) {
+    bytes += chunk.length;
+    if (bytes > TOOL_INPUT_LIMIT) {
+      clearTimeout(watchdog);
+      process.stdin.destroy();
+      if (guardHook) console.error('BLOCKED: Harness20 tool event exceeds the byte limit.');
+      process.exit(guardHook ? 2 : 0);
+    }
+    chunks.push(chunk);
+  }
   const raw = Buffer.concat(chunks);
+  try {
+    const event = parseStrictJson(new TextDecoder('utf-8', { fatal: true }).decode(raw).replace(/^\uFEFF/, ''));
+    if (!event || typeof event !== 'object' || Array.isArray(event)) throw Error('invalid event');
+  } catch {
+    clearTimeout(watchdog);
+    if (guardHook) console.error('BLOCKED: Harness20 rejected malformed tool event.');
+    process.exit(guardHook ? 2 : 0);
+  }
   // hooks/lib/harness-activity.mjs decides whether the project's run phase starts this hook.
   // Without that module only the two guards start (fail toward guarding); every other hook fails closed.
   let shouldRunHook = null;
@@ -90,7 +112,7 @@ if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
     child = started;
     childGroup = !windows;
     const timer = setTimeout(() => {
-      console.error(`Harness36: ${part} did not finish within ${budgets[part] / 1000} s and was stopped without a decision.`);
+      console.error(`Harness20: ${part} did not finish within ${budgets[part] / 1000} s and was stopped without a decision.`);
       if (windows) spawnSync('taskkill.exe', ['/PID', String(started.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true, timeout: 2000 });
       signalChild('SIGKILL');
       if (stdout === 'pipe') started.stdout.destroy();
@@ -99,7 +121,7 @@ if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
     if (stdout === 'pipe') started.stdout.resume();
     started.once('error', error => {
       clearTimeout(timer);
-      console.error(`Harness36: could not start registered hook (${error.code || 'spawn error'})`);
+      console.error(`Harness20: could not start registered hook (${error.code || 'spawn error'})`);
       finish(1);
     });
     started.once('close', (code, signal) => {
@@ -136,12 +158,13 @@ if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
     });
     child.once('error', error => {
       clearTimeout(watchdog);
-      console.error(`Harness36: could not start registered hook (${error.code || 'spawn error'})`);
-      process.exitCode = 1;
+      console.error(`Harness20: could not start registered hook (${error.code || 'spawn error'})`);
+      process.exitCode = failureStatus;
     });
     child.once('close', (code, signal) => {
       clearTimeout(watchdog);
-      process.exitCode = timedOut ? 1 : code ?? (signal ? 128 + (constants.signals[signal] || 1) : 1);
+      const result = timedOut ? failureStatus : code ?? (signal ? 128 + (constants.signals[signal] || 1) : 1);
+      process.exitCode = guardHook && result !== 0 ? 2 : result;
     });
     // A hook may exit without reading its input; the broken pipe is not an error.
     child.stdin.on('error', () => {});

@@ -29,7 +29,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Bash|Read|Write|Edit|MultiEdit|NotebookEdit|WebFetch|WebSearch",
         "hooks": [
           {
             "type": "command",
@@ -51,7 +51,7 @@
     ],
     "PermissionRequest": [
       {
-        "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit|WebFetch|WebSearch",
+        "matcher": "Bash|Read|Write|Edit|MultiEdit|NotebookEdit|WebFetch|WebSearch",
         "hooks": [
           {
             "type": "command",

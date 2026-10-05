@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isActive, physical, within } from './harness-activity.mjs';
+import { parseStrictJson } from '../../scripts/lib/strict-json.mjs';
+import { TOOL_INPUT_LIMIT, inspectToolPolicy, isProtectedWritePath, containsSensitiveText, toolContent, readBoundedStdin } from '../../scripts/lib/tool-policy.mjs';
 
 const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 function canonical(value, root) {
@@ -28,7 +30,7 @@ function singlyLinked(candidate) {
 function sensitive(candidate) {
   const p = candidate.replaceAll('\\', '/').toLowerCase();
   return within(candidate, physical(pluginRoot)) ||
-    /(^|\/)harness(?:36|50)(?:\/[^/]+)?\/(hooks(?:\/|$)|\.claude-plugin(?:\/|$))/.test(p) ||
+    /(^|\/)harness(?:20|36|50)(?:\/[^/]+)?\/(hooks(?:\/|$)|\.claude-plugin(?:\/|$))/.test(p) ||
     /(^|\/)(\.claude|\.codex|\.git)(\/|$)/.test(p) ||
     /(^|\/)(\.ssh|\.gnupg|\.aws|\.azure|\.kube)(\/|$)/.test(p) ||
     /(^|\/)(\.env(?:\.[^/]*)?|\.npmrc|\.pypirc|\.bashrc|\.bash_profile|\.zshrc|\.zprofile|\.profile|\.zshenv)$/.test(p) ||
@@ -101,7 +103,9 @@ const EXECUTION_LINKED = [
 // Active-state judgement lives in harness-activity.mjs (isActive). Any entry at the Codex state
 // path makes it false there, even next to a stale or imported progress.json.
 try {
-  const event = JSON.parse(fs.readFileSync(0, 'utf8').replace(/^\uFEFF/, ''));
+  const raw = readBoundedStdin();
+  if (raw.length > TOOL_INPUT_LIMIT) throw Error('input too large');
+  const event = parseStrictJson(new TextDecoder('utf-8', { fatal: true }).decode(raw).replace(/^\uFEFF/, ''));
   const root = physical(path.resolve(process.env.CLAUDE_PROJECT_DIR || event.cwd || process.cwd()));
   const mode = process.argv[2];
   const edits = ['Write', 'Edit', 'MultiEdit', 'NotebookEdit'];
@@ -111,13 +115,14 @@ try {
     // are never eligible here, and the auto-approve matcher in hooks/hooks.json leaves them out
     // too: widen both together or neither. Edit and MultiEdit text that holds a command the guard
     // catalog (command-guard.mjs) would block or ask about keeps the prompt as well.
-    if (event.tool_name === 'WebSearch') process.stdout.write('eligible');
+    if (event.tool_name === 'WebSearch' && !inspectToolPolicy(event, { workspaceRoot: root }).rule) process.stdout.write('eligible');
     else if (edits.includes(event.tool_name)) {
       // Loaded here, not at the top: a missing or broken catalog must not stop guard mode below
       // from failing closed. In this branch an import error only means no grant.
       const { contentNeedsPrompt } = await import('./command-guard.mjs');
       const input = event.tool_input;
-      const texts = [input?.new_string, ...(Array.isArray(input?.edits) ? input.edits.map(e => e?.new_string) : [])];
+      const texts = toolContent(input);
+      if (inspectToolPolicy(event, { workspaceRoot: root }).rule) process.exit(0);
       const candidate = canonical(input?.file_path || input?.notebook_path, root);
       // Judge both the path as typed and the path the file system opens (resolvedPath).
       const nativeRoot = spelled(root);
@@ -126,12 +131,13 @@ try {
       if (within(candidate, root) && within(resolved, nativeRoot) && !sensitive(candidate) && !sensitive(resolved) &&
           singlyLinked(candidate) && candidate !== root && relative !== '' &&
           !WORKFLOW_STATE.test(relative) && !EXECUTION_LINKED.some(pattern => pattern.test(relative)) &&
-          !texts.some(contentNeedsPrompt)) process.stdout.write('eligible');
+          !isProtectedWritePath(candidate) && !isProtectedWritePath(resolved) &&
+          !texts.some(text => contentNeedsPrompt(text) || containsSensitiveText(text))) process.stdout.write('eligible');
     }
-  } else if (mode === 'guard' && edits.includes(event.tool_name)) {
+  } else if (mode === 'guard' && (edits.includes(event.tool_name) || event.tool_name === 'Read')) {
     // guard keeps the typed path: aliases fall to the host prompt (README).
     const candidate = canonical(event.tool_input?.file_path || event.tool_input?.notebook_path, root);
-    if (sensitive(candidate)) process.stdout.write('protected');
+    if (inspectToolPolicy(event, { workspaceRoot: root }).rule || edits.includes(event.tool_name) && sensitive(candidate)) process.stdout.write('protected');
   }
 } catch {
   // Invalid data, missing state, unavailable paths: no grant. Guard fails closed.

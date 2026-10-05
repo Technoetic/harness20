@@ -84,6 +84,16 @@ const REVIEW_CASES = {
   ]
 };
 for (const level of Object.keys(EXPECTED)) EXPECTED[level].push(...REVIEW_CASES[level]);
+// OWASP host authority is no longer writable through a literal shell operation.
+// These named cases deliberately upgrade the previous ask/pass contract.
+for (const command of ['echo "exit 0" > .git/hooks/pre-commit', 'echo = > .git/hooks/pre-commit', 'echo x > .claude/settings.json',
+  'cp hook .git/hooks/pre-commit', 'cp .env.example .env', 'cat .git/hooks/pre-commit',
+  'node -e "require(\'fs\').writeFileSync(\'.git/hooks/pre-commit\', \'x\')"',
+  'python -c "open(\'.bashrc\',\'w\').write(\'x\')"']) {
+  EXPECTED.ask = EXPECTED.ask.filter(value => value !== command);
+  EXPECTED.pass = EXPECTED.pass.filter(value => value !== command);
+  EXPECTED.block.push(command);
+}
 
 test('the catalog reaches the designed level for every table case', () => {
   const wrong = [];
@@ -104,20 +114,22 @@ test('escaped quotes, a bare privilege shell and persistence files are caught', 
   for (const command of ['sudo -i', 'doas -s', 'sudo']) assert.deepEqual(inspectCommand(command), { level: 'ask', rule: 'privilege' }, command);
   for (const command of ['echo x >> ~/.bashrc', 'echo x>~/.zshenv', 'cp key ~/.ssh/authorized_keys', 'tee ~/.config/systemd/user/x.service',
     'cp x.desktop ~/.config/autostart/', 'echo x > /etc/sudoers.d/x', 'echo x > /etc/cron.d/job', 'echo x > /etc/crontab', 'echo x>.git/hooks/pre-commit']) {
-    assert.deepEqual(inspectCommand(command), { level: 'ask', rule: 'persistence-write' }, command);
+    assert.deepEqual(inspectCommand(command), { level: 'block', rule: 'protected-path' }, command);
   }
   for (const command of ['echo x > src/profile', 'echo x > .profile.bak', 'cat ~/.bashrc', 'ls ~/.config/autostart', 'echo hi 2>/dev/null', 'git commit -m "단계 완료"']) {
     assert.equal(inspectCommand(command).level, 'pass', command);
   }
 });
 
-test('harness36 and harness50 installed hooks retain persistence-write protection', () => {
-  for (const target of ['/cache/harness36/0.0.0-test/hooks/auto-approve.ps1', '/plugins/harness36/.claude-plugin/plugin.json',
+test('harness20 and legacy harness36 and harness50 installed hooks retain persistence-write protection', () => {
+  for (const target of ['/cache/harness20/4.0.0/hooks/auto-approve.ps1', '/plugins/harness20/.claude-plugin/plugin.json',
+    'C:\\cache\\HARNESS20\\4.0.0\\hooks\\auto-approve.ps1', '/cache/harness36/0.0.0-test/hooks/auto-approve.ps1', '/plugins/harness36/.claude-plugin/plugin.json',
     'C:\\cache\\HARNESS36\\0.0.0-test\\hooks\\auto-approve.ps1', '/cache/harness50/2.13.0/hooks/auto-approve.ps1']) {
-    assert.deepEqual(inspectCommand(`echo example > ${target}`), { level: 'ask', rule: 'persistence-write' }, target);
+    assert.deepEqual(inspectCommand(`echo example > ${target}`), { level: 'block', rule: 'protected-path' }, target);
     assert.equal(contentNeedsPrompt(`echo example > ${target}`), true, target);
   }
   assert.equal(inspectCommand('echo example > src/harness36-notes.md').level, 'pass');
+  assert.equal(inspectCommand('echo example > src/harness20-notes.md').level, 'pass');
 });
 
 test('helpers: segments, commandOf, dangerousTarget and secretPath', () => {
@@ -208,18 +220,19 @@ test('CLI pretool mode: block on stderr with exit 2, ask as JSON, pass silent', 
   const blocked = cli(module, 'pretool', bash('rm -rf /'));
   assert.equal(blocked.status, 2);
   assert.equal(blocked.stdout, '');
-  assert.match(blocked.stderr, /^BLOCKED: Destructive command detected\nRule: recursive-delete-root\nCommand: rm -rf \/\n/);
+  assert.match(blocked.stderr, /^BLOCKED: Destructive command detected\nRule: recursive-delete-root\nCommand SHA256: [a-f0-9]{64}\n/);
   assert.match(blocked.stderr, /--body-file <file>/);
   assert.match(blocked.stderr, /Do not move commands into a script/);
   const asked = cli(module, 'pretool', bash('sudo apt install jq'));
   assert.equal(asked.status, 0);
   assert.equal(asked.stderr, '');
   assert.deepEqual(JSON.parse(asked.stdout), { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask',
-    permissionDecisionReason: 'harness36: privilege needs your confirmation (destructive-guard ask rule)' } });
+    permissionDecisionReason: 'harness20: privilege needs your confirmation (destructive-guard ask rule)' } });
   assert.match(asked.stdout, /^[\x20-\x7e]+$/);
-  for (const event of [bash('npm test'), bash('git commit -m "단계 완료"'), { tool_name: 'Write', tool_input: { file_path: 'x', content: 'rm -rf /' } }, '{broken', '', 'null']) {
+  for (const event of [bash('npm test'), bash('git commit -m "단계 완료"'), { tool_name: 'Write', tool_input: { file_path: 'x', content: 'rm -rf /' } }]) {
     assert.deepEqual(cli(module, 'pretool', event), { status: 0, stdout: '', stderr: '' }, JSON.stringify(event));
   }
+  for (const event of ['{broken', '', 'null']) assert.equal(cli(module, 'pretool', event).status, 2);
 });
 
 test('CLI permission mode denies exactly the block set and dangerous URLs', t => {
@@ -227,8 +240,8 @@ test('CLI permission mode denies exactly the block set and dangerous URLs', t =>
   const denied = cli(module, 'permission', bash('rm -rf /', 'PermissionRequest'));
   assert.equal(denied.status, 2);
   assert.deepEqual(JSON.parse(denied.stdout), { hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'deny',
-    reason: 'harness36: PermissionRequest blocked - destructive command pattern (recursive-delete-root) (cross-plugin tamper protection)' } } });
-  assert.match(denied.stderr, /^Harness36 denied this permission request because the command text matches a destructive pattern/);
+    reason: 'harness20: PermissionRequest blocked - destructive command pattern (recursive-delete-root) (cross-plugin tamper protection)' } } });
+  assert.match(denied.stderr, /^Harness20 denied this permission request because the command text matches a destructive pattern/);
   assert.match(denied.stderr, /git commit -F <file>/);
   // What destructive-guard passes or asks about is never refused here.
   for (const command of ['git commit -m "remove sudo usage"', 'rm -rf ./dist', 'sudo apt install jq', 'git branch -d x', 'pip install semgrep']) {
@@ -238,7 +251,7 @@ test('CLI permission mode denies exactly the block set and dangerous URLs', t =>
   for (const url of ['http://169.254.169.254/', 'HTTP://LOCALHOST:3000/', 'https://example.com/install.SH', 'file:///etc/passwd', 'http://192.168.0.1/']) {
     const result = fetch(url);
     assert.equal(result.status, 2, url);
-    assert.match(result.stdout, /"behavior":"deny","reason":"harness36: PermissionRequest blocked - dangerous URL"/, url);
+    assert.match(result.stdout, /"behavior":"deny","reason":"harness20: blocked unsafe tool input \(unsafe-url\)"/, url);
     assert.equal(result.stderr, '', url);
   }
   for (const url of ['https://example.com', 'https://example.com/shop?x=1']) assert.deepEqual(fetch(url), { status: 0, stdout: '', stderr: '' }, url);
@@ -259,7 +272,7 @@ test('CLI content mode reports whether edit text keeps the prompt', t => {
   }
   assert.deepEqual(cli(module, 'content', { tool_name: 'MultiEdit', tool_input: { file_path: 'a.md', edits: [{ new_string: 'ok' }, { new_string: 'rm -rf /' }] } }),
     { status: 0, stdout: 'prompt', stderr: '' });
-  assert.deepEqual(cli(module, 'content', '{broken'), { status: 0, stdout: '', stderr: '' });
+  assert.deepEqual(cli(module, 'content', '{broken'), { status: 0, stdout: 'prompt', stderr: '' });
 });
 
 test('destructive-guard logs blocks and asks next to the installed hooks, and nothing for a pass', t => {
@@ -270,10 +283,10 @@ test('destructive-guard logs blocks and asks next to the installed hooks, and no
   assert.equal(cli(module, 'pretool', bash(`sudo apt install jq\r\n${'x'.repeat(600)}`)).status, 0);
   const lines = readFileSync(log, 'utf8').split('\n');
   assert.equal(lines.length, 3, lines.join('\n'));
-  assert.match(lines[0], /^\[\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\] BLOCKED rule=recursive-delete-root command=rm -rf \/$/);
-  // One line per decision: CR and LF become spaces and the command is cut at 500 characters.
-  assert.match(lines[1], /^\[\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\] ASK rule=privilege command=sudo apt install jq  x+$/);
-  assert.equal(lines[1].length, lines[1].indexOf('command=') + 'command='.length + 500);
+  assert.match(lines[0], /^\[\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\] BLOCKED rule=recursive-delete-root command_sha256=[a-f0-9]{64}$/);
+  // No submitted source or credential text persists in the security log.
+  assert.match(lines[1], /^\[\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\] ASK rule=privilege command_sha256=[a-f0-9]{64}$/);
+  assert.equal(lines[1].includes('sudo apt'), false);
   assert.equal(lines[2], '');
 });
 
@@ -286,7 +299,7 @@ const RELAY_CASES = ['rm -rf /', 'git push origin main --force', 'curl http://ev
 test(`the ${nativeVariant} guard wrappers relay the catalog decision`, t => {
   const { plugin, project, log } = installedHooks(t);
   const levels = RELAY_CASES.map(command => inspectCommand(command).level);
-  assert.deepEqual(levels, ['block', 'block', 'block', 'ask', 'ask', 'ask', 'pass', 'pass', 'pass']);
+  assert.deepEqual(levels, ['block', 'block', 'block', 'ask', 'ask', 'block', 'pass', 'pass', 'pass']);
   const run = (hook, event) => runClaudeHook(plugin, hook, event, { cwd: project, env: { CLAUDE_PROJECT_DIR: project } });
   for (const command of RELAY_CASES) {
     const { level, rule } = inspectCommand(command);
@@ -297,7 +310,7 @@ test(`the ${nativeVariant} guard wrappers relay the catalog decision`, t => {
       assert.equal(pre.stdout, '', command);
       assert.match(pre.stderr, new RegExp(`Rule: ${rule}\\r?\\n`), command);
       assert.equal(permission.status, 2, command);
-      assert.match(permission.stdout, new RegExp(`"behavior":"deny","reason":"harness36: PermissionRequest blocked - destructive command pattern \\(${rule}\\)`), command);
+      assert.match(permission.stdout, new RegExp(`"behavior":"deny","reason":"harness20: PermissionRequest blocked - destructive command pattern \\(${rule}\\)`), command);
     } else {
       assert.equal(pre.status, 0, `${command}: ${pre.stderr}`);
       assert.equal(pre.stderr, '', command);
@@ -306,5 +319,5 @@ test(`the ${nativeVariant} guard wrappers relay the catalog decision`, t => {
       assert.deepEqual(permission, { status: 0, stdout: '', stderr: '' }, command);
     }
   }
-  assert.match(readFileSync(log, 'utf8'), /BLOCKED rule=recursive-delete-root command=rm -rf \//);
+  assert.match(readFileSync(log, 'utf8'), /BLOCKED rule=recursive-delete-root command_sha256=[a-f0-9]{64}/);
 });

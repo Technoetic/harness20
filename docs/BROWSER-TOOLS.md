@@ -1,6 +1,14 @@
 # Browser verification backends
 
-Harness50 needs a real browser for the final output check (`scripts/verify-output.mjs`),
+**Current OWASP hardening:** generated HTML execution requires verified native host
+isolation across all network transports. The dispatcher and both direct native
+backend entries reject before serving or navigating generated artifacts because
+current adapters cannot provide that guarantee. Explicit selection, environment
+variables and historical backend locks cannot waive the gate. Dependency probes
+and locks describe installed tools, not permission or isolation capability.
+See `SECURITY.md` and `verification/2026-10-06-owasp-full.md` for evidence and limits.
+
+Harness20 needs a real browser for the final output check (`scripts/verify-output.mjs`),
 for the E2E step and for the evaluator screenshots. Since 2.5.0 the verifier is a
 dispatcher with two interchangeable backends:
 
@@ -9,11 +17,14 @@ dispatcher with two interchangeable backends:
 | `playwright` | `browser-verifier/` (its own `package.json`; nothing in the plugin root depends on it) | CI, and machines that allow Playwright. Fresh Chromium contexts, headless, full API. |
 | `aside` | `scripts/lib/browser-backend-aside.mjs` driving the Aside CLI (`aside repl`) | Machines where Playwright is not allowed or not installed. Runs inside the user's Aside Browser. |
 
-Both backends produce the same schema-v3 `step_archive/outputs/browser-output.json`
-and the same four screenshots. The gate (`scripts/lib/browser-report.mjs`) reads named
-report fields only, so a passing report from either backend satisfies Steps 30–36. CI
-keeps Playwright; the Aside backend exists so that a workstation without Playwright can
-still finish the curriculum with measured evidence.
+The backend measurement interface uses schema-v3 `step_archive/outputs/browser-output.json`
+and four screenshots. Earlier versions ran both native backends; current native runs
+produce an explicit unsupported-isolation FAIL, no measured views and no screenshots.
+The report validator (`scripts/lib/browser-report.mjs`) checks local measurement fields
+and hashes. It does not authenticate the producer or attest host isolation. Preserve
+historical reports as historical evidence; they do not prove current execution support.
+Existing CI tests of trusted shipped examples remain distinct from executing generated
+artifacts. A future supported host isolation adapter needs independent attack verification.
 
 ## Availability and selection
 
@@ -44,7 +55,8 @@ node scripts/verify-output.mjs --workspace "<project-root>" --backend playwright
 node scripts/verify-output.mjs --workspace "<project-root>" --backend aside
 ```
 
-`--executable-path` still selects a Chromium-based binary for the Playwright backend.
+`--executable-path` retains its historical meaning as a Chromium binary selection;
+it does not bypass the native isolation gate.
 `--timeout <ms>` (the `timeoutMs` option of `verifyOutput()`; integer 1000–120000,
 default 60000) bounds the whole run under Playwright but applies **per chunk** (one
 `aside repl` call) under the Aside backend, because every call gets a fresh 120 s
@@ -52,7 +64,9 @@ session. Measured floor: an Aside chunk needs at least ~9–14 s (`openTab` alon
 fixed ~5.4 s), so values below ~10000 fail with `Browser verification exceeded its
 deadline`; a full three-route run is about 16 chunks × ~8 s ≈ 120–150 s.
 
-Install one backend. Once Step 3 has locked a backend, install and repair only that one:
+The historical installation commands below restore dependencies, not execution
+support under the new isolation policy. Once Step 3 has locked a backend, install
+and repair only that one under the deployment's authorized browser policy:
 
 ```text
 # Playwright (CI, allowed machines)
@@ -68,8 +82,19 @@ Check with the tool hook: `bash hooks/validate-tools.sh aside` or
 
 ## Backend lock (Step 3)
 
-Step 3 probes once and records its choice inside the project, so later steps reuse it
-instead of re-running the `auto` order:
+Fresh planning-first20 environment Step 3 probes the actually available, permitted
+backend and records its choice inside the project. Planning Step 1 and design Step 2
+do not require a deleted browser preflight. Explicit research-free36 and legacy50
+keep their original tool Step 3 and environment Steps 19/31. Later steps reuse the
+selected backend instead of re-running the `auto` order. Replace `<selected>` with
+the explicitly permitted, observed backend; use `aside` on Aside-only machines:
+
+```text
+node scripts/verify-output.mjs --probe --backend <selected> --lock --workspace "<project-root>"
+```
+
+Explicit old36/50 bodies retain their original tool-Step-3 command below. This is
+compatibility notation; fresh20 uses the explicitly permitted backend above:
 
 ```text
 node scripts/verify-output.mjs --probe --lock --workspace "<project-root>"
@@ -127,7 +152,9 @@ other than `playwright`/`aside`, a non-string `tool_version`, an unparseable
 - **Changing backends is deliberate.** Rerun the Step 3 command with
   `--backend <name> --lock`. The same command repairs an invalid lock. A project started
   before the lock existed can record the backend named in
-  `step_archive/step003_playwright_test.md` this way (Claude Step 19 does so).
+  the original `step_archive/step003_playwright_test.md` this way only for old36/50
+  (their environment Steps 19/31 keep this recovery). Fresh20 records environment
+  and backend evidence in `step_archive/step003_환경준비.md`; it does not require that old file.
 - The lock prevents accidental switches. It is not a security boundary: deleting the
   file or passing an explicit backend bypasses it.
 
@@ -239,7 +266,7 @@ scheme, language, DPR and installed extensions**, and a reviewer must not treat 
 dark-scheme ko-KR shared-profile screenshot as equivalent to a light-scheme fresh-context
 capture. When both backends are available at Step 3, `auto` selects and locks
 `playwright`. Once a project is locked, keep the locked backend for all evidence,
-including the final Step 36 report, and do not install the other backend to replace it.
+including the fresh final Step 20 report (old36/50 retain final36/50), and do not install the other backend to replace it.
 
 ## 요약 (한국어)
 
@@ -250,7 +277,7 @@ including the final Step 36 report, and do not install the other backend to repl
 - `node scripts/verify-output.mjs --probe`로 가용 백엔드를 확인하고,
   `--backend auto|playwright|aside`(또는 환경변수 `HARNESS50_BROWSER_BACKEND`)로 선택한다.
   잠금 파일이 없을 때 auto는 Playwright → Aside 순서다.
-- Step 3은 `node scripts/verify-output.mjs --probe --lock --workspace "<project-root>"`로 선택을
+- 새20의 환경 준비 Step 3(기존36·50은 원래 도구3)은 `node scripts/verify-output.mjs --probe --backend <selected> --lock --workspace "<project-root>"`로 선택을
   `step_archive/outputs/browser-backend.json`에 고정한다. 그 뒤 `--backend` 없는 검증은 고정
   백엔드만 쓰고, 사용할 수 없으면 다른 백엔드로 넘어가지 않고 그 백엔드의 복구 방법만 안내한다.
   명시적 `--backend`/환경변수가 우선하며, 잘못된 잠금 파일은 실패로 처리한다(fail closed).

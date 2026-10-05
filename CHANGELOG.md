@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.0.0 - 2026-10-06
+
+- Rename the public repository, Claude/Codex plugin and marketplace identities to `harness20`. Canonical starts are `/harness20:webapp <topic>` and `$harness20:webapp <topic>`; Codex status/reset skills use `harness20-status` and `harness20-reset`. Preserve old parser aliases and installation caches; disable the previous identity before enabling the new one and preserve project disable settings.
+- New workflows begin with planning and run the versioned twenty-stage profile. Existing 36/50 profiles, exact historical bodies, workflow histories, receipts, recovery, quality and routing identifiers remain unchanged.
+- Apply deterministic controls for all applicable risks in the user-supplied OWASP LLM Top 10 document: registered-tool/path/URL mediation, protected measured receipts, bounded strict JSON and physical reads, original TOPIC pins, durable user-wide Jev quotas, reviewed dependency integrity and constrained quality subprocesses.
+- Preserve the existing `.harness36-security/jev-budget` location across the rename. Add the new installation identity to cache-tamper guards while retaining both old identities; reject active conflicts with either old plugin.
+- Native generated-HTML verification refuses execution until a supported host adapter provides verified TCP/UDP egress isolation. Actual Aside tests found STUN/preconnect escapes through HTTP-only controls. All common/direct backend gates reject before serving or executing generated artifacts; workspace JSON, CLI options and environment cannot opt out.
+- Keep native hook permissions and manual review of changed hook hashes. Local preflight and byte verification do not manufacture host trust or a successful end-to-end workflow.
+
 ## 3.0.0 - 2026-10-03
 
 - Rename the public Claude Code and Codex plugin and marketplace identities to `harness36`. Canonical starts are `/harness36:webapp <topic>` in Claude Code and `$harness36:webapp <topic>` in Codex; Codex status/reset skills become `harness36-status` and `harness36-reset`.

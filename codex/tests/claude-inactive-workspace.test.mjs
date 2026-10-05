@@ -1,13 +1,17 @@
 // Claude hooks through the installed dispatcher (node hooks/run-hook.mjs <name>, as hooks.json
-// runs them) in folders that have no active Harness50 run: nothing may be created, approved,
-// blocked or injected there. Only an explicit /webapp <topic> starts a run. A paused run (named
+// runs them) in folders that have no active Harness50 run: harmless events may not create files,
+// grant permissions or inject step instructions. Existing workflow metadata keeps the execution
+// guards on even when stale, stopped or invalid; unsafe events are covered separately below.
+// A genuinely empty folder remains silent. Only an explicit /webapp <topic> starts a run.
+// A paused run (named
 // pause, harness-rules 2-1) is the one exception that speaks: the loader and the prompt guard
 // print where it stopped. The progress writer also starts there, as the first part of the Stop
 // entry stop-advance (the writer, then step-auto-continue, each behind its own gate), to record
 // completion lines of the turn that paused (claude-named-pause P1); its Stop here carries the pause
 // report instead, so it has nothing to record, nothing is written and step-auto-continue does not
-// start. The two guards start only in Harness50 workspaces (paused, drift, finished, Codex or
-// active); on these harmless events they stay silent and write no log. A run whose cursor alone is
+// start. The two guards start only in Harness50 workspaces (paused, drift, finished, Codex, stale,
+// stopped, invalid or active); on these harmless events they stay silent and write no log.
+// A run whose cursor alone is
 // off (drift) starts only the progress writer among the step hooks (inside stop-advance as well),
 // and that writer puts current_step back (tested separately below).
 import { test } from 'node:test';
@@ -124,7 +128,7 @@ async function inPool(tasks, limit = 6) {
 
 const hookList = plugin => readdirSync(join(plugin, 'hooks')).sort();
 // The two guards start a shell in paused and finished runs. They get one event per decision path
-// (destructive-guard: its Bash matcher; permission-request-guard: a command, an edit and a fetch),
+// (destructive-guard: a command; permission-request-guard: a command, an edit and a fetch),
 // which keeps the PowerShell starts few enough that a loaded runner stays inside their 4.5 s budget.
 const GUARD_TOOLS = { 'destructive-guard': ['Bash'], 'permission-request-guard': ['Bash', 'Write', 'WebFetch'] };
 const payloadsFor = (hook, payloads) => Object.hasOwn(GUARD_TOOLS, hook) ? payloads.filter(payload => GUARD_TOOLS[hook].includes(payload.tool_name)) : payloads;
@@ -262,8 +266,9 @@ testEachName('cursor drift: only the progress writer starts, and it puts current
 });
 
 // The two guards run only in Harness50 workspaces: an active, paused or finished Claude run, or a
-// Codex workspace. In an unrelated folder, or next to a loader-created progress.json, no shell
-// starts and the host's permission checks decide. A block writes the guard log next to the
+// Codex workspace, including stale or damaged progress metadata. In an unrelated folder without
+// workflow metadata no shell starts and the host's permission checks decide. A block writes the
+// guard log next to the
 // installed hooks, so this test does not compare the hooks folder.
 testEachName('the guards run only in harness workspaces', (t, name) => {
   const f = setup(t, name);
@@ -271,15 +276,31 @@ testEachName('the guards run only in harness workspaces', (t, name) => {
   const settingsWrite = { hook_event_name: 'PermissionRequest', tool_name: 'Write', tool_input: { file_path: '.claude/settings.json', content: '{}' } };
   const bash = (command, hook_event_name = 'PreToolUse') => ({ hook_event_name, tool_name: 'Bash', tool_input: { command } });
   const silent = { status: 0, stdout: '', stderr: '' };
+  const settingsDenied = project => {
+    const result = guard('permission-request-guard', project, settingsWrite);
+    assert.equal(result.status, 2, `${project}: ${result.stderr}`);
+    assert.equal(result.stderr, '');
+    assert.deepEqual(JSON.parse(result.stdout), { hookSpecificOutput: {
+      hookEventName: 'PermissionRequest', decision: {
+        behavior: 'deny', reason: 'harness20: blocked unsafe tool input (protected-path)'
+      }
+    } });
+  };
+  const resetBlocked = project => {
+    const result = guard('destructive-guard', project, bash('git reset --hard'));
+    assert.equal(result.status, 2, `${project}: ${result.stderr}`);
+    assert.equal(result.stdout, '');
+    assert.match(result.stderr, /Rule: git-reset-hard/);
+  };
 
   const stale = join(f.base, `${name} stale`);
   mkdirSync(stale);
   writeProgress(stale, STALE_LOADER_PROGRESS);
   const staleBefore = tree(stale);
-  for (const project of [f.project, stale]) {
-    assert.deepEqual(guard('permission-request-guard', project, settingsWrite), silent, project);
-    assert.deepEqual(guard('destructive-guard', project, bash('git reset --hard')), silent, project);
-  }
+  assert.deepEqual(guard('permission-request-guard', f.project, settingsWrite), silent, f.project);
+  assert.deepEqual(guard('destructive-guard', f.project, bash('git reset --hard')), silent, f.project);
+  settingsDenied(stale);
+  resetBlocked(stale);
   assert.equal(existsSync(join(f.project, 'step_archive')), false);
   assert.deepEqual(tree(stale), staleBefore);
 
@@ -297,12 +318,15 @@ testEachName('the guards run only in harness workspaces', (t, name) => {
   assert.match(ask.stdout, /"permissionDecision":"ask"/);
   assert.deepEqual(guard('permission-request-guard', f.project, bash('git commit -m "remove sudo usage"', 'PermissionRequest')), silent);
 
-  // Paused, drift, finished (50/50) and Codex workspaces keep the guards as well: moving the
-  // cursor by hand never turns them off.
+  // Paused, drift, finished (50/50), invalid, stopped, corrupt and Codex workspaces keep the
+  // guards as well: changing or damaging existing metadata never turns them off.
   const workspaces = {
     paused: project => { writeProgress(project, PAUSED_RUN); writeBodies(project, [1]); },
     drift: project => { writeProgress(project, { ...valid, completed_steps: [2], current_step: 3 }); writeBodies(project, [1]); },
     finished: project => writeProgress(project, { ...valid, completed_steps: Array.from({ length: 50 }, (_, index) => index + 1), current_step: 50 }),
+    invalid: project => { writeProgress(project, { ...valid, total_steps: 107 }); writeBodies(project, [1]); },
+    stopped: project => { writeProgress(project, { ...valid, status: 'cancelled' }); writeBodies(project, [1]); },
+    corrupt: project => writeProgress(project, '{broken'),
     codex: project => {
       mkdirSync(join(project, 'step_archive', '.harness50-codex'), { recursive: true });
       writeFileSync(join(project, 'step_archive', '.harness50-codex', 'state.json'), '{}');
@@ -312,8 +336,10 @@ testEachName('the guards run only in harness workspaces', (t, name) => {
     const project = join(f.base, `${name} ${kind}`);
     mkdirSync(project);
     prepare(project);
-    const result = guard('destructive-guard', project, bash('git reset --hard'));
-    assert.equal(result.status, 2, `${kind}: ${result.stderr}`);
+    const before = tree(project);
+    settingsDenied(project);
+    resetBlocked(project);
+    assert.deepEqual(tree(project), before, `${kind}: guard decisions preserve workflow bytes`);
   }
 });
 
@@ -338,9 +364,9 @@ testEachName('/webapp <topic> starts a run that the other hooks then follow', (t
   const progress = JSON.parse(readFileSync(progressFile(f), 'utf8').replace(/^﻿/, ''));
   assert.equal(progress.current_step, 1);
   assert.deepEqual(progress.completed_steps, []);
-  assert.equal(progress.total_steps, 36);
-  assert.equal(progress.workflow_profile, "research-free-36-v1");
-  assert.equal(readdirSync(join(f.project, 'step_archive', 'profiles', 'research-free-36-v1', 'archived')).filter(file => /^step\d{3}\.md$/.test(file)).length, 36);
+  assert.equal(progress.total_steps, 20);
+  assert.equal(progress.workflow_profile, "planning-first-20-v1");
+  assert.equal(readdirSync(join(f.project, 'step_archive', 'profiles', 'planning-first-20-v1', 'archived')).filter(file => /^step\d{3}\.md$/.test(file)).length, 20);
   assert.match(readFileSync(topicFile(f), 'utf8'), /fractions/);
 
   const loader = run('step-progress-loader', { hook_event_name: 'SessionStart', source: 'startup' });
@@ -372,7 +398,7 @@ testEachName('/webapp never overwrites a run with completed steps; natural langu
   assert.equal(skipped.length, 1, skipped.join('\n'));
   assert.match(skipped[0], /already records 1\/50 completed steps/);
   assert.deepEqual(bytes(), before);
-  const namespaced = run('webapp-trigger', prompt('/harness36:webapp other'));
+  const namespaced = run('webapp-trigger', prompt('/harness20:webapp other'));
   assert.match(namespaced, /already records 1\/50 completed steps/);
   assert.deepEqual(bytes(), before, 'new namespace preserves the existing 50-step workflow');
   // An active project: natural language reaches no hook that could restart it.
@@ -380,7 +406,7 @@ testEachName('/webapp never overwrites a run with completed steps; natural langu
   assert.deepEqual(bytes(), before);
 });
 
-testEachName('a new /webapp topic replaces one without completed steps, including harness36 and harness50 namespaces', (t, name) => {
+testEachName('a new /webapp topic replaces one without completed steps, including harness20, harness36 and harness50 namespaces', (t, name) => {
   const f = setup(t, name);
   const run = hookRunner(f);
   const prompt = text => ({ hook_event_name: 'UserPromptSubmit', prompt: text });
@@ -392,9 +418,11 @@ testEachName('a new /webapp topic replaces one without completed steps, includin
   assert.match(readFileSync(topicFile(f), 'utf8'), /gamma/);
   assert.match(run('webapp-trigger', prompt('/harness36:webapp delta')), /<harness50-trigger>/);
   assert.match(readFileSync(topicFile(f), 'utf8'), /delta/);
+  assert.match(run('webapp-trigger', prompt('/harness20:webapp epsilon')), /<harness50-trigger>/);
+  assert.match(readFileSync(topicFile(f), 'utf8'), /epsilon/);
   const progress = JSON.parse(readFileSync(progressFile(f), 'utf8').replace(/^﻿/, ''));
-  assert.equal(progress.total_steps, 36);
-  assert.equal(progress.workflow_profile, 'research-free-36-v1');
+  assert.equal(progress.total_steps, 20);
+  assert.equal(progress.workflow_profile, 'planning-first-20-v1');
 });
 
 testEachName('lsp-autofix in an active run starts only a project-local biome or stylelint', (t, name) => {

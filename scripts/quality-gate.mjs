@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { runQualityGate, inspectQualityReport } from './lib/quality.mjs';
+import { runQualityGate, inspectQualityReport, prepareQualityGate } from './lib/quality.mjs';
 import { physicalWorkspace, readSafe, writeSafe } from './lib/quality-files.mjs';
 import { inspectBrowserOutput } from './lib/final-output.mjs';
 import { inspectFinalRegression } from './lib/final-regression.mjs';
@@ -22,6 +22,11 @@ async function main() {
   const hook = args.includes('--hook');
   const inspectFinal = args.includes('--inspect-final');
   const inspect = hook || inspectFinal || args.includes('--inspect');
+  const prepare = args.includes('--prepare');
+  const configHashIndex = args.indexOf('--config-sha256');
+  const approvedConfigSha256 = configHashIndex < 0 ? undefined : args[configHashIndex + 1];
+  if (configHashIndex >= 0 && !/^[a-f0-9]{64}$/.test(approvedConfigSha256 ?? '')) throw new Error('--config-sha256 requires the exact approved 64-character lowercase SHA256');
+  if (prepare && (inspect || hook)) throw new Error('--prepare cannot be combined with inspection or hook modes');
   let event = {};
   if (hook) {
     let input = '';
@@ -35,6 +40,7 @@ async function main() {
   const workspaceOption = args.indexOf('--workspace');
   const workspaceRoot = workspaceOption >= 0 ? args[workspaceOption + 1] : process.env.CLAUDE_PROJECT_DIR || event.cwd || process.cwd();
   if (!workspaceRoot) throw new Error('--workspace requires a directory');
+  if (prepare) { console.log(JSON.stringify(await prepareQualityGate(workspaceRoot), null, 2)); return; }
   let round, finalStep = 50;
   if (hook) {
     // Shared judgement (hooks/lib/harness-activity.mjs), loaded only here: the non-hook modes
@@ -63,13 +69,13 @@ async function main() {
   }
   const final = inspectFinal || round === 'r3';
   const report = final ? await inspectFinalOutput(workspaceRoot)
-    : inspect ? await inspectQualityReport(workspaceRoot) : await runQualityGate(workspaceRoot);
+    : inspect ? await inspectQualityReport(workspaceRoot) : await runQualityGate(workspaceRoot, { approvedConfigSha256 });
   if (hook) {
     const root = await physicalWorkspace(workspaceRoot);
     const md = `# TRUST5 measured quality - ${round}\n\nVerdict: ${report.verdict}\n\nChecks: test, lint, typecheck, security; measured coverage >= 85%.${final ? ' Current HTML, schema-v3 browser routing evidence for both API scenarios, and all six final regression matrices are also required.' : ''}\nNo directory-presence scores or partial credit.\n\n${report.error ?? 'All required evidence passed inspection.'}\n\nEvidence: quality-gate.json${final ? `, browser-output.json, Step${finalStep} immutable QA report` : ''}. This is local evidence, not a signed attestation.\n`;
     await writeSafe(root, `step_archive/outputs/trust5_${round}.md`, md);
     if (report.verdict !== 'PASS' && event.stop_hook_active !== true) {
-      console.log(JSON.stringify({ decision: 'block', reason: 'Harness36 quality evidence is missing, failed or stale. Configure harness50.quality.json and explicitly run node "<plugin-root>/scripts/quality-gate.mjs" --workspace "<project-root>". ' + (final ? `Also run the browser verifier for every declared route in both API scenarios, then snapshot, rerun and record all six Step${finalStep} regression matrices on the final HTML as described in docs/QA-REPORTS.md. ` : '') + 'Read docs/QUALITY.md. Repair failed checks before claiming this milestone complete.' }));
+      console.log(JSON.stringify({ decision: 'block', reason: 'Harness20 quality evidence is missing, failed or stale. Configure harness50.quality.json and explicitly run node "<plugin-root>/scripts/quality-gate.mjs" --workspace "<project-root>". ' + (final ? `Also run the browser verifier for every declared route in both API scenarios, then snapshot, rerun and record all six Step${finalStep} regression matrices on the final HTML as described in docs/QA-REPORTS.md. ` : '') + 'Read docs/QUALITY.md. Repair failed checks before claiming this milestone complete.' }));
     }
     return;
   }
@@ -77,4 +83,4 @@ async function main() {
   if (report.verdict !== 'PASS') process.exitCode = 1;
 }
 
-main().catch(error => { console.error(`Harness36 quality: ${error.message}`); process.exitCode = 1; });
+main().catch(error => { console.error(`Harness20 quality: ${error.message}`); process.exitCode = 1; });

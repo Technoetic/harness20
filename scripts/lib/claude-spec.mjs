@@ -1,5 +1,6 @@
 // Generated SPECs are advisory hints, never completion evidence. Old bytes remain retrievable.
 import { open } from 'node:fs/promises';
+import { parseStrictJson } from './strict-json.mjs';
 import { readSafe, safePath, writeSafe, sha256 } from './quality-files.mjs';
 import { workflowContext, recheckWorkflowContext } from './workflow-context.mjs';
 import { claudeStepBody } from './claude-profile.mjs';
@@ -24,7 +25,7 @@ async function preserve(root, name, bytes) {
 export async function publishProfileSpecs(root) {
   const context = await workflowContext(root);
   if (!context.generation) throw new Error('Legacy SPEC uses its original generator');
-  const state = JSON.parse((await readSafe(root, 'step_archive/progress.json')).toString('utf8').replace(/^\uFEFF/, ''));
+  const state = parseStrictJson(new TextDecoder('utf-8',{fatal:true}).decode(await readSafe(root, 'step_archive/progress.json')).replace(/^\uFEFF/, ''));
   const profile = context.profile;
   const targets = [...new Set([...state.completed_steps, state.current_step])].sort((a, b) => a - b);
   let count = 0;

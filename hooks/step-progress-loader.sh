@@ -24,7 +24,7 @@ if [ -e "$STEP_ARCHIVE/.harness50-codex/state.json" ]; then
   if command -v node >/dev/null 2>&1; then
     CODEX_LINE="$(node "$(dirname "${BASH_SOURCE[0]}")/lib/codex-workflow.mjs" "$PROJECT_ROOT" 2>/dev/null || true)"
   fi
-  [ -n "$CODEX_LINE" ] || CODEX_LINE="[HARNESS] WARNING: step_archive/.harness50-codex/state.json exists but is unreadable or incomplete - Claude hooks will not create progress.json or block Stop here. Inspect it with the harness36 plugin's codex/scripts/harness-state.mjs show and ask the user before repairing or resetting it."
+  [ -n "$CODEX_LINE" ] || CODEX_LINE="[HARNESS] WARNING: step_archive/.harness50-codex/state.json exists but is unreadable or incomplete - Claude hooks will not create progress.json or block Stop here. Inspect it with the harness20 plugin's codex/scripts/harness-state.mjs show and ask the user before repairing or resetting it."
   printf '%s\n' "$CODEX_LINE"
   exit 0
 fi
@@ -37,7 +37,7 @@ ARCHIVED_DIR="$PROJECT_ROOT/$(printf '%s' "$H50_PROFILE" | python3 -c 'import js
 
 
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "=== harness36: Step Progress Loader (python3 missing — silent) ==="
+  echo "=== harness20: Step Progress Loader (python3 missing — silent) ==="
   exit 0
 fi
 
@@ -82,7 +82,8 @@ if isinstance(p,dict) and (('paused' in p and p['paused'] is not False) or p.get
 
 import glob
 # Report only (mirrors the .ps1 loader): rewriting total_steps could flip the run's activity.
-actual=len({os.path.basename(x) for d in [a_dir,os.path.dirname(a_dir)] for x in glob.glob(os.path.join(glob.escape(d),"step???.md"))})
+directories=[a_dir,os.path.dirname(a_dir)] if profile["workflow_profile"]=="legacy-50-v1" else [a_dir]
+actual=len({os.path.basename(x) for d in directories for x in glob.glob(os.path.join(glob.escape(d),"step???.md"))})
 p.setdefault("metrics",{"total_sessions":0,"total_duration_minutes":0,"steps_per_session_avg":0})
 p["metrics"]["total_sessions"]=int(p["metrics"].get("total_sessions",0))+1
 p["last_updated"]=datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
@@ -93,7 +94,7 @@ os.replace(tmp,p_path)
 done=len(p.get("completed_steps") or [])
 cur=next((n for n in range(1,int(p.get("total_steps",50))+1) if n not in (p.get("completed_steps") or [])),int(p.get("total_steps",50)))
 total=int(p.get("total_steps",50))
-print("=== harness36: Step Progress Loader ===")
+print("=== harness20: Step Progress Loader ===")
 if actual>0 and actual!=p.get("total_steps"):
     print(f"WARNING: total_steps mismatch (progress.json={p.get('total_steps', '')}, filesystem={actual}).")
 print(f"Progress: {done}/{total} completed")

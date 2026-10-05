@@ -14,7 +14,7 @@
 // JSON line; errors are one JSON line on stderr. Exit codes: 0 done, 1 I/O failure, 2 refused by
 // workspace state, 64 usage, 75 the file kept changing. Nothing is created: no step_archive/, no
 // progress.json. A Codex workspace is refused (use Codex $webapp pause/resume or
-// $harness36-reset there). Uses no codex/ module.
+// $harness20-reset there). Uses no codex/ module.
 import { lstat } from 'node:fs/promises';
 import { join } from 'node:path';
 

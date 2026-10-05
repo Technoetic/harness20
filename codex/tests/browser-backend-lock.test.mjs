@@ -248,16 +248,17 @@ test("verify-output fails closed on an invalid lock and still writes its report"
   assert.equal(stored.error, INVALID_LOCK);
 });
 
-test("verify-output with an aside lock and no Aside CLI fails without switching to Playwright", async () => {
+test("verify-output preserves an aside lock while refusing unsupported native isolation", async () => {
   const root = await projectWithDist();
   await writeLock(root, validLock("aside"));
   const result = await cli(["--workspace", root], { env: envWithPath(await emptyDirectory()) });
   assert.equal(result.code, 1, result.stderr);
   const report = JSON.parse(result.stdout);
   assert.equal(report.verdict, "FAIL");
-  assert.equal(report.error, lockedUnavailableMessage("aside"));
+  assert.match(report.error, /verified per-tab host network isolation is required/);
   assert.doesNotMatch(report.error, INSTALL_HINT);
-  assert.equal(report.environment, undefined, "no backend may run");
+  assert.equal(report.environment.network_isolation, "missing-host-all-transport-egress", "no backend may run");
+  assert.deepEqual(report.viewports, []);
   const stored = JSON.parse(await readFile(join(root, "step_archive", "outputs", "browser-output.json"), "utf8"));
   assert.equal(stored.error, report.error);
   assert.deepEqual(await readBackendLock(root), validLock("aside"), "verification never rewrites the lock");

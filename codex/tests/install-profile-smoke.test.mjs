@@ -19,7 +19,7 @@ function runPowerShell(args, options) {
   });
 }
 
-test('isolated packaged preflight validates both definitions and refuses missing shared dependencies or changed bodies', {
+test('isolated packaged preflight validates all three definitions and refuses missing shared dependencies or changed bodies', {
   skip: process.platform !== 'win32', timeout: 180000
 }, async () => {
   const sandbox = await makeWorkspace(); // Existing helper guards cleanup beneath the temporary test root.
@@ -51,9 +51,11 @@ test('isolated packaged preflight validates both definitions and refuses missing
   };
   const positive = smoke();
   assert.equal(positive.exit, 0, JSON.stringify(positive.report));
+  assert.equal(positive.report.manifest.name, 'harness20');
+  assert.equal(positive.report.manifest.version, '4.0.0');
   assert.equal(positive.report.codex_version, 'codex-cli 0.150.1');
-  assert.equal(positive.report.step_count, 36);
-  assert.deepEqual(positive.report.workflow_profiles, { 'legacy-50-v1': 50, 'research-free-36-v1': 36 });
+  assert.equal(positive.report.step_count, 20);
+  assert.deepEqual(positive.report.workflow_profiles, { 'legacy-50-v1': 50, 'research-free-36-v1': 36, 'planning-first-20-v1': 20 });
   assert.equal(positive.report.shared_dependencies_verified, true);
 
   const dependency = join(packaged, 'scripts/lib/json-io.mjs');
@@ -79,7 +81,7 @@ test('native smoke readers use the validated selected profile and reject count o
   const mainOffset = smokeSource.lastIndexOf('\ntry {');
   assert.ok(mainOffset > 0);
   const paths = [];
-  for (const workflowProfile of ['research-free-36-v1', 'legacy-50-v1']) {
+  for (const workflowProfile of ['research-free-36-v1', 'legacy-50-v1', 'planning-first-20-v1']) {
     const workspaceRoot = await makeWorkspace();
     const state = await initWorkflow({ workspaceRoot, workflowProfile, topic: 'Public profile smoke fixture' });
     const receipt = parseReceipt({ schema_version: state.schema_version,
@@ -94,15 +96,16 @@ test('native smoke readers use the validated selected profile and reject count o
   const script = `${smokeSource.slice(0, mainOffset)}
 $newRoot = '${paths[0]}'
 $legacyRoot = '${paths[1]}'
-foreach ($case in @(@{root=$newRoot;profile='research-free-36-v1';total=36}, @{root=$legacyRoot;profile='legacy-50-v1';total=50})) {
+$planningRoot = '${paths[2]}'
+foreach ($case in @(@{root=$newRoot;profile='research-free-36-v1';total=36}, @{root=$legacyRoot;profile='legacy-50-v1';total=50}, @{root=$planningRoot;profile='planning-first-20-v1';total=20})) {
   $state = Read-StrictJson (Resolve-SafeFile $case.root 'step_archive/.harness50-codex/state.json' 'State') 'State'
   [void](Assert-State $state $case.root 'Reader')
   $receipts = @(Read-Receipts $case.root $state.workflow_id 'Reader' $case.profile)
   if ($receipts.Count -ne 1) { throw 'Expected one receipt' }
   $contract = Get-NativeStepContract $PluginRoot 17 $case.profile
-  $expectedPath = if ($case.total -eq 36) { 'codex/assets/profiles/research-free-36-v1/steps/step017.md' } else { 'codex/assets/steps/step017.md' }
+  $expectedPath = if ($case.total -eq 50) { 'codex/assets/steps/step017.md' } else { 'codex/assets/profiles/' + $case.profile + '/steps/step017.md' }
   if ($contract.target -cne $expectedPath) { throw 'Wrong selected contract' }
-  $state.total_steps = if ($case.total -eq 36) { 50 } else { 36 }
+  $state.total_steps = if ($case.total -eq 50) { 36 } else { 50 }
   try { [void](Assert-State $state $case.root 'Reader'); throw 'Count mismatch accepted' } catch {
     if ($_.Exception.Data['SmokeCode'] -cne 'STATE_INVALID') { throw }
   }
@@ -161,7 +164,7 @@ Write-Output $env:HARNESS50_FIXTURE
   assert.deepEqual(environment, before);
 });
 
-test('installed identity validates explicit personal or harness36 marketplaces while preserving disabled legacy caches', {
+test('installed identity validates explicit personal or harness20 marketplaces while preserving disabled legacy caches', {
   skip: process.platform !== 'win32', timeout: 60000
 }, async () => {
   const fixture = await makeWorkspace();
@@ -187,7 +190,7 @@ test('installed identity validates explicit personal or harness36 marketplaces w
   const quotedBin = join(bin, 'codex.cmd').replaceAll("'", "''");
   await writeFile(scriptPath, `${smokeSource.slice(0, mainOffset)}
 $script:CodexExecutable = '${quotedBin}'
-$script:Report.manifest.name = 'harness36'
+$script:Report.manifest.name = 'harness20'
 $script:Report.manifest.version = '${version}'
 try {
   $resolved = Get-InstalledPluginRoot $PluginRoot $PluginRoot
@@ -202,8 +205,12 @@ try {
   await mkdir(legacyRoot, { recursive: true });
   const legacyFile = join(legacyRoot, 'preserved.txt');
   await writeFile(legacyFile, 'existing legacy cache stays unchanged', 'utf8');
+  const researchFreeRoot = join(codexHome, 'plugins/cache/personal/harness36/3.0.0');
+  await mkdir(researchFreeRoot, { recursive: true });
+  const researchFreeFile = join(researchFreeRoot, 'preserved.txt');
+  await writeFile(researchFreeFile, 'existing research-free cache stays unchanged', 'utf8');
   const entry = (marketplaceName, sourcePath, overrides = {}) => ({
-    pluginId: `harness36@${marketplaceName}`, name: 'harness36', marketplaceName, version,
+    pluginId: `harness20@${marketplaceName}`, name: 'harness20', marketplaceName, version,
     installed: true, enabled: true, source: { source: 'local', path: sourcePath },
     installPolicy: 'AVAILABLE', authPolicy: 'ON_INSTALL', ...overrides
   });
@@ -215,29 +222,32 @@ try {
     assert.ifError(result.error);
     return result;
   };
-  for (const marketplaceName of ['personal', 'harness36']) {
+  for (const marketplaceName of ['personal', 'harness20']) {
     const sourceRoot = join(fixture, `source-${marketplaceName}`);
-    const cacheRoot = join(codexHome, 'plugins/cache', marketplaceName, 'harness36', version);
+    const cacheRoot = join(codexHome, 'plugins/cache', marketplaceName, 'harness20', version);
     for (const root of [sourceRoot, cacheRoot]) {
       await mkdir(join(root, '.codex-plugin'), { recursive: true });
       await mkdir(join(root, '.claude-plugin'), { recursive: true });
       await writeFile(join(root, '.codex-plugin/plugin.json'), JSON.stringify({
-        name: 'harness36', version, skills: './codex/skills/', hooks: './codex/hooks/hooks.json'
+        name: 'harness20', version, skills: './codex/skills/', hooks: './codex/hooks/hooks.json'
       }), 'utf8');
-      await writeFile(join(root, '.claude-plugin/marketplace.json'), JSON.stringify({ name: 'harness36' }), 'utf8');
+      await writeFile(join(root, '.claude-plugin/marketplace.json'), JSON.stringify({ name: 'harness20' }), 'utf8');
     }
     const active = entry(marketplaceName, sourceRoot);
     const legacy = entry('personal', legacyRoot, { pluginId: 'harness50@personal', name: 'harness50', version: '2.13.0', enabled: false });
-    const positive = await observe(marketplaceName, cacheRoot, [active, legacy]);
+    const researchFree = entry('personal', researchFreeRoot, { pluginId: 'harness36@personal', name: 'harness36', version: '3.0.0', enabled: false });
+    const positive = await observe(marketplaceName, cacheRoot, [active, legacy, researchFree]);
     assert.equal(positive.status, 0, positive.stderr || positive.stdout);
     assert.deepEqual(JSON.parse(positive.stdout.trim()), { passed: true, root: cacheRoot });
     for (const [label, inputMarketplace, requestedRoot, installed] of [
       ['unsafe marketplace path', '../personal', cacheRoot, [active]],
       ['missing explicit marketplace', '', cacheRoot, [active]],
-      ['wrong selected marketplace', marketplaceName === 'personal' ? 'harness36' : 'personal', cacheRoot, [active]],
+      ['wrong selected marketplace', marketplaceName === 'personal' ? 'harness20' : 'personal', cacheRoot, [active]],
       ['source used as active cache', marketplaceName, sourceRoot, [active]],
       ['unexpected plugin ID', marketplaceName, cacheRoot, [{ ...active, pluginId: 'harness50@personal' }]],
       ['legacy and renamed hooks both active', marketplaceName, cacheRoot, [active, { ...legacy, enabled: true }]],
+      ['research-free and renamed hooks both active', marketplaceName, cacheRoot, [active, { ...researchFree, enabled: true }]],
+      ['malformed research-free activation', marketplaceName, cacheRoot, [active, { ...researchFree, enabled: 'false' }]],
       ['duplicate active renamed install', marketplaceName, cacheRoot, [active, entry('another', sourceRoot)]]
     ]) {
       const rejected = await observe(inputMarketplace, requestedRoot, installed);
@@ -248,11 +258,12 @@ try {
     }
     const sourceManifest = join(sourceRoot, '.codex-plugin/plugin.json');
     const previous = await readFile(sourceManifest);
-    await writeFile(sourceManifest, JSON.stringify({ name: 'harness36', version, skills: './codex/skills/', hooks: './codex/hooks/hooks.json', changed: true }), 'utf8');
+    await writeFile(sourceManifest, JSON.stringify({ name: 'harness20', version, skills: './codex/skills/', hooks: './codex/hooks/hooks.json', changed: true }), 'utf8');
     const drifted = await observe(marketplaceName, cacheRoot, [active]);
     assert.equal(drifted.status, 1, drifted.stdout);
     assert.equal(JSON.parse(drifted.stdout.trim()).error_code, 'PLUGIN_IDENTITY_FAILED');
     await writeFile(sourceManifest, previous);
   }
   assert.equal(await readFile(legacyFile, 'utf8'), 'existing legacy cache stays unchanged');
+  assert.equal(await readFile(researchFreeFile, 'utf8'), 'existing research-free cache stays unchanged');
 });

@@ -1,10 +1,11 @@
-# Final summary after step 36
+# Final summary after the selected final step
 
 `scripts/final-summary.mjs` turns the evidence a finished run has already saved into one short
 report with three fixed headings. It is a report, not a gate: it never decides or records
 completion, and a missing or malformed source only adds a `확인 불가` line.
 
-New36 scans steps031–036 and uses final36/SPEC036; explicit legacy50 retains
+Fresh planning-first20 scans steps015–020 and uses final20/SPEC020; explicit
+research-free36 keeps steps031–036 and final36/SPEC036; legacy50 retains
 steps045–050 and final50/SPEC050. QA/Jev evidence is selected by profile/generation
 so prior reset runs and same-number reports do not become current evidence.
 
@@ -34,10 +35,10 @@ never printed.
 | Source | What is read | Section |
 |---|---|---|
 | `dist/index.html` | size, SHA-256, route manifest (mode, screens, fallback) | 변경 |
-| the three inspections of `quality-gate.mjs --inspect-final` | quality, browser and step 36 regression verdicts, lowest coverage | 발견; any verdict other than PASS also in 사용자 확인 필요 |
-| `step_archive/step031_*.md` to `step036_*.md`, `step_archive/outputs/step036_*.md` | `deployment-verification: <value>` lines | `pending` in 사용자 확인 필요, other values in 변경 |
+| the three inspections of `quality-gate.mjs --inspect-final` | quality, browser and selected final-step regression verdicts, lowest coverage | 발견; any verdict other than PASS also in 사용자 확인 필요 |
+| selected E2E-to-final reports (fresh `step_archive/step015_*.md` to `step020_*.md`, plus `step_archive/outputs/step020_*.md`) | `deployment-verification: <value>` lines | `pending` in 사용자 확인 필요, other values in 변경 |
 | `step_archive/outputs/browser-output.json`, only when it describes the current HTML | axe `accessibility_incomplete` rule ids of every viewport and route, `environment.isolation`, `environment.backend` | 사용자 확인 필요, 발견 |
-| the selected QA namespace returned by `inspect`, steps 1 to the selected total | `verifier.mode` `same-agent` (a stale report is marked 이전 빌드), the six step 36 regression outcomes as a table | 사용자 확인 필요, 발견 |
+| the selected QA namespace returned by `inspect`, steps 1 to the selected total | `verifier.mode` `same-agent` (a stale report is marked 이전 빌드), the six selected final-step regression outcomes as a table | 사용자 확인 필요, 발견 |
 | the selected Jev profile/generation namespace (legacy also keeps `jev-reviews/`) | abstentions, low confidence, unverified runs and changed inputs, one line per step and input | 사용자 확인 필요 |
 | `step_archive/TOPIC/TOPIC.md` | the `기본값으로 보완한 항목: <fields>.` line | 사용자 확인 필요 |
 | decision markers (below) | `결정/사유` lines | 사용자 확인 필요 |
@@ -71,9 +72,9 @@ backticks, `|` and control characters, and a line that looks like a credential s
 
 ## When it runs
 
-- Claude Code: once `quality-gate.mjs --inspect-final` exits 0 at step 36, the main session runs the
-  command once and sends `Step 036/36 완료` followed directly by the unchanged output (harness-rules
-  §2, `/webapp`, and the generated `SPEC-036.md`, which step 36 reads first). If the command fails,
+- Claude Code: once `quality-gate.mjs --inspect-final` exits 0 at the selected final step (fresh20), the main session runs the
+  command once and sends `Step 020/20 완료` (existing36/50 retain `Step 036/36 완료`/`Step 050/50 완료`) followed directly by the unchanged output (harness-rules
+  §2, `/webapp`, and the generated `SPEC-020.md`, which fresh step 20 reads first). If the command fails,
   the message adds only `## 사용자 확인 필요` and `- 확인 불가: final-summary 실행 실패`. The step
   executor keeps its one-line handoff. Flat SPEC aliases are advisory and profile/generation-bound. Mismatched alias bytes
   are preserved at guarded `step_archive/specs/history/<sha256>/SPEC-NNN.md` before replacement;

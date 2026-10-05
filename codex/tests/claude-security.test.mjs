@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -17,8 +16,8 @@ function stepBody(root, step) {
   fs.writeFileSync(path.join(root, 'step_archive', 'archived', `step${String(step).padStart(3, '0')}.md`), `# Step ${step}\n`);
 }
 function fixture(t, state = active, { body = true } = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'h50-security-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  // macOS exposes /var through /private/var; fixtures use the shared physical root.
+  const root = tempRoot(t, 'h50-security-');
   fs.mkdirSync(path.join(root, 'step_archive'));
   if (state !== null) fs.writeFileSync(path.join(root, 'step_archive/progress.json'), typeof state === 'string' ? state : JSON.stringify(state));
   const step = state?.current_step;
@@ -52,7 +51,7 @@ for (const [name, state] of Object.entries({ missing: null, malformed: '{', empt
     assert.equal(run(fixture(t, state), 'auto-approve', write('src/app.js')).output, '');
   });
 }
-for (const target of ['.claude/subdir/../settings.json', '/cache/harness50/2.1.0/hooks/auto-approve.ps1', '/cache/harness36/0.0.0-test/hooks/auto-approve.ps1', '/cache/HARNESS36/0.0.0-test/.claude-plugin/plugin.json', path.join(repo, 'hooks/auto-approve.ps1')]) {
+for (const target of ['/cache/harness20/4.0.0/hooks/auto-approve.ps1', '/cache/HARNESS20/4.0.0/.claude-plugin/plugin.json', '.claude/subdir/../settings.json', '/cache/harness50/2.1.0/hooks/auto-approve.ps1', '/cache/harness36/0.0.0-test/hooks/auto-approve.ps1', '/cache/HARNESS36/0.0.0-test/.claude-plugin/plugin.json', path.join(repo, 'hooks/auto-approve.ps1')]) {
   test(`protect canonical target ${target}`, t => {
     const root = fixture(t);
     assert.equal(run(root, 'auto-approve', write(target)).output, '');
@@ -248,13 +247,13 @@ test('stream, 8.3, trailing-dot and home-level aliases never receive hook approv
 // Flat step bodies are the fallback location of the step bodies (harness-activity stepBody), and
 // archived/ and tools/ under a subfolder step_archive are the same material. Step 1 writes
 // TOPIC.md itself, so it stays eligible.
-test('flat step bodies and subfolder archived/tools stay out of approval; TOPIC.md and step results stay in', t => {
+test('workflow bodies and frozen TOPIC stay out of approval; ordinary step results stay in', t => {
   const root = fixture(t);
   for (const target of ['step_archive/step002.md', 'STEP_ARCHIVE/STEP050.MD', 'step_archive/step002.md.', 'step_archive/step002.md::$DATA',
-    'sub/step_archive/archived/step001.md', 'a/STEP_ARCHIVE/Archived/x.md', 'sub/step_archive/tools/html-bundler.ps1']) {
+    'sub/step_archive/archived/step001.md', 'a/STEP_ARCHIVE/Archived/x.md', 'sub/step_archive/tools/html-bundler.ps1', 'step_archive/TOPIC/TOPIC.md']) {
     assert.equal(policy(root, target), '', target);
   }
-  for (const target of ['step_archive/TOPIC/TOPIC.md', 'step_archive/step002_result.md', 'step_archive/step0021.md', 'sub/step_archive_x/archived/a.md', 'docs/archived/x.md']) {
+  for (const target of ['step_archive/step002_result.md', 'step_archive/step0021.md', 'sub/step_archive_x/archived/a.md', 'docs/archived/x.md']) {
     assert.equal(policy(root, target), 'eligible', target);
   }
 });
@@ -264,8 +263,7 @@ test('the guard mode leaves execution-linked edits to the normal prompt instead 
   assert.equal(guard.status, 0);
   assert.equal(guard.output, '');
 });
-// Without node (no HARNESS50_NODE from run-hook.mjs and none on PATH) the relays make no decision:
-// auto-approve grants nothing, and destructive-guard lets the host decide (documented fail-open).
+// Missing Node grants no approval and the tool guard denies rather than fail open.
 test('missing Node runtime cannot grant approval', t => {
   const root = fixture(t);
   const executable = windows ? path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe') : '/bin/bash';
@@ -279,7 +277,7 @@ test('missing Node runtime cannot grant approval', t => {
     return { status: result.status, stdout: result.stdout.trim() };
   };
   assert.deepEqual(withoutNode('auto-approve', write('src/app.js')), { status: 0, stdout: '' });
-  assert.deepEqual(withoutNode('destructive-guard', { tool_name: 'Bash', tool_input: { command: 'rm -rf /' } }), { status: 0, stdout: '' });
+  assert.deepEqual(withoutNode('destructive-guard', { tool_name: 'Bash', tool_input: { command: 'rm -rf /' } }), { status: 2, stdout: '' });
 });
 
 // The guards read the whole command text, quoted strings and heredoc bodies included. A block
@@ -339,12 +337,15 @@ test('permission-request-guard never refuses what destructive-guard leaves to th
     assert.deepEqual({ status: pre.status, stdout: pre.stdout }, { status: 0, stdout: '' }, command);
     assert.deepEqual({ status: permission.status, stdout: permission.stdout }, { status: 0, stdout: '' }, command);
   }
-  for (const command of ['sudo apt install jq', 'pip install semgrep', 'git config core.hooksPath .githooks', 'echo x > .claude/settings.json']) {
+  for (const command of ['sudo apt install jq', 'pip install semgrep', 'git config core.hooksPath .githooks']) {
     const [pre, permission] = guards(command);
     assert.equal(pre.status, 0, command);
     assert.match(pre.stdout, /"permissionDecision":"ask"/, command);
     assert.deepEqual({ status: permission.status, stdout: permission.stdout }, { status: 0, stdout: '' }, command);
   }
+  const [pre, permission] = guards('echo x > .claude/settings.json');
+  assert.equal(pre.status, 2);
+  assert.equal(permission.status, 2);
 });
 // Writing text that names a command is not running it: the permission guard never denies an edit
 // for its content. Auto-approval keeps the prompt for such text instead (approval-policy auto mode).
@@ -360,10 +361,10 @@ test('edit content never makes permission-request-guard deny', t => {
   assert.match(run(root, 'auto-approve', edit('const a = 1')).output, /"permissionDecision":"allow"/);
 });
 
-test('profile archived bodies receive no automatic approval like legacy archived bodies', t => {
+test('profile and legacy archived bodies cannot be overwritten through ordinary tools', t => {
   const root = fixture(t);
   for (const target of ['step_archive/profiles/research-free-36-v1/archived/step017.md', 'step_archive/archived/step017.md']) {
     assert.equal(run(root, 'auto-approve', write(target)).output, '');
-    assert.equal(run(root, 'permission-request-guard', write(target)).output, '');
+    assert.equal(run(root, 'permission-request-guard', write(target)).status, 2);
   }
 });

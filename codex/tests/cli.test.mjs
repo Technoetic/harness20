@@ -28,45 +28,53 @@ const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
 function evidence(detail = "verified by CLI") {
   return [
     {
-      acceptance_id: "topic-contract",
+      acceptance_id: "base-planning-snapshot",
       kind: "artifact",
       detail,
       ok: true,
-      artifact_path: "step_archive/TOPIC/TOPIC.md"
+      artifact_path: "step_archive/step001_planning_chunk1.md"
     },
     {
-      acceptance_id: "preflight-report",
+      acceptance_id: "planning-verification-report",
       kind: "artifact",
-      detail: "preflight report persisted",
+      detail: "independent planning report persisted",
       ok: true,
-      artifact_path: "step_archive/step001_preflight.md"
+      artifact_path: "step_archive/outputs/step001_검증.md"
     },
     {
-      acceptance_id: "node-runtime-version",
-      kind: "command",
-      detail: "version command exited successfully",
-      ok: true,
-      command: "node --version",
-      exit_code: 0
-    },
-    {
-      acceptance_id: "npm-cli-version",
-      kind: "command",
-      detail: "version command exited successfully",
-      ok: true,
-      command: "npm --version",
-      exit_code: 0
-    },
-    {
-      acceptance_id: "required-tool-inventory",
+      acceptance_id: "topic-fidelity",
       kind: "check",
-      detail: "required tools verified",
+      detail: "synthetic request is reflected",
       ok: true
     },
     {
-      acceptance_id: "optional-tool-disposition",
+      acceptance_id: "requirements-traceability",
       kind: "check",
-      detail: "optional tools recorded",
+      detail: "synthetic request is traced to its literal input",
+      ok: true
+    },
+    {
+      acceptance_id: "planning-chunks-bounded",
+      kind: "check",
+      detail: "synthetic planning snapshot has one bounded chunk",
+      ok: true
+    },
+    {
+      acceptance_id: "bounded-independent-review",
+      kind: "check",
+      detail: "synthetic independent review uses one round",
+      ok: true
+    },
+    {
+      acceptance_id: "pass-verdict",
+      kind: "check",
+      detail: "synthetic planning report records PASS",
+      ok: true
+    },
+    {
+      acceptance_id: "provided-api-contract",
+      kind: "check",
+      detail: "N/A: this literal CLI fixture uses no external API",
       ok: true
     }
   ];
@@ -414,7 +422,9 @@ test("all ten commands dispatch to their workflow operations with literal struct
   const frozenTopic = await readFile(join(root, "step_archive", "TOPIC", "TOPIC.md"), "utf8");
   assert.ok(frozenTopic.includes(topic), "the literal request survives topic preparation");
   assert.equal(initialized.current_step, 1);
-  await writeFile(join(root, "step_archive", "step001_preflight.md"), "preflight passed\n", "utf8");
+  await writeFile(join(root, "step_archive", "step001_planning_chunk1.md"), "Synthetic planning snapshot\n", "utf8");
+  await mkdir(join(root, "step_archive", "outputs"));
+  await writeFile(join(root, "step_archive", "outputs", "step001_검증.md"), "PASS — synthetic independent CLI fixture\n", "utf8");
 
   const first = parseSuccess(await runCli([
     "begin", "--workspace", root, "--step", "1", "--session", session, "--input", "-"

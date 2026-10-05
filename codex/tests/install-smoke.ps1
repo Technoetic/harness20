@@ -659,7 +659,7 @@ function Assert-ManifestAndVersions {
     }
   }
   if (
-    $manifest.name -cne "harness36" -or
+    $manifest.name -cne "harness20" -or
     $manifest.version -isnot [string] -or
     $manifest.version -cnotmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:\+[a-z0-9.-]+)?$' -or
     $manifest.skills -cne "./codex/skills/" -or
@@ -700,7 +700,7 @@ function Assert-Skills {
   param([Parameter(Mandatory = $true)][string]$Root)
 
   $skillsRoot = Resolve-SafeDirectory $Root "codex/skills" "Codex skills directory"
-  $expected = @("webapp", "harness36-status", "harness36-reset")
+  $expected = @("webapp", "harness20-status", "harness20-reset")
   $entries = @(Get-ChildItem -Force -LiteralPath $skillsRoot -ErrorAction Stop)
   Assert-ExactNames -Items $entries -Expected $expected -Label "Codex skills directory"
   foreach ($name in $expected) {
@@ -720,7 +720,8 @@ function Assert-Steps {
 
   foreach ($profile in @(
     @{ id = "legacy-50-v1"; count = 50; directory = "codex/assets/steps"; source = "assets/steps" },
-    @{ id = "research-free-36-v1"; count = 36; directory = "codex/assets/profiles/research-free-36-v1/steps"; source = "assets/profiles/research-free-36-v1/steps" }
+    @{ id = "research-free-36-v1"; count = 36; directory = "codex/assets/profiles/research-free-36-v1/steps"; source = "assets/profiles/research-free-36-v1/steps" },
+    @{ id = "planning-first-20-v1"; count = 20; directory = "codex/assets/profiles/planning-first-20-v1/steps"; source = "assets/profiles/planning-first-20-v1/steps" }
   )) {
     $stepsRoot = Resolve-SafeDirectory $Root $profile.directory "Codex profile steps directory"
     $expectedNames = @("index.json")
@@ -761,19 +762,20 @@ function Assert-Steps {
   foreach ($dependency in @(
     "scripts/lib/workflow-profiles.mjs", "scripts/lib/workflow-context.mjs",
     "scripts/lib/claude-profile.mjs", "scripts/lib/claude-spec.mjs",
-    "scripts/lib/json-io.mjs", "scripts/lib/errors.mjs", "scripts/lib/quality-files.mjs",
+    "scripts/lib/json-io.mjs", "scripts/lib/errors.mjs", "scripts/lib/quality-files.mjs", "scripts/lib/topic-contract.mjs",
+    "scripts/lib/strict-json.mjs", "scripts/lib/tool-policy.mjs", "scripts/lib/sensitive-data.mjs", "scripts/lib/workflow-security.mjs",
     "scripts/lib/quality.mjs", "scripts/lib/qa-report.mjs", "scripts/lib/final-regression.mjs",
     "scripts/lib/final-summary.mjs", "scripts/lib/jev-judge.mjs", "hooks/lib/workflow-profile.mjs"
   )) { [void](Resolve-SafeFile $Root $dependency "Shared profile dependency") }
   $node = Get-Application @("node.exe", "node") "Node.js"
   $validator = Resolve-SafeFile $Root "codex/scripts/validate-steps.mjs" "Codex step validator"
   $validatorOutput = Invoke-CheckedApplication -Executable $node -Arguments @($validator, "--all-profiles") -WorkingDirectory $Root -FailureCode "STEP_VALIDATION_FAILED" -FailureMessage "The complete profile validation failed."
-  if ($validatorOutput -cne "validated 86 indexed step(s) across 2 profiles") {
+  if ($validatorOutput -cne "validated 106 indexed step(s) across 3 profiles") {
     Stop-Smoke "STEP_VALIDATION_FAILED" "The profile validator returned an unexpected result."
   }
   [void](Invoke-CheckedApplication -Executable $node -Arguments @("--input-type=module", "-e", "await Promise.all(['quality','qa-report','final-regression','final-summary','jev-judge','claude-spec','json-io','errors'].map(name => import('./scripts/lib/' + name + '.mjs')))") -WorkingDirectory $Root -FailureCode "SHARED_DEPENDENCY_INVALID" -FailureMessage "Shared CLI dependencies could not be loaded.")
   $script:Report.shared_dependencies_verified = $true
-  $script:Report.step_count = 36
+  $script:Report.step_count = 20
 }
 
 function Assert-Hooks {
@@ -813,7 +815,7 @@ function Assert-Hooks {
     $group = $groups[0]
     if ($eventName -ceq "PreToolUse") {
       Assert-ExactProperties $group @("matcher", "hooks") @() "PreToolUse hook group"
-      if ($group.matcher -cne "Bash|apply_patch") {
+      if ($group.matcher -cne "Bash|apply_patch|Read|Write|Edit|MultiEdit|NotebookEdit|WebFetch|WebSearch") {
         Stop-Smoke "HOOK_CONFIG_INVALID" "The PreToolUse matcher is unexpected."
       }
     } else {
@@ -893,7 +895,7 @@ function Get-InstalledPluginRoot {
     Stop-Smoke "PARAMETER_INVALID" "AfterTrust requires an explicit safe MarketplaceName."
   }
   $pluginName = $script:Report.manifest.name
-  if ($pluginName -cne "harness36") {
+  if ($pluginName -cne "harness20") {
     Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The validated package plugin identity is unexpected."
   }
   $expectedPluginId = $pluginName + "@" + $MarketplaceName
@@ -924,7 +926,7 @@ function Get-InstalledPluginRoot {
         Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The Codex CLI installed-plugin evidence is malformed."
       }
     }
-    if ($entry.name -ceq $pluginName -or $entry.name -ceq "harness50") {
+    if ($entry.name -ceq $pluginName -or $entry.name -ceq "harness36" -or $entry.name -ceq "harness50") {
       foreach ($activationField in @("installed", "enabled")) {
         if (@($entryNames | Where-Object { $_ -ceq $activationField }).Count -ne 1 -or $entry.$activationField -isnot [bool]) {
           Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The harness installed-plugin activation evidence is malformed."
@@ -939,13 +941,13 @@ function Get-InstalledPluginRoot {
     }
   }
   if ($candidates.Count -ne 1) {
-    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The Codex CLI did not report one unambiguous installed harness36 plugin."
+    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The Codex CLI did not report one unambiguous installed harness20 plugin."
   }
   $plugin = $candidates[0]
   Assert-ExactProperties $plugin @(
     "pluginId", "name", "marketplaceName", "version", "installed", "enabled",
     "source", "installPolicy", "authPolicy"
-  ) @("marketplaceSource") "Installed harness36 plugin"
+  ) @("marketplaceSource") "Installed harness20 plugin"
   if (
     $plugin.pluginId -cne $expectedPluginId -or
     $plugin.name -cne $pluginName -or
@@ -956,30 +958,30 @@ function Get-InstalledPluginRoot {
     $plugin.installPolicy -cne "AVAILABLE" -or
     $plugin.authPolicy -cne "ON_INSTALL"
   ) {
-    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The active harness36 plugin identity is unexpected."
+    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The active harness20 plugin identity is unexpected."
   }
-  Assert-ExactProperties $plugin.source @("source", "path") @() "Installed harness36 plugin source"
+  Assert-ExactProperties $plugin.source @("source", "path") @() "Installed harness20 plugin source"
   if ($plugin.source.source -cne "local" -or -not (Test-FullyQualifiedFilesystemPath $plugin.source.path)) {
-    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The installed harness36 plugin source is not the expected local source."
+    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The installed harness20 plugin source is not the expected local source."
   }
-  $sourceRoot = Resolve-PhysicalDirectory $plugin.source.path "Installed harness36 source"
+  $sourceRoot = Resolve-PhysicalDirectory $plugin.source.path "Installed harness20 source"
   if (@(Get-PropertyNames $plugin | Where-Object { $_ -ceq "marketplaceSource" }).Count -eq 1) {
-    Assert-ExactProperties $plugin.marketplaceSource @("sourceType", "source") @() "Installed harness36 marketplace source"
+    Assert-ExactProperties $plugin.marketplaceSource @("sourceType", "source") @() "Installed harness20 marketplace source"
     if (
       $plugin.marketplaceSource.sourceType -cne "local" -or
       -not (Test-FullyQualifiedFilesystemPath $plugin.marketplaceSource.source)
     ) {
-      Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The installed harness36 marketplace source is malformed."
+      Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The installed harness20 marketplace source is malformed."
     }
-    $marketplaceRoot = Resolve-PhysicalDirectory $plugin.marketplaceSource.source "Installed harness36 marketplace source"
+    $marketplaceRoot = Resolve-PhysicalDirectory $plugin.marketplaceSource.source "Installed harness20 marketplace source"
     if (-not (Test-PathEqual $marketplaceRoot $sourceRoot)) {
-      Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The selected marketplace and local harness36 source disagree."
+      Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The selected marketplace and local harness20 source disagree."
     }
-    [void](Resolve-SafeFile $marketplaceRoot ".claude-plugin/marketplace.json" "Installed harness36 marketplace manifest")
+    [void](Resolve-SafeFile $marketplaceRoot ".claude-plugin/marketplace.json" "Installed harness20 marketplace manifest")
   }
-  $sourceManifest = Resolve-SafeFile $sourceRoot ".codex-plugin/plugin.json" "Installed harness36 source manifest"
-  $installedManifest = Resolve-SafeFile $RequestedRoot ".codex-plugin/plugin.json" "Installed harness36 manifest"
-  $sourceIdentity = Read-StrictJson $sourceManifest "Installed harness36 source manifest"
+  $sourceManifest = Resolve-SafeFile $sourceRoot ".codex-plugin/plugin.json" "Installed harness20 source manifest"
+  $installedManifest = Resolve-SafeFile $RequestedRoot ".codex-plugin/plugin.json" "Installed harness20 manifest"
+  $sourceIdentity = Read-StrictJson $sourceManifest "Installed harness20 source manifest"
   if (
     $sourceIdentity.name -cne $pluginName -or
     $sourceIdentity.version -cne $script:Report.manifest.version -or
@@ -987,7 +989,7 @@ function Get-InstalledPluginRoot {
     $sourceIdentity.hooks -cne "./codex/hooks/hooks.json" -or
     (Get-Sha256 $sourceManifest) -cne (Get-Sha256 $installedManifest)
   ) {
-    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The installed harness36 source manifest does not match the active package."
+    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "The installed harness20 source manifest does not match the active package."
   }
 
   $codexHomeInput = if ([string]::IsNullOrWhiteSpace($env:CODEX_HOME)) {
@@ -998,9 +1000,9 @@ function Get-InstalledPluginRoot {
   $codexHome = Resolve-PhysicalDirectory $codexHomeInput "Codex home"
   $expectedRoot = Resolve-PhysicalDirectory (
     Join-Path $codexHome ("plugins/cache/" + $MarketplaceName + "/" + $pluginName + "/" + $script:Report.manifest.version)
-  ) "Active harness36 plugin root"
+  ) "Active harness20 plugin root"
   if (-not (Test-PathEqual $RequestedRoot $expectedRoot)) {
-    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "PluginRoot is not the active Codex harness36 installation."
+    Stop-Smoke "PLUGIN_IDENTITY_FAILED" "PluginRoot is not the active Codex harness20 installation."
   }
   return $expectedRoot
 }
@@ -1213,8 +1215,9 @@ function Assert-State {
   Assert-ExactProperties $State $stateFields @() "$Label state"
   $expectedTotal = 50
   if ($isNew) {
-    if ($State.workflow_profile -cne "research-free-36-v1") { Stop-Smoke "STATE_INVALID" "$Label workflow profile is invalid." }
-    $expectedTotal = 36
+    if ($State.workflow_profile -ceq "planning-first-20-v1") { $expectedTotal = 20 }
+    elseif ($State.workflow_profile -ceq "research-free-36-v1") { $expectedTotal = 36 }
+    else { Stop-Smoke "STATE_INVALID" "$Label workflow profile is invalid." }
   }
   if (
     -not (Test-Integer $State.schema_version) -or
@@ -1365,8 +1368,11 @@ function Read-Receipts {
     [string]$WorkflowProfile = "legacy-50-v1"
   )
 
-  $isNew = $WorkflowProfile -ceq "research-free-36-v1"
-  $total = if ($isNew) { 36 } else { 50 }
+  if (@("legacy-50-v1", "research-free-36-v1", "planning-first-20-v1") -cnotcontains $WorkflowProfile) {
+    Stop-Smoke "SCHEMA_INVALID" "$Label workflow profile is invalid."
+  }
+  $isNew = $WorkflowProfile -cne "legacy-50-v1"
+  $total = if ($WorkflowProfile -ceq "planning-first-20-v1") { 20 } elseif ($isNew) { 36 } else { 50 }
   $schemaVersion = if ($isNew) { 2 } else { 1 }
   $receiptsRoot = Resolve-SafeDirectory $WorkspaceRoot "step_archive/.harness50-codex/receipts" "$Label receipts directory"
   $entries = @(Get-ChildItem -Force -LiteralPath $receiptsRoot -ErrorAction Stop)
@@ -1598,8 +1604,12 @@ function Get-NativeStepContract {
     [string]$WorkflowProfile = "legacy-50-v1"
   )
 
-  $total = if ($WorkflowProfile -ceq "research-free-36-v1") { 36 } else { 50 }
-  $relativeIndex = if ($total -eq 36) { "codex/assets/profiles/research-free-36-v1/steps/index.json" } else { "codex/assets/steps/index.json" }
+  if (@("legacy-50-v1", "research-free-36-v1", "planning-first-20-v1") -cnotcontains $WorkflowProfile) {
+    Stop-Smoke "STEP_PACKAGE_INVALID" "The selected workflow profile is invalid."
+  }
+  $total = if ($WorkflowProfile -ceq "planning-first-20-v1") { 20 } elseif ($WorkflowProfile -ceq "research-free-36-v1") { 36 } else { 50 }
+  if ($Step -lt 1 -or $Step -gt $total) { Stop-Smoke "STEP_PACKAGE_INVALID" "The selected step is outside its workflow profile." }
+  $relativeIndex = if ($WorkflowProfile -ceq "legacy-50-v1") { "codex/assets/steps/index.json" } else { "codex/assets/profiles/$WorkflowProfile/steps/index.json" }
   $indexPath = Resolve-SafeFile $PluginRoot $relativeIndex "Selected Codex step index"
   $index = Read-StrictJson $indexPath "Codex step index" 8388608
   if ($index.steps -isnot [Array] -or @($index.steps).Count -ne $total) {

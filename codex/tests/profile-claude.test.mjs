@@ -9,11 +9,41 @@ import { snapshotQa, recordQa, inspectQa } from '../../scripts/lib/qa-report.mjs
 import { prepareQuality, prepareFinalRegression } from './helpers/completion-quality.mjs';
 import { completionHtml, passingBrowserReport } from './helpers/routing.mjs';
 import { sha256 } from '../../scripts/lib/quality-files.mjs';
-test('fresh native Claude trigger selects36 and profile-only archived instructions', t => {
+
+// Explicit existing36 fixture: changing the fresh default must never reinterpret this run.
+function existing36(plugin, root, topic) {
+  const directory = join(root, 'step_archive/profiles/research-free-36-v1/archived');
+  mkdirSync(directory, { recursive: true });
+  for (let step = 1; step <= 36; step++) {
+    const name = `step${String(step).padStart(3, '0')}.md`;
+    copyFileSync(join(plugin, 'assets/profiles/research-free-36-v1/steps', name), join(directory, name));
+  }
+  const identity = { schema_version: 2, workflow_profile: 'research-free-36-v1', total_steps: 36 };
+  writeFileSync(join(root, 'step_archive/workflow-profile.json'), JSON.stringify(identity));
+  writeFileSync(join(root, 'step_archive/progress.json'), JSON.stringify({ ...identity,
+    run_started_at: '2026-10-04T00:00:00.000Z', current_step: 1, completed_steps: [], skipped_steps: [],
+    failed_steps: [], session_history: [], metrics: { total_sessions: 0 } }));
+  mkdirSync(join(root, 'step_archive/TOPIC'), { recursive: true });
+  writeFileSync(join(root, 'step_archive/TOPIC/TOPIC.md'), `# Existing36 topic\n${topic}\n`);
+}
+
+function recordSuccessfulStep(plugin, root, step) {
+  // A parallel fixture may hold the native writer's machine-wide mutex. It defers safely;
+  // wait for an actual recorded completion without weakening any gate or completion assertion.
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    const result = runClaudeHook(plugin, 'step-progress-writer', { cwd: root, last_assistant_message: `Step ${step}/36 완료` });
+    assert.equal(result.status, 0, result.stderr);
+    const state = JSON.parse(readFileSync(join(root, 'step_archive/progress.json'), 'utf8'));
+    if (state.completed_steps.includes(step)) return result;
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500 * attempt);
+  }
+  assert.fail(`Step ${step}/36 was not recorded after bounded native writer attempts`);
+}
+
+test('explicit native Claude36 resumes profile-only archived instructions', t => {
   const base = tempRoot(t, 'h50-profile-'); const plugin = installPlugin(base);
   const root = join(base, 'project'); mkdirSync(root);
-  const out = runClaudeHook(plugin, 'webapp-trigger', { cwd: root, prompt: '/webapp Profile fixture' });
-  assert.equal(out.status, 0, out.stderr);
+  existing36(plugin, root, 'Profile fixture');
   const state = JSON.parse(readFileSync(join(root, 'step_archive/progress.json'), 'utf8'));
   assert.equal(state.total_steps, 36);
   assert.equal(state.workflow_profile, 'research-free-36-v1');
@@ -21,10 +51,9 @@ test('fresh native Claude trigger selects36 and profile-only archived instructio
   assert.equal(existsSync(join(root, 'step_archive/archived/step017.md')), false);
   assert.equal(existsSync(join(root, 'step_archive/profiles/research-free-36-v1/archived/step017.md')), true);
   assert.equal(readRun(root).phase, 'active');
-  assert.match(out.stdout, /001\/36/);
   const loader = runClaudeHook(plugin, 'step-progress-loader', { cwd: root });
   assert.match(loader.stdout, /profiles\/research-free-36-v1\/archived\/step001\.md/);
-  const writer = runClaudeHook(plugin, 'step-progress-writer', { cwd: root, last_assistant_message: 'Step 001/36 완료' });
+  const writer = recordSuccessfulStep(plugin, root, 1);
   assert.equal(writer.status, 0, writer.stderr);
   const read = () => JSON.parse(readFileSync(join(root, 'step_archive/progress.json'), 'utf8'));
   assert.deepEqual(read().completed_steps, [1]);
@@ -51,7 +80,7 @@ test('fresh native Claude trigger selects36 and profile-only archived instructio
 test('Claude36 pause resume returns selected body; reset preserves profile and isolates previous QA', async t => {
   const base = tempRoot(t, 'h50-profile-reset-'); const plugin = installPlugin(base);
   const root = join(base, 'project'); mkdirSync(root);
-  runClaudeHook(plugin, 'webapp-trigger', { cwd: root, prompt: '/webapp Reset fixture' });
+  existing36(plugin, root, 'Reset fixture');
   const file = join(root, 'step_archive/progress.json');
   const state = JSON.parse(readFileSync(file, 'utf8'));
   const cli = (command, ...extra) => {
@@ -69,7 +98,7 @@ test('Claude36 pause resume returns selected body; reset preserves profile and i
     outcomes: [{ id: 'layout', status: 'pass', observation: 'Correct.', evidence_paths: ['step_archive/outputs/test.md'], next_check: '' }], next_actions: [] });
   assert.equal((await inspectQa(root, 27)).verdict, 'PASS');
   writeFileSync(file, JSON.stringify({ ...state, current_step: 27, completed_steps: Array.from({ length: 26 }, (_, i) => i + 1) }));
-  const completedQa = runClaudeHook(plugin, 'step-progress-writer', { cwd: root, last_assistant_message: 'Step 027/36 완료' });
+  const completedQa = recordSuccessfulStep(plugin, root, 27);
   assert.equal(completedQa.status, 0, completedQa.stderr);
   assert.ok(JSON.parse(readFileSync(file, 'utf8')).completed_steps.includes(27), 'A hooks+scripts-only install can inspect and accept current QA');
   const reset = cli('reset');
@@ -84,7 +113,7 @@ test('Claude36 pause resume returns selected body; reset preserves profile and i
 test('new36 native SPEC publication preserves old bytes and replaces stale profile and reset generation hints', t => {
   const base = tempRoot(t, 'h50-profile-spec-'); const plugin = installPlugin(base);
   const root = join(base, 'project'); mkdirSync(root);
-  runClaudeHook(plugin, 'webapp-trigger', { cwd: root, prompt: '/webapp SPEC fixture' });
+  existing36(plugin, root, 'SPEC fixture');
   const progressFile = join(root, 'step_archive/progress.json');
   const state = JSON.parse(readFileSync(progressFile, 'utf8'));
   mkdirSync(join(root, 'step_archive/specs'));
@@ -105,7 +134,7 @@ test('new36 native SPEC publication preserves old bytes and replaces stale profi
 test('native final36 records only current measured browser and six-matrix evidence', async t => {
   const base = tempRoot(t, 'h50-profile-final-'); const plugin = installPlugin(base);
   const root = join(base, 'project'); mkdirSync(root);
-  runClaudeHook(plugin, 'webapp-trigger', { cwd: root, prompt: '/webapp Final fixture' });
+  existing36(plugin, root, 'Final fixture');
   const file = join(root, 'step_archive/progress.json'); const state = JSON.parse(readFileSync(file, 'utf8'));
   writeFileSync(file, JSON.stringify({ ...state, current_step: 36, completed_steps: Array.from({ length: 35 }, (_, i) => i + 1) }));
   mkdirSync(join(root, 'dist')); mkdirSync(join(root, 'step_archive/outputs'));
@@ -113,7 +142,7 @@ test('native final36 records only current measured browser and six-matrix eviden
   writeFileSync(join(root, 'step_archive/outputs/browser-output.json'), JSON.stringify(passingBrowserReport(sha256(completionHtml))));
   await prepareFinalRegression(root, { workflowProfile: 'research-free-36-v1' });
   await prepareQuality(root);
-  const result = runClaudeHook(plugin, 'step-progress-writer', { cwd: root, last_assistant_message: 'Step 036/36 완료' });
+  const result = recordSuccessfulStep(plugin, root, 36);
   assert.equal(result.status, 0, result.stderr);
   assert.equal(JSON.parse(readFileSync(file, 'utf8')).completed_steps.length, 36);
   assert.equal(readRun(root).phase, 'finished');

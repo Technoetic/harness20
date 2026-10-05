@@ -2,6 +2,8 @@
 // Browser verification dispatcher. The measurement itself lives in a backend module:
 //   playwright -> ../browser-verifier/backend-playwright.mjs (fresh headless Chromium contexts; CI)
 //   aside      -> ./lib/browser-backend-aside.mjs (the user's Aside Browser via `aside repl`)
+// Native generated-HTML execution is currently disabled for both backends until
+// a verified per-tab host boundary enforces all-transport network isolation.
 // Backend interface: `available()` -> boolean (cheap, never throws) and `run(ctx)` which fills
 // report.viewports / report.compatibility.navigation_api_unavailable.viewports, writes the four
 // screenshots, sets report.environment and throws Error(message) on any failure.
@@ -10,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { physicalWorkspace, readSafe, writeSafe, sha256 } from './lib/quality-files.mjs';
 import { readRouteManifestBytes, ROUTE_ENTRY_PATH, UNKNOWN_ROUTE_PATH } from './lib/route-contract.mjs';
 import { readBackendLock, resolveBackend, writeBackendLock } from './lib/browser-backend-lock.mjs';
+import { requireHostNetworkIsolation } from './lib/host-network-isolation.mjs';
 
 export const ENTRY = 'http://harness50.local/index.html';
 export const ARTIFACT = 'dist/index.html';
@@ -42,7 +45,9 @@ function validateBackend(backend) {
   return backend;
 }
 
-// Reports which backends can run here without launching a browser. Without a workspace the
+// Reports dependency availability only, never authorization or host isolation.
+// No current backend may execute generated HTML; the execution gate is separate.
+// Without a workspace the
 // output is `{ backends, selected, tool_version }` and `auto` uses the historical order. With a
 // workspace, `auto` honours its Step 3 lock (see ./lib/browser-backend-lock.mjs) and the result
 // adds `lock` (plus `error` when nothing may run); `lock: true` also records the selection.
@@ -95,6 +100,11 @@ export async function verifyOutput(workspaceRoot, { timeoutMs = 60000, executabl
     const routing = readRouteManifestBytes(bytes);
     report.routing = routing;
     report.artifact_sha256 = sha256(bytes);
+    // Preserve invalid-lock diagnostics without importing or probing a backend.
+    if (backend === 'auto') await readBackendLock(root);
+    // Gate before selection can import a backend or probe installed browser tools.
+    // Explicit, environment, lock and automatic choices cannot override policy.
+    requireHostNetworkIsolation(backend, { report });
     const { name, module, source } = await selectBackend(backend, root);
     selected = name;
     report.backend_selection = { requested: backend, source, backend: name };

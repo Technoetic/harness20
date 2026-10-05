@@ -39,9 +39,10 @@ export async function prepareFinalRegression(root, { status = 'pass', workflowPr
       try { await access(join(root, file)); exists = true; } catch (error) { if (error.code !== 'ENOENT') throw error; }
     }
     if (!exists) {
+      const totalSteps = getWorkflowProfile(workflowProfile).stepCount;
       await mkdir(join(root, 'step_archive'), { recursive: true });
-      await writeFile(join(root, 'step_archive/workflow-profile.json'), JSON.stringify({ schema_version: 2, workflow_profile: workflowProfile, total_steps: 36 }));
-      await writeFile(join(root, 'step_archive/progress.json'), JSON.stringify({ schema_version: 2, workflow_profile: workflowProfile, total_steps: 36, current_step: 36, completed_steps: [], run_started_at: '2026-10-02T01:00:00.000Z' }));
+      await writeFile(join(root, 'step_archive/workflow-profile.json'), JSON.stringify({ schema_version: 2, workflow_profile: workflowProfile, total_steps: totalSteps }));
+      await writeFile(join(root, 'step_archive/progress.json'), JSON.stringify({ schema_version: 2, workflow_profile: workflowProfile, total_steps: totalSteps, current_step: totalSteps, completed_steps: [], run_started_at: '2026-10-02T01:00:00.000Z' }));
     }
   }
   const checks = ['e2e', 'screenshot', 'keyboard', 'mouse', 'design', 'console'].map(name => ({

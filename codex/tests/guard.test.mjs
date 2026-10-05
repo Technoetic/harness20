@@ -26,7 +26,7 @@ const expectedDeny = ruleId => ({
   hookSpecificOutput: {
     hookEventName: "PreToolUse",
     permissionDecision: "deny",
-    permissionDecisionReason: `Harness36 blocked this operation (rule: ${ruleId}).`
+    permissionDecisionReason: `Harness20 blocked this operation (rule: ${ruleId}).`
   }
 });
 
@@ -1367,7 +1367,7 @@ test("apply_patch parses only structural directives and rejects malformed, outsi
   );
 });
 
-test("inactive, completed, missing, and corrupt workflows defer without creating metadata", async () => {
+test("existing inactive and corrupt workflows retain guards while missing workflows defer without creating metadata", async () => {
   const roots = [];
   const missing = await makeWorkspace();
   roots.push(missing);
@@ -1413,8 +1413,9 @@ test("inactive, completed, missing, and corrupt workflows defer without creating
       tool_input: { command: "rm -rf /" }
     });
     assert.equal(result.code, 0);
-    assert.equal(result.stdout, "{}\n");
-    assert.deepEqual(result.output, {});
+    const expected = index === 0 ? {} : expectedDeny('protected-root');
+    assert.equal(result.stdout, `${JSON.stringify(expected)}\n`);
+    assert.deepEqual(result.output, expected);
     assert.deepEqual(await events(root), before);
   }
 });
