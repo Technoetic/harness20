@@ -81,10 +81,13 @@ test('child environment rejects runtime loaders and credential variables regardl
 });
 
 test('aggregate quality budget stops the next configured command', async () => {
-  const root = await fixture('const end=Date.now()+150; while(Date.now()<end){};', "require('node:fs').writeFileSync('step_archive/outputs/attacker-ran','bad');");
+  // Exhaust the200ms aggregate budget regardless of child-process startup speed.
+  const root = await fixture('Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000);', "require('node:fs').writeFileSync('step_archive/outputs/attacker-ran','bad');");
   const result = await runQualityGate(root, { timeoutMs: 2000, totalTimeoutMs: 200 });
   assert.equal(result.verdict, 'FAIL');
   assert.match(result.error, /budget/i);
+  assert.equal(result.checks.test.timed_out, true, 'the first command must exhaust the aggregate budget');
+  assert.deepEqual(Object.keys(result.checks), ['test'], 'the next configured command must never be dispatched');
   await assert.rejects(access(join(root, 'step_archive', 'outputs', 'attacker-ran')), { code: 'ENOENT' });
   await assert.rejects(runQualityGate(root, { totalTimeoutMs: 480001 }), /total quality timeout/);
 });
