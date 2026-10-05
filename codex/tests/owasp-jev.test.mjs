@@ -89,24 +89,69 @@ test('repeated API calls stop before a fourth same-input attempt and count HTTP 
 
 test('API-key shared minute cap applies to different inputs and survives fresh processes', async t => {
   const budgetRoot = await fixture(t);
-  // The quota resets at a UTC minute. Start away from that legitimate boundary
-  // so the race checks one bucket rather than accidentally exercising two.
-  const remaining = 60000 - (Date.now() % 60000);
-  if (remaining < 10000) await new Promise(resolve => setTimeout(resolve, remaining + 20));
+  // A child-local UTC offset starts this fixture's bucket at a known boundary.
+  // Time still advances at its real rate, including the unchanged 2 s lock deadline.
+  const clockOffset = Date.UTC(2026, 0, 1) - Date.now();
+  const minute = Math.floor((Date.now() + clockOffset) / 60000);
   const moduleUrl = pathToFileURL(resolve('scripts/lib/jev-budget.mjs')).href;
-  const jobs = Array.from({ length: 14 }, (_, i) => new Promise((resolveJob, rejectJob) => {
+  const askModuleUrl = pathToFileURL(resolve('scripts/lib/jev-ask.mjs')).href;
+  const freshProcess = (i, transport = false) => new Promise((resolveJob, rejectJob) => {
     const child = spawn(process.execPath, ['--input-type=module', '-'], { stdio: ['pipe', 'pipe', 'pipe'] });
     let output = '', errors = '';
     child.stdout.on('data', b => { output += b; });
     child.stderr.on('data', b => { errors += b; });
     child.once('error', rejectJob);
-    child.once('close', code => code === 0 ? resolveJob(output.trim()) : rejectJob(new Error(errors)));
-    child.stdin.end(`import {reserveJevBudget} from ${JSON.stringify(moduleUrl)};\n` +
-      `try {await reserveJevBudget({apiKey:${JSON.stringify(key)},request:${JSON.stringify('bounded-'+i)},budgetRoot:${JSON.stringify(budgetRoot)}});console.log('reserved')}catch(e){console.log(e.code)}`);
-  }));
+    child.once('close', code => {
+      if (code !== 0) return rejectJob(new Error(errors));
+      try { resolveJob(JSON.parse(output.trim())); } catch (error) { rejectJob(error); }
+    });
+    const clock = `const nativeNow=Date.now.bind(Date);Date.now=()=>nativeNow()+${clockOffset};\n`;
+    child.stdin.end(clock + (transport
+      ? `const {runJevAsk}=await import(${JSON.stringify(askModuleUrl)});let calls=0;\n` +
+        `const result=await runJevAsk(${JSON.stringify(ask('post-race bounded claim '+i))},{allowNetwork:true,apiKey:${JSON.stringify(key)},budgetRoot:${JSON.stringify(budgetRoot)},fetchImpl:()=>{calls++;throw Error('exhausted budget must not dispatch')}});console.log(JSON.stringify({result,fetch_calls:calls}));`
+      : `const {reserveJevBudget}=await import(${JSON.stringify(moduleUrl)});\n` +
+        `try {await reserveJevBudget({apiKey:${JSON.stringify(key)},request:${JSON.stringify('bounded-'+i)},budgetRoot:${JSON.stringify(budgetRoot)}});console.log(JSON.stringify({status:'reserved'}))}catch(e){console.log(JSON.stringify({status:'denied',code:e.code,message:e.message}))}`));
+  });
+  const jobs = Array.from({ length: 14 }, (_, i) => freshProcess(i));
   const results = await Promise.all(jobs);
-  assert.equal(results.filter(x => x === 'reserved').length, 12);
-  assert.equal(results.filter(x => x === 'budget_exhausted').length, 2);
+  const reserved = results.filter(x => x.status === 'reserved').length;
+  assert.ok(reserved <= 12, JSON.stringify(results));
+  const denied = results.filter(x => x.status === 'denied');
+  assert.equal(reserved + denied.length, 14, JSON.stringify(results));
+  for (const result of denied) {
+    assert.ok(['budget_exhausted', 'budget_unavailable'].includes(result.code), JSON.stringify(result));
+    assert.equal(typeof result.message, 'string');
+    assert.ok(result.message.length > 0);
+  }
+  const ledgerPath = join(budgetRoot, 'user-global.json');
+  let ledger;
+  try { ledger = JSON.parse(await readFile(ledgerPath, 'utf8')); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+  assert.ok(reserved <= (ledger?.day_requests ?? 0));
+  // Contention may fail closed before or after a consumed reservation. Fill only
+  // the remaining durable capacity with at most twelve sequential fresh processes.
+  let filled = 0;
+  for (let fill = 0; (ledger?.minute_requests ?? 0) < 12 && fill < 12; fill++) {
+    assert.deepEqual(await freshProcess(14 + fill), { status: 'reserved' });
+    filled++;
+    ledger = JSON.parse(await readFile(ledgerPath, 'utf8'));
+  }
+  assert.equal(ledger.minute, minute);
+  assert.equal(ledger.minute_requests, 12);
+  assert.equal(ledger.day_requests, 12);
+  assert.equal(ledger.request_attempts.reduce((sum, row) => sum + row.attempts, 0), 12);
+  const exhaustedLedger = await readFile(ledgerPath);
+  for (const i of [26, 27]) {
+    const denied = await freshProcess(i, true);
+    assert.equal(denied.result.error_code, 'budget_exhausted');
+    assert.equal(denied.result.network_attempted, false);
+    assert.equal(denied.fetch_calls, 0);
+    assert.deepEqual(await readFile(ledgerPath), exhaustedLedger);
+  }
+  t.diagnostic(JSON.stringify({ race_processes: 14, race_reserved: reserved,
+    race_denial_codes: denied.map(result => result.code), sequential_fill: filled,
+    minute_requests: ledger.minute_requests, day_requests: ledger.day_requests,
+    fresh_quota_denials: 2, fresh_transport_calls: 0, ledger_unchanged_after_denials: true }));
 });
 
 test('corrupt and aliased budget files fail closed and never silently reset counters', async t => {

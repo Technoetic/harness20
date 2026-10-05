@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -17,8 +16,8 @@ function stepBody(root, step) {
   fs.writeFileSync(path.join(root, 'step_archive', 'archived', `step${String(step).padStart(3, '0')}.md`), `# Step ${step}\n`);
 }
 function fixture(t, state = active, { body = true } = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'h50-security-'));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  // macOS exposes /var through /private/var; fixtures use the shared physical root.
+  const root = tempRoot(t, 'h50-security-');
   fs.mkdirSync(path.join(root, 'step_archive'));
   if (state !== null) fs.writeFileSync(path.join(root, 'step_archive/progress.json'), typeof state === 'string' ? state : JSON.stringify(state));
   const step = state?.current_step;

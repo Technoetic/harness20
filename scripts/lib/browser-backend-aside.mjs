@@ -103,8 +103,11 @@ function inject(bytes, bridge) {
   return Buffer.concat([bytes.subarray(0, at), Buffer.from(bridge, 'utf8'), bytes.subarray(at)]);
 }
 
-export async function startVerificationServers({ document, allowed, axe }, { execute = exec } = {}) {
+export async function startVerificationServers({ document, allowed, axe }, { execute = exec, testBindHost } = {}) {
   requireHostNetworkIsolation(execute);
+  // The existing registered-fake gate must succeed before this portable unit
+  // fixture option is inspected. No native adapter can use it to open a server.
+  if (testBindHost !== undefined && testBindHost !== 'localhost') throw new Error('Invalid trusted HTTP fixture bind host');
   const state = { blocked: 0, application_requests: 0, host_requests: 0 };
   const html = (response, body, csp) => {
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': csp, 'permissions-policy': PERMISSIONS_POLICY,
@@ -114,7 +117,7 @@ export async function startVerificationServers({ document, allowed, axe }, { exe
   // Cookie scope ignores ports. A fresh IP host, not merely a fresh port, avoids
   // sharing the user's localhost cookies with generated JavaScript.
   const ipBytes = randomBytes(3);
-  const appHost = `127.${ipBytes[0] || 2}.${ipBytes[1] || 2}.${ipBytes[2] || 2}`;
+  const appHost = testBindHost ?? `127.${ipBytes[0] || 2}.${ipBytes[1] || 2}.${ipBytes[2] || 2}`;
   let hostOrigin, origin;
   const denied = response => { state.blocked++; response.writeHead(404, { 'cache-control': 'no-store' }); response.end(); };
   const handler = application => (request, response) => {

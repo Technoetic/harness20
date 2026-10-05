@@ -21,3 +21,15 @@ Cache-tamper protections add the new identity and retain both old ones. Native i
 An existing public Ubuntu CI failure showed an IPC `EPIPE` during actor cleanup. The test-only correction passes a callback, tolerates only closed-channel/`EPIPE` cleanup races, waits for actual child exit with the existing five-second grace period, and propagates unexpected errors. Production locks, assertions, hook timeouts and approval policy are preserved.
 
 The preceding OWASP complete suite and its failed/partial predecessors remain immutable historical records. Fresh release CI and installation results must identify their actual commit, assets and observed execution rather than relabeling those older results.
+
+## First release CI and portable fixtures
+
+The first release CI run, `37382593962` at candidate `a5aeb6d1a0ecdfe918f26fead7363a5324323799`, completed with one successful job and five failed jobs. Its actual logs and per-job counts are preserved. The failures exposed three fixture issues: macOS temporary-directory aliases used for nonexistent children; randomized `127.x` HTTP listener addresses unavailable on macOS; and a concurrency assertion that treated every fail-closed lock-contention denial as quota exhaustion.
+
+The security fixture now uses the existing physical temporary-root helper, with the same assertion reproduced as failing and then passing through an owned Windows junction. All 47 cases pass. Production guard logic and its deadlines remain unchanged.
+
+The HTTP fixture selects `localhost` only after the existing registered-fake executor gate succeeds, while retaining a distinct `127.0.0.1` host origin. Native or unregistered execution and invalid bind choices are refused before listening. All 38 affected cases pass; the earlier missing-axe dependency failure remains recorded. No native browser isolation capability was added.
+
+The quota fixture retains fourteen concurrent fresh processes and verifies at most twelve successful reservations, allowing only the proven fail-closed exhaustion/unavailability errors. It fills remaining durable capacity with at most twelve sequential fresh processes, then requires two further same-key, different-input requests to be quota-denied without transport or ledger changes. A child-local clock offset keeps the test in one controlled UTC bucket while real elapsed time and the compiled lock deadline continue normally. All eleven cases pass; the production quota module and limits are unchanged.
+
+Independent replays pass the affected security case, all three selected HTTP/native-gate cases and all eleven Jev cases with unchanged source hashes. These local results justify another complete six-job CI run; they do not turn the first failed run into a successful one or substitute for the final release CI.

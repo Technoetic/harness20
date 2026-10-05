@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile, readFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
+import { Server } from 'node:net';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { registerHooks } from 'node:module';
@@ -173,8 +174,9 @@ test('native Aside refuses untrusted execution before artifact servers or browse
 
 test('Aside HTTP response imposes capability restrictions independent of generated markup', async () => {
   const servers = await startVerificationServers({ document: Buffer.from('<html><head></head><body>safe</body></html>'), allowed: new Set(['/index.html']), axe: Buffer.from('/* test */') },
-    { execute: asideBackend.testOnly.registerFakeExecutor(async () => ({})) });
+    { execute: asideBackend.testOnly.registerFakeExecutor(async () => ({})), testBindHost: 'localhost' });
   try {
+    assert.equal(new URL(servers.origin).hostname, 'localhost', 'the trusted HTTP fixture must bind a portable explicit loopback host');
     assert.notEqual(new URL(servers.origin).hostname, new URL(servers.hostOrigin).hostname, 'ports alone do not isolate cookie hosts');
     const response = await fetch(`${servers.origin}/index.html`);
     assert.equal(response.status, 200);
@@ -187,6 +189,21 @@ test('Aside HTTP response imposes capability restrictions independent of generat
     assert.equal((await fetch(`${servers.origin}/__harness50__/host.html`)).status, 404);
     assert.equal((await fetch(`${servers.hostOrigin}/index.html`)).status, 404);
   } finally { await servers.close(); }
+});
+
+test('Aside portable HTTP fixture cannot grant native isolation or choose another bind host', async () => {
+  const fixture = { document: Buffer.from('<html>safe</html>'), allowed: new Set(['/index.html']), axe: Buffer.alloc(0) };
+  const listen = Server.prototype.listen;
+  let listens = 0;
+  Server.prototype.listen = function () { listens++; throw new Error('HTTP_LISTEN_REACHED_BEFORE_REFUSAL'); };
+  try {
+    await assert.rejects(startVerificationServers(fixture, { testBindHost: 'localhost' }), error => error.code === 'ASIDE_NETWORK_ISOLATION_UNSUPPORTED');
+    await assert.rejects(startVerificationServers(fixture, { execute: async () => ({}), testBindHost: 'localhost' }), error => error.code === 'ASIDE_NETWORK_ISOLATION_UNSUPPORTED');
+    for (const testBindHost of ['127.0.0.1', '0.0.0.0', 'example.test']) {
+      await assert.rejects(startVerificationServers(fixture, { execute: asideBackend.testOnly.registerFakeExecutor(async () => ({})), testBindHost }), /invalid trusted HTTP fixture bind host/i);
+    }
+    assert.equal(listens, 0, 'native or invalid fixture options must be rejected before listen');
+  } finally { Server.prototype.listen = listen; }
 });
 
 test('every dispatcher selection rejects generated HTML before loading any browser backend', async () => {
