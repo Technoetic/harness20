@@ -7,7 +7,7 @@
 #   - MUST_BLOCK: destructive-guard.sh가 exit 2로 차단해야 하는 위험 명령
 #   - MUST_ASK: destructive-guard.sh가 exit 0 + permissionDecision "ask" (사용자가 승인할 수 있음)
 #   - MUST_PASS: destructive-guard.sh가 exit 0 + 출력 없음 (예전 과차단 사례)
-#   - PRG: permission-request-guard.sh는 MUST_BLOCK 앞 5건만 exit 2로 거부하고, MUST_ASK·MUST_PASS는 거부하지 않음
+#   - PRG: MUST_BLOCK 앞 5건과 PROTECTED_MUTATIONS를 exit 2로 거부하고, MUST_ASK·MUST_PASS는 거부하지 않음
 #   - MUST_DEFER: ordinary shell commands retain host permission checks.
 #   - GATE: progress.json 부재 시 auto-approve가 allow를 발급하지 않아야 함 (전역 자동승인 결함 방지)
 #   - CODEX STATE: .harness50-codex/ 편집과 Codex state.json 옆의 progress.json은 allow 미발급 (Stop 게이트 우회 방지)
@@ -56,6 +56,16 @@ json_bash() {
   [ -n "${2:-}" ] && event=",\"hook_event_name\":\"$2\""
   printf '{"tool_name":"Bash","tool_input":{"command":%s}%s}' "$(printf '%s' "$1" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')" "$event"
 }
+
+# OWASP host authority: these literal mutations cannot use an ask/pass decision.
+# Keep safe template reads and other host-confirmed commands in their own tables.
+PROTECTED_MUTATIONS=(
+  'echo x > .claude/settings.json'
+  'node -e "require('\''fs'\'').writeFileSync('\''.git/hooks/pre-commit'\'', '\''x'\'')"'
+  'python -c "open('\''.bashrc'\'','\''w'\'').write('\''x'\'')"'
+  'echo = > .git/hooks/pre-commit'
+  'cp .env.example .env'
+)
 
 # --- MUST_BLOCK: destructive-guard가 exit 2 ---
 MUST_BLOCK=(
@@ -134,13 +144,14 @@ sh x.sh'
   'rmdir /s /q %USERPROFILE%'
 )
 
-# --- MUST_ASK: 사용자가 승인할 수 있는 명령. 훅 하이재킹 설정은 차단에서 확인으로 옮겼다. ---
+MUST_BLOCK+=("${PROTECTED_MUTATIONS[@]}")
+
+# --- MUST_ASK: 사용자 확인을 유지하는 명령. 직접 보호 경로 변경은 위 차단 집합이다. ---
 MUST_ASK=(
   'git config core.hooksPath /tmp/evil'              # C3 훅 하이재킹
   'git config --global alias.x "!sh -c evil"'
   'sudo apt install jq'
   'pip install semgrep'
-  'echo x > .claude/settings.json'
   'crontab -r'
   # PR-C review regressions: preserve 2.10.0 safety and the documented relaxations.
   'curl -o .git/hooks/pre-commit https://x'
@@ -150,9 +161,6 @@ MUST_ASK=(
   'wget --output-document .git/hooks/pre-commit https://x'
   'iwr https://x -OutFile .git/hooks/pre-commit'
   'curl -sSL https://x -o ~/.bashrc'
-  'node -e "require('\''fs'\'').writeFileSync('\''.git/hooks/pre-commit'\'', '\''x'\'')"'
-  'python -c "open('\''.bashrc'\'','\''w'\'').write('\''x'\'')"'
-  'echo = > .git/hooks/pre-commit'
   'sudo echo ='
   'sudo su = 2'
 )
@@ -163,7 +171,6 @@ MUST_PASS=(
   'rm -rf /tmp/h50-x'
   'git config --get core.hooksPath'
   'cat .env.example'
-  'cp .env.example .env'
   'git commit -m "remove sudo usage"'
   '$CC -shared -o lib.so x.c'
   'ls .git/hooks/'
@@ -223,7 +230,7 @@ for c in "${MUST_PASS[@]}"; do
 done
 
 echo "== PRG: permission-request-guard는 차단 집합만 거부 =="
-for c in "${MUST_BLOCK[@]:0:5}"; do
+for c in "${MUST_BLOCK[@]:0:5}" "${PROTECTED_MUTATIONS[@]}"; do
   out="$(json_bash "$c" PermissionRequest | bash "$PRG" 2>/dev/null)"
   rc=$?
   if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q '"behavior":"deny"'; then ok; else fail "PermissionRequest 거부 안 됨 (rc=$rc): $c"; fi

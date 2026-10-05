@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cp, mkdir, readFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir } from "node:fs/promises";
 import { join, posix, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -50,7 +50,7 @@ test("hook config contains exactly four synchronous lifecycle and guard commands
     assert.equal(groups.length, 1);
     if (eventName === "PreToolUse") {
       assert.deepEqual(Object.keys(groups[0]), ["matcher", "hooks"]);
-      assert.equal(groups[0].matcher, "Bash|apply_patch");
+      assert.equal(groups[0].matcher, "Bash|apply_patch|Read|Write|Edit|MultiEdit|NotebookEdit|WebFetch|WebSearch");
     } else {
       assert.deepEqual(Object.keys(groups[0]), ["hooks"]);
       assert.equal(groups[0].matcher, undefined);
@@ -102,7 +102,9 @@ test("Codex substitution executes the selected hook through the native host shel
     recursive: true
   });
   await mkdir(join(pluginRoot, "scripts", "lib"), { recursive: true });
-  for (const name of ["workflow-profiles.mjs", "json-io.mjs", "errors.mjs"]) {
+  // Exact shared dependency closure for the two native hook entrypoints exercised here.
+  for (const name of ["workflow-profiles.mjs", "json-io.mjs", "errors.mjs", "quality-files.mjs",
+    "strict-json.mjs", "tool-policy.mjs", "sensitive-data.mjs"]) {
     await cp(join(checkoutRoot, "scripts", "lib", name), join(pluginRoot, "scripts", "lib", name));
   }
   assert.match(pluginRoot, /\s/);
@@ -133,4 +135,43 @@ test("Codex substitution executes the selected hook through the native host shel
   assert.deepEqual(result.output, {});
   assert.equal(result.stdout, "{}\n");
   assert.equal(result.stderr, "");
+
+  // Established workflow scope remains guarded even when no state is available.
+  const metadataRoot = join(root, "step_archive", ".harness50-codex");
+  await mkdir(metadataRoot, { recursive: true });
+  const guardHandler = config.hooks.PreToolUse[0].hooks[0];
+  const guardCommand = process.platform === "win32" ? guardHandler.commandWindows : guardHandler.command;
+  const wireEvent = {
+    hook_event_name: "PreToolUse",
+    cwd: root,
+    turn_id: "native-guard-turn",
+    tool_use_id: "native-guard-tool",
+    session_id: "native-command-smoke",
+    transcript_path: null,
+    permission_mode: "default",
+    model: "gpt-5.6-codex"
+  };
+  const harmless = await runConfiguredHook(guardCommand, {
+    ...wireEvent, tool_name: "Bash", tool_input: { command: "git status --short" }
+  }, { pluginRoot, cwd: root });
+  assert.equal(harmless.code, 0);
+  assert.deepEqual(harmless.output, {});
+  assert.equal(harmless.stdout, "{}\n");
+  assert.equal(harmless.stderr, "");
+
+  const secretRead = await runConfiguredHook(guardCommand, {
+    ...wireEvent, tool_name: "Read", tool_input: { file_path: join(root, ".env") }
+  }, { pluginRoot, cwd: root });
+  const expectedDenial = {
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: "Harness36 blocked this operation (rule: protected-path)."
+    }
+  };
+  assert.equal(secretRead.code, 0);
+  assert.deepEqual(secretRead.output, expectedDenial);
+  assert.equal(secretRead.stdout, `${JSON.stringify(expectedDenial)}\n`);
+  assert.equal(secretRead.stderr, "");
+  assert.deepEqual(await readdir(metadataRoot), []);
 });

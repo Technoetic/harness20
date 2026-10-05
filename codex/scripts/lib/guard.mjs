@@ -1,6 +1,7 @@
 import { lstat, realpath } from "node:fs/promises";
 import { homedir } from "node:os";
 import { posix, win32 } from "node:path";
+import { inspectToolPolicy, inspectShellBoundary, isProtectedWritePath } from '../../../scripts/lib/tool-policy.mjs';
 
 const MAX_COMMAND_BYTES = 128 * 1024;
 const MAX_TOKENS = 1024;
@@ -1581,6 +1582,7 @@ function isOutside(pathApi, root, target) {
 }
 
 function isSensitivePathLiteral(value) {
+  try { if (isProtectedWritePath(value)) return true; } catch { /* The shell parser classifies dynamic or malformed targets. */ }
   const segments = value.replaceAll("\\", "/").split("/").filter(Boolean);
   const lowered = segments.map(segment => segment.toLowerCase());
   if (lowered.some(segment => SENSITIVE_DIRECTORIES.has(segment))) return true;
@@ -1695,7 +1697,7 @@ async function analyzeTarget(value, workspaceRoot, { patch = false, dynamic, cle
     const normalizedHome = comparable(pathApi, pathApi.resolve(home));
     if (normalizedTarget === normalizedHome) return patch ? "patch-outside-workspace" : "protected-root";
   }
-  if (isSensitivePath(targetText) || isSensitivePath(pathApi.relative(root, resolvedTarget))) {
+  if (isSensitivePath(targetText) || isSensitivePath(pathApi.relative(root, resolvedTarget)) || isSensitivePath(resolvedTarget)) {
     return patch ? "patch-sensitive-path" : "sensitive-path";
   }
   const cleanupMatch = /^[^*?\[\]{}$%!]+[\\/]\*$/.exec(targetText);
@@ -1801,6 +1803,8 @@ async function classifyPatch(command, workspaceRoot) {
 
 export async function classifyPreToolUse(event, { workspaceRoot, active = true } = {}) {
   if (!active) return { denied: false, ruleId: "no-match", supported: false };
+  const policy = inspectToolPolicy(event, { workspaceRoot });
+  if (policy.supported) return { denied: policy.rule !== null, ruleId: policy.rule ?? 'no-match', supported: true };
   if (!plainObject(event) || !SUPPORTED_TOOLS.has(event.tool_name)) {
     return { denied: false, ruleId: "no-match", supported: false };
   }
@@ -1812,9 +1816,19 @@ export async function classifyPreToolUse(event, { workspaceRoot, active = true }
   ) {
     return { denied: true, ruleId: "malformed-input", supported: true };
   }
-  const ruleId = event.tool_name === "Bash"
-    ? await classifyShell(event.tool_input.command, workspaceRoot)
-    : await classifyPatch(event.tool_input.command, workspaceRoot);
+  let ruleId;
+  if (event.tool_name === 'Bash') {
+    // Preserve the bounded shell parser's argument semantics and stable rule
+    // precedence. The extra boundary catches credential readers and literal
+    // inline interpreter access, which are outside its file-mutation grammar.
+    ruleId = await classifyShell(event.tool_input.command, workspaceRoot);
+    if (ruleId === 'no-match') {
+      const boundary = inspectShellBoundary(event.tool_input.command);
+      const reads = /(?:^|[;&|\s])(?:cat|less|more|head|tail|base64|xxd|od|strings|type|get-content|gc|bat|nl)\s/i.test(event.tool_input.command);
+      const inline = /\b(?:python3?|node|perl|ruby)\b[^\r\n]{0,128}\s-(?:c|e|p)\s/i.test(event.tool_input.command);
+      if (boundary && (boundary !== 'protected-path' || reads || inline)) ruleId = boundary === 'protected-path' ? 'sensitive-path' : boundary;
+    }
+  } else ruleId = await classifyPatch(event.tool_input.command, workspaceRoot);
   return { denied: ruleId !== "no-match", ruleId, supported: true };
 }
 

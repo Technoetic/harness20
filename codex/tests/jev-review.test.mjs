@@ -1,3 +1,5 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { after } from 'node:test';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -14,6 +16,9 @@ const call = (name, ...args) => {
 const prepare = (...args) => call('prepareJevReview', ...args);
 const run = (...args) => call('runJevReview', ...args);
 const inspect = (...args) => call('inspectJevReview', ...args);
+const budgetFixture = mkdtempSync(join(tmpdir(), 'harness36-jev-synthetic-budget-'));
+after(() => rmSync(budgetFixture, { recursive: true, force: true }));
+const freshBudget = () => mkdtempSync(join(budgetFixture, 'call-'));
 const key = 'synthetic-review-key-only';
 const topic = 'The page must provide a year filter.';
 const plan = 'A year filter is provided above the chart.';
@@ -25,7 +30,7 @@ const apiResponse = () => ({ model: 'jev-1.13.0', answers: { 'year-filter': {
   type: 'choice', choice: 'met', probabilities: { met: .9, unmet: .05, insufficient_evidence: .05 }, confidence: .8,
 } }, usage: { input_tokens: 32, output_tokens: 5 } });
 const jsonResponse = value => new Response(JSON.stringify(value), { status: 200, headers: { 'content-type': 'application/json' } });
-const opts = fetchImpl => ({ allowNetwork: true, apiKey: key, fetchImpl });
+const opts = fetchImpl => ({ allowNetwork: true, apiKey: key, fetchImpl, budgetRoot: freshBudget() });
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 
 async function fixture(t) {
@@ -284,7 +289,7 @@ test('source mutation while receiving an answer invalidates every result', async
 test('sources are checked again before transmission and changing them prevents any call', async t => {
   const root = await fixture(t);
   let calls = 0;
-  const options = { allowNetwork: true, fetchImpl: () => { calls++; return jsonResponse(apiResponse()); },
+  const options = { allowNetwork: true, budgetRoot: freshBudget(), fetchImpl: () => { calls++; return jsonResponse(apiResponse()); },
     get apiKey() {
       writeFileSync(join(root, topicPath), topic + '\nChanged after preparation.');
       return key;

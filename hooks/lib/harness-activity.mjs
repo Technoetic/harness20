@@ -29,7 +29,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { resolveWorkflowProfile, LEGACY_WORKFLOW_PROFILE } from '../../scripts/lib/workflow-profiles.mjs';
-import { claudeStepBody, checkClaudeProfileBinding } from '../../scripts/lib/claude-profile.mjs';
+import { claudeStepBody, checkClaudeProfileBinding, readPhysicalFileSync } from '../../scripts/lib/claude-profile.mjs';
+import { parseStrictJson } from '../../scripts/lib/strict-json.mjs';
 
 export const STEP_COUNT = 50;
 export const ACTIVE_STATUSES = Object.freeze(['active', 'running', 'in_progress']);
@@ -48,7 +49,7 @@ export const EXPLICIT_WEBAPP = /^[ \t]*\/(?:harness(?:36|50):)?webapp[ \t]+\S/;
 // guards stay on, so moving current_step by hand never turns them off.
 // The Stop event runs the writer and then step-auto-continue through run-hook.mjs's 'stop-advance'
 // sequence; each part keeps its own gate below.
-export const GUARD_PHASES = Object.freeze(['active', 'paused', 'finished', 'codex', 'drift']);
+export const GUARD_PHASES = Object.freeze(['active', 'paused', 'finished', 'codex', 'drift', 'invalid', 'stopped', 'stale']);
 export const HOOK_GATES = Object.freeze({
   'destructive-guard': GUARD_PHASES,
   'permission-request-guard': GUARD_PHASES,
@@ -140,9 +141,7 @@ function progressEntry(root) {
 // Parsed progress.json that lies inside root, or throws.
 function readProgress(root, file) {
   if (!within(physical(file), root)) throw new Error('progress.json leaves the project');
-  const stat = fs.statSync(file);
-  if (!stat.isFile() || stat.size > MAX_PROGRESS_BYTES) throw new Error('progress.json is not a small regular file');
-  return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, ''));
+  return parseStrictJson(new TextDecoder('utf-8',{fatal:true}).decode(readPhysicalFileSync(root,'step_archive/progress.json',MAX_PROGRESS_BYTES)).replace(/^﻿/, ''));
 }
 
 export function readRun(root) {
@@ -189,7 +188,7 @@ export function shouldRunHook(name, raw, env = process.env, cwd = process.cwd())
   try {
     const gate = Object.hasOwn(HOOK_GATES, name) ? HOOK_GATES[name] : DEFAULT_GATE;
     const text = typeof raw === 'string' ? raw : Buffer.isBuffer(raw) ? raw.toString('utf8') : '';
-    const event = JSON.parse(text.replace(/^﻿/, ''));
+    const event = parseStrictJson(text.replace(/^﻿/, ''));
     if (!event || typeof event !== 'object' || Array.isArray(event)) return false;
     if (gate === 'explicit-webapp') return typeof event.prompt === 'string' && EXPLICIT_WEBAPP.test(event.prompt);
     return gate.includes(readRun(projectRoot(event, env, cwd)).phase);

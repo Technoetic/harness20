@@ -32,6 +32,8 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             browser-verifier/package-lock.json
+      - name: Audit pinned dependency integrity and lifecycle policy
+        run: npm --ignore-scripts run verify:security
       - name: Install pinned validation dependencies
         run: npm ci --ignore-scripts
       # Pays the first-start cost of Windows PowerShell 5.1 outside the test spawn limits. The log

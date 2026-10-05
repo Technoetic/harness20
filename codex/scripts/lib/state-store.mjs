@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readSafe } from '../../../scripts/lib/quality-files.mjs';
 import {
   mkdir,
   lstat,
@@ -408,7 +409,7 @@ function archiveReason(value) {
 export async function readState(workspaceRoot) {
   const { statePath } = pathsFor(workspaceRoot);
   try {
-    return parseState(await readFile(statePath, "utf8"));
+    return parseState(new TextDecoder('utf-8',{fatal:true}).decode(await readSafe(workspaceRoot,'step_archive/.harness50-codex/state.json',1024*1024)));
   } catch (error) {
     if (error?.code === "ENOENT") return null;
     throw error;

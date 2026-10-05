@@ -1,3 +1,5 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { after } from 'node:test';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -6,13 +8,15 @@ import { tmpdir } from 'node:os';
 import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const budgetFixture = mkdtempSync(join(tmpdir(), 'harness36-jev-cli-budget-'));
+after(() => rmSync(budgetFixture, { recursive: true, force: true }));
 const cli = fileURLToPath(new URL('../../scripts/jev-ask.mjs', import.meta.url));
 const input = { schema_version: 1, context: { kind: 'user_input', text: 'Is 1 + 1 = 2?' },
   questions: [{ id: 'answer', type: 'noul', instructions: 'Is the arithmetic statement true?' }] };
 const diagnostic = { error: { code: 'JEV_COMMAND_FAILED', message: 'Jev direct question command failed' } };
 
 function run(args, stdin = JSON.stringify(input), { cwd, apiKey, probability } = {}) {
-  const env = { ...process.env };
+  const env = { ...process.env, HARNESS36_JEV_BUDGET_ROOT: mkdtempSync(join(budgetFixture, 'call-')) };
   delete env.TYPESAFE_API_KEY;
   if (apiKey !== undefined) env.TYPESAFE_API_KEY = apiKey;
   const preload = probability === undefined ? 'globalThis.fetch=()=>{throw Error("UNEXPECTED_FETCH")}'

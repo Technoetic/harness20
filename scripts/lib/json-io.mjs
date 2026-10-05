@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { TextDecoder } from "node:util";
 
 import { HarnessError } from "./errors.mjs";
+import { parseStrictJson } from './strict-json.mjs';
 
 const DEFAULT_TIMEOUT_MS = 10000;
 const DEFAULT_OUTPUT_TIMEOUT_MS = 1000;
@@ -106,7 +107,7 @@ function decodeJson(chunks) {
   if (text.trim() === "") fail("INPUT_EMPTY", "input must contain one JSON object");
   let value;
   try {
-    value = JSON.parse(text);
+    value = parseStrictJson(text);
   } catch {
     fail("INPUT_JSON", "input must contain valid JSON");
   }

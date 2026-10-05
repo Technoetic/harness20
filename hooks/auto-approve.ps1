@@ -11,20 +11,12 @@ $ErrorActionPreference = 'Continue'
 $OutputEncoding = [Text.UTF8Encoding]::new($false)
 try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch {}
 
-$raw = $null
-try {
-  $reader = [System.IO.StreamReader]::new([Console]::OpenStandardInput(), [System.Text.Encoding]::UTF8)
-  $raw = $reader.ReadToEnd()
-  $reader.Close()
-} catch {}
-if (-not $raw) { exit 0 }
-
 $node = $null
 try { if ($env:HARNESS50_NODE -and (Test-Path -LiteralPath $env:HARNESS50_NODE -PathType Leaf)) { $node = $env:HARNESS50_NODE } } catch {}
 if (-not $node) { $node = (Get-Command node -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source }
 if (-not $node) { exit 0 }
 
-$eligibility = $raw | & $node (Join-Path $PSScriptRoot 'lib/approval-policy.mjs') auto 2>$null
+$eligibility = & $node (Join-Path $PSScriptRoot 'lib/approval-policy.mjs') auto 2>$null
 if ($LASTEXITCODE -ne 0 -or $eligibility -ne 'eligible') { exit 0 }
 [Console]::Out.Write('{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","permissionDecisionReason":"harness36 autopilot mode: eligible edit or WebSearch in an active run"}}')
 exit 0

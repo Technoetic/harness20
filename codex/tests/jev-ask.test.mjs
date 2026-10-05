@@ -1,8 +1,15 @@
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { after } from 'node:test';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { prepareJevAsk as prepare, runJevAsk as run, parseJevAskJson as parse, readJevAskInput as read } from '../../scripts/lib/jev-ask.mjs';
 
+const budgetFixture = mkdtempSync(join(tmpdir(), 'harness36-jev-synthetic-budget-'));
+after(() => rmSync(budgetFixture, { recursive: true, force: true }));
+const freshBudget = () => mkdtempSync(join(budgetFixture, 'call-'));
 const key = 'synthetic-direct-key';
 const input = () => ({ schema_version: 1, context: { kind: 'user_input', text: 'Is 1 + 1 = 2? Hello, friend.' },
   questions: [
@@ -16,7 +23,7 @@ const response = () => ({ model: 'jev-1.13.0', answers: {
   tone: { type: 'score', score: 1.99, legend: { 0: 'Hostile', 1: 'Neutral', 2: 'Friendly' }, probabilities: { 0: 0, 1: .01, 2: .99 }, confidence: .98 },
 }, usage: { input_tokens: 73, output_tokens: 14 } });
 const json = value => new Response(JSON.stringify(value));
-const options = fetchImpl => ({ allowNetwork: true, apiKey: key, fetchImpl });
+const options = fetchImpl => ({ allowNetwork: true, apiKey: key, fetchImpl, budgetRoot: freshBudget() });
 
 test('direct native types preserve probabilities and rubric meaning with no invented Noul confidence', async () => {
   const prepared = await prepare(input());

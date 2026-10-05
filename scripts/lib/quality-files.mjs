@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { lstat, mkdir, open, readdir, realpath, rename, unlink } from 'node:fs/promises';
+import { lstat, mkdir, open, opendir, realpath, rename, unlink } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
@@ -36,16 +36,28 @@ export async function safePath(root, name, { createParents = false } = {}) {
 }
 
 export async function readSafe(root, name, limit = 8 * 1024 * 1024) {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 128 * 1024 * 1024) throw new Error('Invalid evidence byte limit');
   const path = await safePath(root, name);
   const before = await lstat(path, { bigint: true });
   const handle = await open(path, constants.O_RDONLY | (process.platform === 'win32' ? 0 : constants.O_NOFOLLOW ?? 0));
   try {
     const stat = await handle.stat({ bigint: true });
     if (!stat.isFile() || stat.nlink !== 1n || stat.size > BigInt(limit) || stat.ino !== before.ino || stat.dev !== before.dev) throw new Error('Evidence changed or exceeds size limit');
-    const bytes = await handle.readFile();
+    // Size checks alone race a growing file. Allocate only its observed bounded size,
+    // then probe one extra byte, regardless of subsequent file growth.
+    const bytes = Buffer.alloc(Number(stat.size));
+    let offset = 0;
+    while (offset < bytes.length) {
+      const { bytesRead } = await handle.read(bytes, offset, bytes.length-offset, offset);
+      if (!bytesRead) break;
+      offset += bytesRead;
+    }
+    const extra = Buffer.alloc(1);
+    if (offset !== bytes.length || (await handle.read(extra, 0, 1, offset)).bytesRead !== 0) throw new Error('Evidence changed during bounded reading');
+    const openedAfter = await handle.stat({ bigint: true });
     await safePath(root, name);
     const after = await lstat(path, { bigint: true });
-    if (bytes.length !== Number(stat.size) || ['ino','dev','size','mtimeNs','ctimeNs'].some(k => stat[k] !== after[k])) throw new Error('Evidence changed during reading');
+    if (['ino','dev','nlink','size','mtimeNs','ctimeNs'].some(k => stat[k] !== after[k] || stat[k] !== openedAfter[k])) throw new Error('Evidence changed during reading');
     return bytes;
   } finally { await handle.close(); }
 }
@@ -65,14 +77,20 @@ export async function writeSafe(root, name, bytes) {
 const EXCLUDED = new Set(['.git', '.harness50-quality-tools', 'node_modules', 'step_archive', 'coverage', '.cache', 'test-results', 'playwright-report']);
 export async function sourceFingerprint(root) {
   const hash = createHash('sha256');
-  let files = 0, size = 0;
-  async function visit(dir, prefix = '') {
-    const entries = (await readdir(dir, { withFileTypes: true })).sort((a,b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+  let files = 0, size = 0, directories = 0;
+  async function visit(dir, prefix = '', depth = 0) {
+    if (depth > 32 || ++directories > 10000) throw new Error('Source fingerprint depth/directory limit exceeded');
+    const entries = [];
+    for await (const entry of await opendir(dir)) {
+      if (entries.length >= 20000) throw new Error('Source fingerprint directory entry limit exceeded');
+      entries.push(entry);
+    }
+    entries.sort((a,b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
     for (const entry of entries) {
       if (EXCLUDED.has(entry.name)) continue;
       const name = `${prefix}${entry.name}`;
       if (entry.isSymbolicLink()) throw new Error('Source fingerprint refuses linked inputs');
-      if (entry.isDirectory()) await visit(join(dir, entry.name), `${name}/`);
+      if (entry.isDirectory()) await visit(join(dir, entry.name), `${name}/`, depth+1);
       else if (entry.isFile()) {
         const bytes = await readSafe(root, name);
         size += bytes.length;

@@ -763,6 +763,7 @@ function Assert-Steps {
     "scripts/lib/workflow-profiles.mjs", "scripts/lib/workflow-context.mjs",
     "scripts/lib/claude-profile.mjs", "scripts/lib/claude-spec.mjs",
     "scripts/lib/json-io.mjs", "scripts/lib/errors.mjs", "scripts/lib/quality-files.mjs", "scripts/lib/topic-contract.mjs",
+    "scripts/lib/strict-json.mjs", "scripts/lib/tool-policy.mjs", "scripts/lib/sensitive-data.mjs", "scripts/lib/workflow-security.mjs",
     "scripts/lib/quality.mjs", "scripts/lib/qa-report.mjs", "scripts/lib/final-regression.mjs",
     "scripts/lib/final-summary.mjs", "scripts/lib/jev-judge.mjs", "hooks/lib/workflow-profile.mjs"
   )) { [void](Resolve-SafeFile $Root $dependency "Shared profile dependency") }
@@ -814,7 +815,7 @@ function Assert-Hooks {
     $group = $groups[0]
     if ($eventName -ceq "PreToolUse") {
       Assert-ExactProperties $group @("matcher", "hooks") @() "PreToolUse hook group"
-      if ($group.matcher -cne "Bash|apply_patch") {
+      if ($group.matcher -cne "Bash|apply_patch|Read|Write|Edit|MultiEdit|NotebookEdit|WebFetch|WebSearch") {
         Stop-Smoke "HOOK_CONFIG_INVALID" "The PreToolUse matcher is unexpected."
       }
     } else {

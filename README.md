@@ -922,3 +922,7 @@ MIT License · Copyright (c) 2026 [Technoetic](https://github.com/Technoetic)
 [![Star this repo](https://img.shields.io/github/stars/Technoetic/harness36?style=for-the-badge&color=F59E0B)](https://github.com/Technoetic/harness36/stargazers)
 
 </div>
+
+## OWASP security hardening
+
+Hardening against the supplied OWASP 2026 reference adds deterministic tool/scope guards, bounded credential-filtered Jev calls with persistent user-wide quotas, and current evidence checks. Generated HTML requires verified all-transport host network isolation: the common dispatcher and direct backend entries reject execution because current native adapters cannot provide that guarantee. Read [security controls and deployment boundaries](docs/SECURITY.md). Validate reviewed dependency inputs with `npm --ignore-scripts run verify:security` before installation or release. Provider spending caps and OS process restrictions remain host responsibilities.

@@ -38,13 +38,15 @@ export async function handlePreToolUse(event, {
         );
       } catch (error) {
         if (unsafe(error)) throw error;
-        return {};
+        const result = await classifyPreToolUse(event, { workspaceRoot, active: true });
+        return result.denied ? deny(result.ruleId) : {};
       }
-      if (state === null || state.status !== "running") return {};
-
       const result = await classifyPreToolUse(event, { workspaceRoot, active: true });
       decision = result.denied ? deny(result.ruleId) : {};
       if (!result.supported) return decision;
+      // A paused or finished run still protects credentials and workflow authority,
+      // while its event history remains frozen.
+      if (state?.status !== 'running') return decision;
       try {
         await guardedHookOperation(
           guard,

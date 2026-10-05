@@ -22,7 +22,7 @@ test('constants keep the documented values', () => {
   assert.deepEqual([...ACTIVE_STATUSES], ['active', 'running', 'in_progress']);
   assert.equal(MAX_PROGRESS_BYTES, 1024 * 1024);
   assert.ok(Object.isFrozen(HOOK_GATES));
-  assert.deepEqual([...GUARD_PHASES], ['active', 'paused', 'finished', 'codex', 'drift']);
+  assert.deepEqual([...GUARD_PHASES], ['active', 'paused', 'finished', 'codex', 'drift', 'invalid', 'stopped', 'stale']);
   assert.ok(Object.isFrozen(GUARD_PHASES));
 });
 
@@ -195,8 +195,8 @@ const PHASES = ['absent', 'stale', 'paused', 'stopped', 'invalid', 'finished', '
 // The two guards run only where a Harness50 run is established; elsewhere the host decides. In a
 // drift run only the progress writer of the step hooks starts, to put the cursor back.
 const EXPECTED = {
-  'destructive-guard': ['paused', 'finished', 'codex', 'active', 'drift'],
-  'permission-request-guard': ['paused', 'finished', 'codex', 'active', 'drift'],
+  'destructive-guard': ['paused', 'finished', 'codex', 'active', 'drift', 'invalid', 'stopped', 'stale'],
+  'permission-request-guard': ['paused', 'finished', 'codex', 'active', 'drift', 'invalid', 'stopped', 'stale'],
   'webapp-trigger': [],
   'step-progress-loader': ['paused', 'codex', 'active'],
   'trust5-validator': ['finished', 'active'],

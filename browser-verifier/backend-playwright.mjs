@@ -2,6 +2,7 @@
 // `playwright` and `@axe-core/playwright` are imported lazily so this module loads
 // (and `node --check` passes) without the packages installed.
 import { createRequire } from 'node:module';
+import { requireHostNetworkIsolation } from '../scripts/lib/host-network-isolation.mjs';
 
 export async function available() {
   try { await import('playwright'); return true; }
@@ -73,6 +74,9 @@ async function outgoingLink(page, routing, route, routeUrl) {
 }
 
 export async function run(ctx) {
+  // Direct callers obey the same gate, before artifact access, package imports,
+  // browser launch or any context routing can execute untrusted document bytes.
+  requireHostNetworkIsolation('playwright', { report: ctx?.report });
   const { root, bytes, routing, report, timeoutMs, executablePath, viewports, entry, origin, routeUrl, passes, screenshotPath, writeSafe, ROUTE_ENTRY_PATH, UNKNOWN_ROUTE_PATH } = ctx;
   let browser, deadline;
   try {

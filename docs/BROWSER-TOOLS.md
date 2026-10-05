@@ -1,5 +1,13 @@
 # Browser verification backends
 
+**Current OWASP hardening:** generated HTML execution requires verified native host
+isolation across all network transports. The dispatcher and both direct native
+backend entries reject before serving or navigating generated artifacts because
+current adapters cannot provide that guarantee. Explicit selection, environment
+variables and historical backend locks cannot waive the gate. Dependency probes
+and locks describe installed tools, not permission or isolation capability.
+See `SECURITY.md` and `verification/2026-10-06-owasp-full.md` for evidence and limits.
+
 Harness36 needs a real browser for the final output check (`scripts/verify-output.mjs`),
 for the E2E step and for the evaluator screenshots. Since 2.5.0 the verifier is a
 dispatcher with two interchangeable backends:
@@ -9,11 +17,14 @@ dispatcher with two interchangeable backends:
 | `playwright` | `browser-verifier/` (its own `package.json`; nothing in the plugin root depends on it) | CI, and machines that allow Playwright. Fresh Chromium contexts, headless, full API. |
 | `aside` | `scripts/lib/browser-backend-aside.mjs` driving the Aside CLI (`aside repl`) | Machines where Playwright is not allowed or not installed. Runs inside the user's Aside Browser. |
 
-Both backends produce the same schema-v3 `step_archive/outputs/browser-output.json`
-and the same four screenshots. The gate (`scripts/lib/browser-report.mjs`) reads named
-report fields only, so a passing report from either backend satisfies fresh Steps 14–20 (explicit old36/50 retain their original gates). CI
-keeps Playwright; the Aside backend exists so that a workstation without Playwright can
-still finish the curriculum with measured evidence.
+The backend measurement interface uses schema-v3 `step_archive/outputs/browser-output.json`
+and four screenshots. Earlier versions ran both native backends; current native runs
+produce an explicit unsupported-isolation FAIL, no measured views and no screenshots.
+The report validator (`scripts/lib/browser-report.mjs`) checks local measurement fields
+and hashes. It does not authenticate the producer or attest host isolation. Preserve
+historical reports as historical evidence; they do not prove current execution support.
+Existing CI tests of trusted shipped examples remain distinct from executing generated
+artifacts. A future supported host isolation adapter needs independent attack verification.
 
 ## Availability and selection
 
@@ -44,7 +55,8 @@ node scripts/verify-output.mjs --workspace "<project-root>" --backend playwright
 node scripts/verify-output.mjs --workspace "<project-root>" --backend aside
 ```
 
-`--executable-path` still selects a Chromium-based binary for the Playwright backend.
+`--executable-path` retains its historical meaning as a Chromium binary selection;
+it does not bypass the native isolation gate.
 `--timeout <ms>` (the `timeoutMs` option of `verifyOutput()`; integer 1000–120000,
 default 60000) bounds the whole run under Playwright but applies **per chunk** (one
 `aside repl` call) under the Aside backend, because every call gets a fresh 120 s
@@ -52,7 +64,9 @@ session. Measured floor: an Aside chunk needs at least ~9–14 s (`openTab` alon
 fixed ~5.4 s), so values below ~10000 fail with `Browser verification exceeded its
 deadline`; a full three-route run is about 16 chunks × ~8 s ≈ 120–150 s.
 
-Install one backend. Once Step 3 has locked a backend, install and repair only that one:
+The historical installation commands below restore dependencies, not execution
+support under the new isolation policy. Once Step 3 has locked a backend, install
+and repair only that one under the deployment's authorized browser policy:
 
 ```text
 # Playwright (CI, allowed machines)

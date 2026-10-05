@@ -90,9 +90,9 @@ async function judgeFixture(id) {
   await writeFile(join(root,'step_archive/outputs/input.md'),'Synthetic selected requirements.');
   return root;
 }
-test('the old36 Jev policy stays stable and its reports remain inspectable after default change', async () => {
+test('old36 resumes retain history while new judgments use the hardened security policy', async () => {
   const root=await judgeFixture('research-free-36-v1');
-  const before=await prepareJevJudgment(root,judgment(17));assert.equal(before.policy_hash,oldPolicy);
+  const before=await prepareJevJudgment(root,judgment(17));assert.notEqual(before.policy_hash,oldPolicy);
   const saved=await runJevJudgment(root,judgment(17));
   assert.equal(saved.error_code,'network_disabled');
   assert.equal((await inspectJevJudgment(root,saved.report_path)).status,'current');
