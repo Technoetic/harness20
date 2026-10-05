@@ -128,7 +128,7 @@ export const secretPath = arg => HARD_SECRET.test(arg) || (!ENV_TEMPLATE.test(ar
 const PERSISTENT_TARGET = new RegExp([
   String.raw`(?:^|[\\/])\.git[\\/](?:hooks(?:[\\/]|$)|config$)`,
   String.raw`(?:^|[\\/])\.claude[\\/]settings(?:\.local)?\.json$`,
-  String.raw`(?:^|[\\/])harness(?:36|50)(?:[\\/][^\\/]+)?[\\/](?:hooks|\.claude-plugin)(?:[\\/]|$)`,
+  String.raw`(?:^|[\\/])harness(?:20|36|50)(?:[\\/][^\\/]+)?[\\/](?:hooks|\.claude-plugin)(?:[\\/]|$)`,
   String.raw`(?:^|[\\/])\.(?:bashrc|bash_profile|zshrc|zprofile|profile|zshenv)$`,
   String.raw`(?:^|[\\/])\.ssh[\\/]authorized_keys2?$`,
   String.raw`(?:^|[\\/])\.config[\\/](?:systemd|autostart)(?:[\\/]|$)`,
@@ -333,7 +333,7 @@ export function contentNeedsPrompt(text) {
 // URL and file-tool arguments are parsed by the shared deterministic tool policy.
 
 const BLOCK_LINES = [
-  'Harness36 checks the whole command text, including quoted strings and heredoc bodies, and this block cannot be approved from here.',
+  'Harness20 checks the whole command text, including quoted strings and heredoc bodies, and this block cannot be approved from here.',
   'If the match is only inside a commit message or PR/issue body, write that text to a file with the Write tool and pass the file: git commit -F <file>, gh pr create --body-file <file>.',
   'Do not move commands into a script to get past this check. If the command itself must run, ask the user to run it.'
 ];
@@ -370,7 +370,7 @@ function main(mode) {
     if (!event || typeof event !== 'object' || Array.isArray(event)) throw Error('invalid event');
   } catch {
     if (['pretool','permission'].includes(mode)) {
-      process.stderr.write('BLOCKED: Harness36 rejected malformed or oversized tool input.\n');
+      process.stderr.write('BLOCKED: Harness20 rejected malformed or oversized tool input.\n');
       return 2;
     }
     process.stdout.write('prompt');
@@ -384,7 +384,7 @@ function main(mode) {
   }
   const policy = inspectToolPolicy(event, { workspaceRoot: process.env.CLAUDE_PROJECT_DIR || event.cwd || process.cwd() });
   if (policy.supported && policy.rule) {
-    const reason = `harness36: blocked unsafe tool input (${policy.rule})`;
+    const reason = `harness20: blocked unsafe tool input (${policy.rule})`;
     process.stdout.write(JSON.stringify({ hookSpecificOutput: mode === 'permission'
       ? { hookEventName: 'PermissionRequest', decision: { behavior: 'deny', reason } }
       : { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } }));
@@ -401,13 +401,13 @@ function main(mode) {
       return 2;
     }
     if (verdict.level === 'ask') {
-      process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask', permissionDecisionReason: `harness36: ${verdict.rule} needs your confirmation (destructive-guard ask rule)` } }));
+      process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask', permissionDecisionReason: `harness20: ${verdict.rule} needs your confirmation (destructive-guard ask rule)` } }));
     }
     return 0;
   }
   if (mode === 'permission' && verdict.level === 'block') {
-    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'deny', reason: `harness36: PermissionRequest blocked - destructive command pattern (${verdict.rule}) (cross-plugin tamper protection)` } } }));
-    process.stderr.write(`Harness36 denied this permission request because the command text matches a destructive pattern (quoted strings and heredoc bodies included).\n${BLOCK_LINES.slice(1).join('\n')}\n`);
+    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'deny', reason: `harness20: PermissionRequest blocked - destructive command pattern (${verdict.rule}) (cross-plugin tamper protection)` } } }));
+    process.stderr.write(`Harness20 denied this permission request because the command text matches a destructive pattern (quoted strings and heredoc bodies included).\n${BLOCK_LINES.slice(1).join('\n')}\n`);
     return 2;
   }
   return 0;

@@ -75,7 +75,7 @@ async function main() {
     const md = `# TRUST5 measured quality - ${round}\n\nVerdict: ${report.verdict}\n\nChecks: test, lint, typecheck, security; measured coverage >= 85%.${final ? ' Current HTML, schema-v3 browser routing evidence for both API scenarios, and all six final regression matrices are also required.' : ''}\nNo directory-presence scores or partial credit.\n\n${report.error ?? 'All required evidence passed inspection.'}\n\nEvidence: quality-gate.json${final ? `, browser-output.json, Step${finalStep} immutable QA report` : ''}. This is local evidence, not a signed attestation.\n`;
     await writeSafe(root, `step_archive/outputs/trust5_${round}.md`, md);
     if (report.verdict !== 'PASS' && event.stop_hook_active !== true) {
-      console.log(JSON.stringify({ decision: 'block', reason: 'Harness36 quality evidence is missing, failed or stale. Configure harness50.quality.json and explicitly run node "<plugin-root>/scripts/quality-gate.mjs" --workspace "<project-root>". ' + (final ? `Also run the browser verifier for every declared route in both API scenarios, then snapshot, rerun and record all six Step${finalStep} regression matrices on the final HTML as described in docs/QA-REPORTS.md. ` : '') + 'Read docs/QUALITY.md. Repair failed checks before claiming this milestone complete.' }));
+      console.log(JSON.stringify({ decision: 'block', reason: 'Harness20 quality evidence is missing, failed or stale. Configure harness50.quality.json and explicitly run node "<plugin-root>/scripts/quality-gate.mjs" --workspace "<project-root>". ' + (final ? `Also run the browser verifier for every declared route in both API scenarios, then snapshot, rerun and record all six Step${finalStep} regression matrices on the final HTML as described in docs/QA-REPORTS.md. ` : '') + 'Read docs/QUALITY.md. Repair failed checks before claiming this milestone complete.' }));
     }
     return;
   }
@@ -83,4 +83,4 @@ async function main() {
   if (report.verdict !== 'PASS') process.exitCode = 1;
 }
 
-main().catch(error => { console.error(`Harness36 quality: ${error.message}`); process.exitCode = 1; });
+main().catch(error => { console.error(`Harness20 quality: ${error.message}`); process.exitCode = 1; });

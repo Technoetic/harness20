@@ -166,7 +166,7 @@ test("Codex substitution executes the selected hook through the native host shel
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
       permissionDecision: "deny",
-      permissionDecisionReason: "Harness36 blocked this operation (rule: protected-path)."
+      permissionDecisionReason: "Harness20 blocked this operation (rule: protected-path)."
     }
   };
   assert.equal(secretRead.code, 0);

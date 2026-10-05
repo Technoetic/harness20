@@ -93,7 +93,7 @@ for (const variant of variants) {
   test(`${variant} fresh planning20 starts without removed preflight artifacts and follows selected instructions`, t => {
     const base = tempRoot(t, 'h36-planning-hooks-'); const plugin = installPlugin(base);
     const root = join(base, 'project'); mkdirSync(root);
-    const trigger = run(plugin, 'webapp-trigger', root, { prompt: '/harness36:webapp Requirements planning fixture' });
+    const trigger = run(plugin, 'webapp-trigger', root, { prompt: '/harness20:webapp Requirements planning fixture' });
     const state = readProgress(root);
     assert.equal(state.workflow_profile, planning); assert.equal(state.total_steps, 20);
     assert.equal(state.schema_version, 2); assert.equal(state.current_step, 1); assert.deepEqual(state.completed_steps, []);
@@ -155,7 +155,7 @@ for (const variant of variants) {
   test(`${variant} native initialization freezes explicit six-field requests and normalizes unspecified fields before planning`, t => {
     const base = tempRoot(t, 'h36-topic-contract-'); const plugin = installPlugin(base);
     const incompleteRoot = join(base, 'incomplete'); mkdirSync(incompleteRoot);
-    const raw = '/harness36:webapp Plan a dashboard from the supplied requirements';
+    const raw = '/harness20:webapp Plan a dashboard from the supplied requirements';
     run(plugin, 'webapp-trigger', incompleteRoot, { prompt: raw });
     const normalized = readFileSync(join(incompleteRoot, 'step_archive/TOPIC/TOPIC.md'), 'utf8');
     assert.equal(hasCompleteTopicContract(normalized), true);

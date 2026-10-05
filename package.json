@@ -1,6 +1,6 @@
 {
-  "name": "harness36-validation",
-  "version": "3.1.0",
+  "name": "harness20-validation",
+  "version": "4.0.0",
   "private": true,
   "type": "module",
   "engines": {

@@ -525,7 +525,7 @@ async function assertNoInitConflict(workspaceRoot, paths) {
   ];
   for (const path of sharedPaths) {
     if (await pathExists(path)) {
-      fail("WORKFLOW_CONFLICT", "existing Harness36 work must be resumed or moved to another workspace", {
+      fail("WORKFLOW_CONFLICT", "existing Harness20 work must be resumed or moved to another workspace", {
         path: assertInside(workspaceRoot, path)
       });
     }

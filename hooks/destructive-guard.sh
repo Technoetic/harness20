@@ -7,11 +7,11 @@ NODE="${HARNESS50_NODE:-}"
 [ -x "$NODE" ] || NODE="$(command -v node 2>/dev/null || true)"
 DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 if [ -z "$NODE" ] || [ ! -f "$DIR/lib/command-guard.mjs" ]; then
-  echo 'BLOCKED: Harness36 guard runtime is unavailable.' >&2
+  echo 'BLOCKED: Harness20 guard runtime is unavailable.' >&2
   exit 2
 fi
 "$NODE" "$DIR/lib/command-guard.mjs" pretool
 CODE=$?
 [ "$CODE" -eq 0 ] && exit 0
-[ "$CODE" -eq 2 ] || echo 'BLOCKED: Harness36 guard could not validate this tool request.' >&2
+[ "$CODE" -eq 2 ] || echo 'BLOCKED: Harness20 guard could not validate this tool request.' >&2
 exit 2

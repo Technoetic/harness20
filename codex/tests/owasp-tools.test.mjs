@@ -26,6 +26,24 @@ function cli(plugin, module, mode, raw, root) {
 const fetchEvent = url => ({ tool_name: 'WebFetch', tool_input: { url } });
 const writeEvent = (file_path, content = 'ordinary text') => ({ tool_name: 'Write', tool_input: { file_path, content } });
 
+test('harness20 installed hook and manifest writes stay protected in both adapters with legacy cache aliases', async t => {
+  const { root, plugin } = fixture(t);
+  for (const name of ['harness20', 'HARNESS20', 'harness36', 'harness50']) {
+    for (const file of ['hooks/guard.mjs', '.claude-plugin/plugin.json', '.codex-plugin/plugin.json']) {
+      const target = `cache/${name}/4.0.0/${file}`;
+      const event = writeEvent(target);
+      assert.equal((await classifyPreToolUse(event, { workspaceRoot: root })).denied, true, target);
+      assert.equal((await classifyPreToolUse({ tool_name: 'apply_patch', tool_input: {
+        command: `*** Begin Patch\n*** Add File: ${target}\n+{}\n*** End Patch`
+      } }, { workspaceRoot: root })).denied, true, target);
+      assert.equal(cli(plugin, 'hooks/lib/approval-policy.mjs', 'guard', event, root).stdout.trim(), 'protected', target);
+      assert.equal(cli(plugin, 'hooks/lib/approval-policy.mjs', 'auto', event, root).stdout, '', target);
+    }
+  }
+  assert.equal((await classifyPreToolUse(writeEvent('src/harness20-notes.md'), { workspaceRoot: root })).denied, false);
+  assert.equal(cli(plugin, 'hooks/lib/approval-policy.mjs', 'auto', writeEvent('src/harness20-notes.md'), root).stdout, 'eligible');
+});
+
 test('LLM01/03: Codex direct patch cannot mutate workflow authority or durable budget', async t => {
   const { root } = fixture(t);
   for (const target of ['step_archive/progress.json', 'step_archive/workflow-profile.json', 'step_archive/TOPIC/TOPIC.md',

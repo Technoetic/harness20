@@ -18,5 +18,5 @@ NODE="${HARNESS50_NODE:-}"
 POLICY_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ELIGIBILITY="$("$NODE" "$POLICY_ROOT/lib/approval-policy.mjs" auto 2>/dev/null)" || exit 0
 [ "$ELIGIBILITY" = eligible ] || exit 0
-printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","permissionDecisionReason":"harness36 autopilot mode: eligible edit or WebSearch in an active run"}}'
+printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","permissionDecisionReason":"harness20 autopilot mode: eligible edit or WebSearch in an active run"}}'
 exit 0

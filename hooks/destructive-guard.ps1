@@ -9,12 +9,12 @@ try { if ($env:HARNESS50_NODE -and (Test-Path -LiteralPath $env:HARNESS50_NODE -
 if (-not $node) { $node = (Get-Command node -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source }
 $guard = Join-Path $PSScriptRoot 'lib/command-guard.mjs'
 if (-not $node -or -not (Test-Path -LiteralPath $guard -PathType Leaf)) {
-  [Console]::Error.WriteLine('BLOCKED: Harness36 guard runtime is unavailable.')
+  [Console]::Error.WriteLine('BLOCKED: Harness20 guard runtime is unavailable.')
   exit 2
 }
 # Native stdin remains attached: no unbounded ReadToEnd or intermediate shell string.
 & $node $guard pretool
 $code = $LASTEXITCODE
 if ($code -eq 0) { exit 0 }
-if ($code -ne 2) { [Console]::Error.WriteLine('BLOCKED: Harness36 guard could not validate this tool request.') }
+if ($code -ne 2) { [Console]::Error.WriteLine('BLOCKED: Harness20 guard could not validate this tool request.') }
 exit 2

@@ -250,7 +250,7 @@ test("SessionStart accepts the official full shape and all documented sources wi
     assert.deepEqual(Object.keys(result.output), ["hookSpecificOutput"]);
     assert.equal(result.output.hookSpecificOutput.hookEventName, "SessionStart");
     const context = result.output.hookSpecificOutput.additionalContext;
-    assert.match(context, /^Harness36: running, 0\/50 complete\./);
+    assert.match(context, /^Harness20: running, 0\/50 complete\./);
     assert.match(context, /Topic: step_archive\/TOPIC\/TOPIC\.md\./);
     assert.match(context, /Next: Step 001\./);
     assert.match(context, /\$webapp resume\.$/);
@@ -303,7 +303,7 @@ test("SessionStart reports corrupt state concisely without overwrite or disclosu
   assert.equal(result.stderr, "");
   assert.equal(
     result.output.hookSpecificOutput.additionalContext,
-    "Harness36 state is unreadable. Run $harness36-status, then repair or reset the Codex workflow."
+    "Harness20 state is unreadable. Run $harness20-status, then repair or reset the Codex workflow."
   );
   assert.ok(Buffer.from(await readFile(paths.statePath)).equals(corrupt));
   assert.doesNotMatch(result.stdout, /sk-proj|password|node:internal|hook-lifecycle|\\|\/[A-Za-z]/i);
@@ -356,9 +356,11 @@ test(`${agentType} subagent prompts preserve parent state and lifecycle events`,
 });
 }
 
-test("only exact explicit Harness36 and legacy Harness50 control-skill calls bypass pause", async () => {
+test("harness20 exact control-skill calls and legacy Harness36 and Harness50 aliases bypass pause", async () => {
   const accepted = [
     "$webapp", "$webapp resume", "$webapp build a small dashboard",
+    "$harness20-status", "$harness20-reset", "$harness20:webapp", "$harness20:webapp resume",
+    "$harness20:harness20-status", "$harness20:harness20-reset", "$harness20:status", "$harness20:reset",
     "$harness36-status", "$harness36-reset", "$harness36:webapp", "$harness36:webapp resume",
     "$harness36:harness36-status", "$harness36:harness36-reset", "$harness36:status", "$harness36:reset",
     "$harness50-status", "$harness50-reset", "$harness50:webapp", "$harness50:webapp resume",
@@ -379,6 +381,9 @@ test("only exact explicit Harness36 and legacy Harness50 control-skill calls byp
   const rejected = [
     "please run $webapp resume",
     "$webappx",
+    "$harness20:webappx", "$harness20:harness20-status now", "$harness20-status now", "$harness20-reset-now",
+    "$harness20:harness36-status", "$harness20:harness50-reset", "$harness36:harness20-reset", "$harness50:harness20-status",
+    "$Harness20:status", "$harness200:status",
     "$harness36:webappx",
     "$harness36:harness36-status now",
     "$harness36-status now",

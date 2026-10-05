@@ -8,7 +8,7 @@ variables and historical backend locks cannot waive the gate. Dependency probes
 and locks describe installed tools, not permission or isolation capability.
 See `SECURITY.md` and `verification/2026-10-06-owasp-full.md` for evidence and limits.
 
-Harness36 needs a real browser for the final output check (`scripts/verify-output.mjs`),
+Harness20 needs a real browser for the final output check (`scripts/verify-output.mjs`),
 for the E2E step and for the evaluator screenshots. Since 2.5.0 the verifier is a
 dispatcher with two interchangeable backends:
 

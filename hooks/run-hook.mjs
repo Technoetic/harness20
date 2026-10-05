@@ -21,7 +21,7 @@ const budgets = {"step-progress-loader":28000,"webapp-trigger":9000,"step-obedie
 const sequences = {"stop-advance":["step-progress-writer","step-auto-continue"]};
 const args = process.argv.slice(2);
 if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
-  console.error('Harness36: expected one registered hook name');
+  console.error('Harness20: expected one registered hook name');
   process.exitCode = 64;
 } else {
   const name = args[0];
@@ -44,7 +44,7 @@ if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
   // Armed before the hook starts, so the budget also covers any work done before spawn.
   const watchdog = setTimeout(() => {
     timedOut = true;
-    console.error(`Harness36: ${name} did not finish within ${budgets[name] / 1000} s and was ${guardHook ? 'blocked' : 'stopped without a decision'}.`);
+    console.error(`Harness20: ${name} did not finish within ${budgets[name] / 1000} s and was ${guardHook ? 'blocked' : 'stopped without a decision'}.`);
     if (!child) process.exit(failureStatus);
     // A node started by PowerShell is outside Node's job object and inherits the hook's output
     // handles, so end the whole tree while PowerShell is still its root.
@@ -68,7 +68,7 @@ if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
     if (bytes > TOOL_INPUT_LIMIT) {
       clearTimeout(watchdog);
       process.stdin.destroy();
-      if (guardHook) console.error('BLOCKED: Harness36 tool event exceeds the byte limit.');
+      if (guardHook) console.error('BLOCKED: Harness20 tool event exceeds the byte limit.');
       process.exit(guardHook ? 2 : 0);
     }
     chunks.push(chunk);
@@ -79,7 +79,7 @@ if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
     if (!event || typeof event !== 'object' || Array.isArray(event)) throw Error('invalid event');
   } catch {
     clearTimeout(watchdog);
-    if (guardHook) console.error('BLOCKED: Harness36 rejected malformed tool event.');
+    if (guardHook) console.error('BLOCKED: Harness20 rejected malformed tool event.');
     process.exit(guardHook ? 2 : 0);
   }
   // hooks/lib/harness-activity.mjs decides whether the project's run phase starts this hook.
@@ -112,7 +112,7 @@ if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
     child = started;
     childGroup = !windows;
     const timer = setTimeout(() => {
-      console.error(`Harness36: ${part} did not finish within ${budgets[part] / 1000} s and was stopped without a decision.`);
+      console.error(`Harness20: ${part} did not finish within ${budgets[part] / 1000} s and was stopped without a decision.`);
       if (windows) spawnSync('taskkill.exe', ['/PID', String(started.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true, timeout: 2000 });
       signalChild('SIGKILL');
       if (stdout === 'pipe') started.stdout.destroy();
@@ -121,7 +121,7 @@ if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
     if (stdout === 'pipe') started.stdout.resume();
     started.once('error', error => {
       clearTimeout(timer);
-      console.error(`Harness36: could not start registered hook (${error.code || 'spawn error'})`);
+      console.error(`Harness20: could not start registered hook (${error.code || 'spawn error'})`);
       finish(1);
     });
     started.once('close', (code, signal) => {
@@ -158,7 +158,7 @@ if (args.length !== 1 || !Object.hasOwn(budgets, args[0])) {
     });
     child.once('error', error => {
       clearTimeout(watchdog);
-      console.error(`Harness36: could not start registered hook (${error.code || 'spawn error'})`);
+      console.error(`Harness20: could not start registered hook (${error.code || 'spawn error'})`);
       process.exitCode = failureStatus;
     });
     child.once('close', (code, signal) => {

@@ -23,7 +23,7 @@ Test names above refer to `codex/tests/*.test.mjs`. `codex/tests/owasp-aside-liv
 
 ## Durable Jev limits
 
-The three Jev transports share one user-wide ledger in `~/.harness36-security/jev-budget`, across CLI processes, API keys and workflow resets. Reserve before dispatch; authentication failures, timeouts and malformed responses consume the reservation. UTC day/minute boundaries apply.
+The three Jev transports share one user-wide ledger in `~/.harness36-security/jev-budget`, across CLI processes, API keys and workflow resets. The historical storage name stays unchanged when the public plugin becomes harness20, so renaming does not reset quota enforcement. Reserve before dispatch; authentication failures, timeouts and malformed responses consume the reservation. UTC day/minute boundaries apply.
 
 - 12 requests/minute and 200 requests/day.
 - 786432 UTF8 request bytes/minute and 8 MiB/day; at most 65536 bytes/request.

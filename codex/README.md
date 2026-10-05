@@ -1,15 +1,15 @@
-# harness36 for Codex
+# harness20 for Codex
 
-Harness36의 Codex 어댑터는 기획부터 시작하는 기본20 절차를 20개의 검증 가능한 단계로 실행하되, Codex의 정상 권한 확인과 명시적인 후크 신뢰 절차를 유지합니다. Claude Code 설치와 기존 동작은 [루트 안내서](../README.md)를 참고하세요.
+Harness20의 Codex 어댑터는 기획부터 시작하는 기본20 절차를 20개의 검증 가능한 단계로 실행하되, Codex의 정상 권한 확인과 명시적인 후크 신뢰 절차를 유지합니다. Claude Code 설치와 기존 동작은 [루트 안내서](../README.md)를 참고하세요.
 
 ## Workflow profiles / 새20와 기존36·50
 
-공개 저장소·플러그인·마켓플레이스 이름은 **harness36**입니다. Claude Code는 `/harness36:webapp <주제>`, Codex는 `$harness36:webapp <주제>`로 시작합니다. 새 실행은 schema2·`planning-first-20-v1`의 **20단계**를 선택합니다. 기존36의 17단계 요구사항 기획을 새1로 삼고 앞의 1–16단계를 새 실행에서 제거했습니다.
+공개 저장소·플러그인·마켓플레이스 이름은 **harness20**입니다. Claude Code는 `/harness20:webapp <주제>`, Codex는 `$harness20:webapp <주제>`로 시작합니다. 새 실행은 schema2·`planning-first-20-v1`의 **20단계**를 선택합니다. 기존36의 17단계 요구사항 기획을 새1로 삼고 앞의 1–16단계를 새 실행에서 제거했습니다.
 
 초기화 관리자가 사용자 원문과 명시 조건을 TOPIC의 여섯 필드로 보존합니다.
 Codex는 `state.topic_sha256`에 TOPIC 해시를 고정하고 관리자가 현재 바이트를 검증합니다.
-Claude는 원문·여섯 필드를 보존하고 실행자의 TOPIC 수정을 금지하며, 기획·독립 검증자가
-입력 SHA-256을 확인·기록합니다. Claude 상태에는 TOPIC 해시의 자동 고정·검증이 구현돼 있지 않습니다.
+새 Claude 실행은 원문·여섯 필드를 보존하고 원문 TOPIC 해시를 자동 고정·검증합니다.
+과거 미표식 Claude 바인딩은 호환 실행이며 새 정책의 자동 고정이 적용됐다고 표시하지 않습니다.
 첫 기획은 TOPIC·명시 제공 자료를 검토하며 삭제된 프리플라이트·도구·의존성 게이트 산출물을
 요구하지 않습니다. 입력은 사용자 요구, TOPIC, 제공 자료, **2단계 설계 계약**과 현재 측정 출력입니다.
 필수 API 대상·버전·스키마·인증·오류/재시도 계약이 없으면 누락 요구사항으로 남깁니다.
@@ -66,14 +66,14 @@ Jev 체크포인트는 **1·2·9·15·19**이며, 최대5라운드·필수 findi
 
 | Host | Start | Status | Reset |
 |---|---|---|---|
-| Claude Code | `/harness36:webapp <topic>` | `/harness36:harness-status` | `/harness36:harness-reset` |
-| Codex | `$harness36:webapp <topic>` | `$harness36:harness36-status` | `$harness36:harness36-reset` |
+| Claude Code | `/harness20:webapp <topic>` | `/harness20:harness-status` | `/harness20:harness-reset` |
+| Codex | `$harness20:webapp <topic>` | `$harness20:harness20-status` | `$harness20:harness20-reset` |
 
-짧은 이름도 사용할 수 있습니다: Claude Code의 `/webapp`, `/harness-status`, `/harness-reset`과 Codex의 `$webapp`, `$harness36-status`, `$harness36-reset`. 각 시작 명령에는 주제를 붙입니다.
+짧은 이름도 사용할 수 있습니다: Claude Code의 `/webapp`, `/harness-status`, `/harness-reset`과 Codex의 `$webapp`, `$harness20-status`, `$harness20-reset`. 각 시작 명령에는 주제를 붙입니다.
 
 Codex does not provide a `/webapp` slash command. 진행 중인 Codex 워크플로를 이어가려면 `$webapp resume`, 자동 이어가기를 일시 정지하려면 `$webapp pause`를 사용하세요.
 
-플러그인 이름을 포함한 `$harness36:webapp`, `$harness36:harness36-status`, `$harness36:harness36-reset`도 지원합니다. 하위 에이전트의 요청은 부모 워크플로를 일시정지하지 않습니다.
+플러그인 이름을 포함한 `$harness20:webapp`, `$harness20:harness20-status`, `$harness20:harness20-reset`도 지원합니다. 하위 에이전트의 요청은 부모 워크플로를 일시정지하지 않습니다.
 
 Codex는 설치할 때 Claude Code `commands/*.md`의 일부를 `source-command-<이름>` 스킬로 바꿔 플러그인 캐시(`.codex-plugin/migrated-command-skills/`)에 둘 수 있습니다. 이 변환은 호스트 동작이며, 어떤 명령이 바뀌는지는 Codex 버전과 명령 내용에 따라 다릅니다(관측: 2.10.0 설치에서는 reset·resume, 2.9.0에서는 reset·status). Codex에서는 위 표의 스킬과 `$webapp pause`·`$webapp resume`을 사용하세요. 이관된 스킬이 선택되어도 다섯 Claude 명령은 모두 Codex 작업 공간(`step_archive/.harness50-codex/state.json`)을 먼저 확인하므로, 그 공간에서는 Claude `progress.json`과 TOPIC을 만들거나 바꾸지 않고, Codex 명령을 안내하거나 Codex 상태 관리자 절차를 따릅니다.
 
@@ -99,8 +99,8 @@ See the [direct question guide](../docs/jev-first.md) for the JSON contract and 
 현재 브랜치의 Codex 지원을 확인하려면 저장소를 체크아웃한 뒤 그 루트를 로컬 마켓플레이스로 등록합니다.
 
 ```text
-codex plugin marketplace add <path-to-harness36>
-codex plugin add harness36@harness36
+codex plugin marketplace add <path-to-harness20>
+codex plugin add harness20@harness20
 ```
 
 ### GitHub source
@@ -108,8 +108,8 @@ codex plugin add harness36@harness36
 공개 저장소에서 다음 경로로 설치할 수 있습니다.
 
 ```text
-codex plugin marketplace add Technoetic/harness36
-codex plugin add harness36@harness36
+codex plugin marketplace add Technoetic/harness20
+codex plugin add harness20@harness20
 ```
 
 The published repository includes both Claude Code and Codex adapters. 어느 경로를 사용하든 설치만으로 후크가 신뢰되지는 않습니다.
@@ -117,17 +117,17 @@ The published repository includes both Claude Code and Codex adapters. 어느 �
 ### Remove / 제거
 
 ```text
-codex plugin remove harness36@harness36
+codex plugin remove harness20@harness20
 ```
 
-이 명령은 로컬 설정과 캐시에서 플러그인을 지웁니다. 마켓플레이스 등록까지 지우려면 이어서 `codex plugin marketplace remove harness36`을 실행합니다. 진행 중인 워크플로는 캐시 안의 `codex/scripts/harness-state.mjs`를 쓰므로, 제거하거나 `codex plugin add`로 갱신하기 전에 `$webapp pause`로 멈추거나 워크플로를 완료하세요. 갱신도 이전 버전의 캐시를 지웁니다.
+이 명령은 로컬 설정과 캐시에서 플러그인을 지웁니다. 마켓플레이스 등록까지 지우려면 이어서 `codex plugin marketplace remove harness20`을 실행합니다. 진행 중인 워크플로는 캐시 안의 `codex/scripts/harness-state.mjs`를 쓰므로, 제거하거나 `codex plugin add`로 갱신하기 전에 `$webapp pause`로 멈추거나 워크플로를 완료하세요. 갱신도 이전 버전의 캐시를 지웁니다.
 
 ## Permissions and continuation / 권한과 이어가기
 
 - Normal Codex permission confirmations remain in effect for every command.
-- Harness36 never auto-approves commands and never changes sandbox or approval settings.
+- Harness20 never auto-approves commands and never changes sandbox or approval settings.
 - Each later turn receives at most one one-step continuation marker; that marker schedules work but grants no permission.
-- Submitted command evidence is validated only as a string and exit status; the Harness36 runtime never executes that submitted command.
+- Submitted command evidence is validated only as a string and exit status; the Harness20 runtime never executes that submitted command.
 - The guard is a bounded, deny-only defense, not a shell sandbox; benign commands are never approved by the hook and still follow normal Codex permissions.
 
 `$webapp <주제>` 한 번으로 현재 대화에서 순차 실행을 시작합니다. 한 작업 단위에서는
@@ -158,11 +158,13 @@ codex plugin remove harness36@harness36
 
 ## Migration and reset / 마이그레이션과 리셋
 
-### harness50 → harness36 설치 전환
+### harness36 → harness20 설치 전환
 
-v3.0.0은 설치 ID와 명령 namespace를 `harness36`으로 바꿉니다. 기존 `harness50` 설치가 자동으로 개명되지는 않습니다. 진행 중인 실행은 먼저 일시 정지하고, 기존 플러그인을 해당 설치 범위에서 비활성화한 뒤 새 `harness36`을 설치·활성화하세요. 두 이름의 플러그인을 동시에 활성화하지 마세요. 이전에 특정 프로젝트에서 꺼 둔 설정은 새 이름에서도 유지합니다.
+v4.0.0은 설치 ID와 명령 namespace를 `harness20`으로 바꿉니다. 기존 `harness36` 또는 `harness50` 설치가 자동으로 개명되지는 않습니다. 진행 중인 실행은 먼저 일시 정지하고, 기존 플러그인을 해당 설치 범위에서 비활성화한 뒤 새 `harness20`을 설치·활성화하세요. 두 이름의 플러그인을 동시에 활성화하지 마세요. 이전에 특정 프로젝트에서 꺼 둔 설정은 새 이름에서도 유지합니다. v3.0.0의 `harness50`→`harness36` 전환 이력은 루트 안내서의 과거 절에 보존합니다.
 
 기존 플러그인 캐시는 롤백과 다른 프로젝트를 위해 보존합니다. 전환 중에는 기존 설치를 제거하거나 캐시 폴더를 개명하지 않습니다. `step_archive/.harness50-codex/`, Claude 진행 기록, TOPIC, 단계 본문과 산출물은 이동·개명 없이 이어서 사용합니다. 기존 36/50 실행의 프로필과 계약 식별자도 유지합니다. 새 설치 후 호스트를 다시 시작하고 Codex의 변경된 훅 정의는 직접 검토·신뢰해야 합니다.
+
+사용자 공용 Jev 장부 `~/.harness36-security/jev-budget`과 기존 `HARNESS36_JEV_BUDGET_ROOT`는 유지합니다. 개명으로 호출·입력 예약 한도를 초기화하지 않습니다. 생성 HTML의 네이티브 브라우저 실행은 전체 전송 격리가 지원될 때까지 거부되며, 설치 여부나 가용성 probe가 격리를 증명하지 않습니다. 통제와 한계는 [보안 안내](../docs/SECURITY.md)를 따릅니다.
 
 
 - Only when no Codex workflow exists, existing Claude progress may be imported read-only once.
@@ -170,11 +172,11 @@ v3.0.0은 설치 ID와 명령 namespace를 `harness36`으로 바꿉니다. 기�
 - Reset archives and deactivates only Codex control metadata.
 - Reset preserves Claude progress, TOPIC, shared outputs, project source, and application source.
 
-가져온 Claude 완료 기록은 `imported`, Codex가 새로 검증한 완료 기록은 `codex_verified`로 구분됩니다. `$harness36-reset`은 복구 가능한 백업 경로를 보고하고 자동으로 새 워크플로를 시작하지 않습니다.
+가져온 Claude 완료 기록은 `imported`, Codex가 새로 검증한 완료 기록은 `codex_verified`로 구분됩니다. `$harness20-reset`은 복구 가능한 백업 경로를 보고하고 자동으로 새 워크플로를 시작하지 않습니다.
 가져오기나 영수증 복구 결과가 이미 `completed`라면 이 구분을 유지해 결과를 보고하며,
 완료된 작업에 다시 `resume`을 호출하지 않습니다.
 
-Claude Code hooks defer to an existing Codex workflow. While `step_archive/.harness50-codex/state.json` exists, they never create, rewrite or advance Claude `progress.json`, never block Stop, never auto-approve Claude edits and never re-initialize TOPIC; SessionStart reports the Codex step in one line instead. The two Claude guards still check Bash commands there, because a Claude session has no other Harness36 guard in a Codex workspace.
+Claude Code hooks defer to an existing Codex workflow. While `step_archive/.harness50-codex/state.json` exists, they never create, rewrite or advance Claude `progress.json`, never block Stop, never auto-approve Claude edits and never re-initialize TOPIC; SessionStart reports the Codex step in one line instead. The two Claude guards still check Bash commands there, because a Claude session has no other Harness20 guard in a Codex workspace.
 같은 작업 공간을 Claude Code에서 열어도 진행 기준은 Codex 상태 관리자입니다. 이어서 진행하려면 `codex/skills/webapp/SKILL.md`의 상태 관리자 절차(`show`·`resume`·`begin`·`complete`)를 따르며, 대화 속 완료 보고는 단계를 진행시키지 않습니다. 리셋 뒤 `state.json`이 백업으로 옮겨지면 Claude 훅은 기존 동작으로 돌아갑니다.
 
 ## Hook trust gate / 후크 신뢰 게이트
@@ -184,7 +186,7 @@ Claude Code hooks defer to an existing Codex workflow. While `step_archive/.harn
 3. Confirm that no approval hook is present, then manually trust only those exact current definitions.
 4. Changed hook hashes require review and manual trust again; never bypass or automate this trust step.
 
-확인할 세 스킬은 `$webapp`, `$harness36-status`, `$harness36-reset`입니다. Codex가 Claude 명령에서 옮긴 `source-command-*` 스킬은 이 세 스킬에 포함되지 않습니다. Hook execution stops at this trust gate until the user confirms the review. 설치 자동화가 훅 신뢰를 대신 처리해서는 안 됩니다. 스킬의 현재 대화 내 순차 실행은 훅을 실행하지 않으므로 이 신뢰 조작을 요구하지 않습니다.
+확인할 세 스킬은 `$webapp`, `$harness20-status`, `$harness20-reset`입니다. Codex가 Claude 명령에서 옮긴 `source-command-*` 스킬은 이 세 스킬에 포함되지 않습니다. Hook execution stops at this trust gate until the user confirms the review. 설치 자동화가 훅 신뢰를 대신 처리해서는 안 됩니다. 스킬의 현재 대화 내 순차 실행은 훅을 실행하지 않으므로 이 신뢰 조작을 요구하지 않습니다.
 
 ### When the workflow waits after every step / 매 단계 대기할 때
 
@@ -195,7 +197,7 @@ Claude Code hooks defer to an existing Codex workflow. While `step_archive/.harn
 An enabled plugin and `features.hooks = true` do not prove that its hooks can run.
 An enabled hook marked `untrusted` is skipped. This prevents hook-based scheduling
 after a real turn ending, not the active-turn execution loop. For that optional
-cross-turn recovery, inspect Harness36's four current definitions in `/hooks` and
+cross-turn recovery, inspect Harness20's four current definitions in `/hooks` and
 review and trust them manually. Repeated `$webapp resume` commands do not repair
 missing hook trust. Never reset a healthy workflow to address this problem.
 

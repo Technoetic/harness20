@@ -67,5 +67,5 @@ export async function auditSecurityInputs(root) {
 }
 if(process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
   try { console.log(JSON.stringify(await auditSecurityInputs(fileURLToPath(new URL('../',import.meta.url))),null,2)); }
-  catch { console.error('Harness36 security inputs failed review; release blocked.');process.exitCode=1; }
+  catch { console.error('Harness20 security inputs failed review; release blocked.');process.exitCode=1; }
 }

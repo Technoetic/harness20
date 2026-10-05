@@ -43,8 +43,8 @@ backend produces it is free. Install one of the two [browser backends](BROWSER-T
 in a separate checkout, outside the plugin cache:
 
 ```text
-git clone https://github.com/Technoetic/harness36.git
-cd harness36
+git clone https://github.com/Technoetic/harness20.git
+cd harness20
 
 # Backend 1 — Playwright (CI, machines that allow it), isolated in browser-verifier/
 cd browser-verifier && npm ci && npx playwright install chromium && cd ..
