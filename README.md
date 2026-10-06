@@ -4,7 +4,7 @@
 
 ### 한 줄 요청 → 기획부터 20 step 자율주행 → 인터랙티브 웹 튜토리얼 1편
 
-패키지 버전: **[v4.0.0](https://github.com/Technoetic/harness20/releases/tag/v4.0.0)** · Claude Code와 Codex 지원 · 기획부터 새 실행 20단계, 기존 36·50단계 이력 보존 · 제공 OWASP 10개 위험의 적용 가능한 호스트 통제 보강. [릴리스·전환 안내](docs/releases/v4.0.0.md)를 확인하세요.
+패키지 버전: **[v4.0.0](https://github.com/Technoetic/harness20/releases/tag/v4.0.0)** · Claude Code와 Codex 지원 · 기획부터 새 실행 20단계, 기존 36·50단계 이력 보존 · 제공 OWASP 10개 위험의 적용 가능한 호스트 통제 보강. [OWASP 보안 원칙·적용 범위](#owasp-보안-철학과-적용-범위) · [릴리스·전환 안내](docs/releases/v4.0.0.md)
 
 **`/harness20:webapp 논문 트렌드 분석 대시보드`** 한 줄을 던지면 요구사항 기획부터 20단계 완료나 명명된 멈춤 전까지 이어가는 결정론적 절차가 가동된다.<br/>
 모델을 똑똑하게 만드는 대신 **모델이 놓을 트랙을 좁힌다**.
@@ -31,14 +31,39 @@
 
 ---
 
+## OWASP 보안 철학과 적용 범위
+
+**모델이 악성 지시를 따를 수 있다는 전제에서, 실행 권한과 신뢰 경계를 호스트 코드가 강제합니다.** 웹·PDF·소스 문서 같은 외부 입력과 Jev의 응답은 자료·참고 판단입니다. 현재 사용자가 허용한 작업 범위, 도구·경로 접근, 입력의 무결성과 실행 한도를 임의로 바꿀 수 없습니다.
+
+사용자가 제공한 **OWASP LLM Top 10 2026 문서**를 기준으로 다음 통제를 보강했습니다. 공식 최종판 확인이나 OWASP 인증·완전한 보호를 주장하지 않습니다.
+
+| 보안 영역 | 적용한 호스트 통제 |
+|---|---|
+| 프롬프트 주입·과도한 자율성 | 등록된 도구의 인자·경로·범위 검사, 민감 경로 보호, 호스트 권한 정책 적용, 새 실행의 TOPIC 해시 고정·검증 |
+| 민감 정보·숨은 컨텍스트 노출 | 선택한 발췌만 크기를 제한해 전송, 자격 증명 필터, 자식 프로세스의 최소 환경·로그 정리 |
+| 공급망·입력/증거 오염 | 검토한 의존성 버전·무결성·출처 검사, 설치 lifecycle 스크립트 배제, 소스·설정·실행 세대에 연결된 현재 증거 검사 |
+| 무제한 소비·잘못된 정보 | 프로세스·API 키 간 공유하는 영속 Jev 사용량 예약, 반복·입출력·시간 상한, 보류·낮은 확신도 검토, 실제 측정 근거 요구 |
+| 부적절한 출력 처리 | 엄격한 응답 스키마와 shell 확장 없는 argv 실행, 생성 HTML 실행 전 호스트 TCP/UDP 전체 전송 경로의 네트워크 격리 요구 |
+
+**현재 네이티브 브라우저 어댑터는 필요한 격리를 제공하지 못하므로 생성 HTML 실행을 차단합니다.** CI의 신뢰된 브라우저 fixture 통과는 생성물의 네이티브 미리보기 지원을 뜻하지 않습니다.
+
+벡터 검색·임베딩·시맨틱 캐시·모델 학습 데이터 수집은 현재 플러그인에 없습니다. 추가할 때는 별도 위협 모델과 검증이 필요합니다. OS 권한·네트워크 접근 정책·서비스 과금 상한·비공개 업무 정보 보호와 변경된 훅의 수동 신뢰 검토는 호스트·운영자가 관리합니다.
+
+**v4.0.0 검증 근거:** 릴리스 커밋 `a6966675cb1f8dc90a2eb8d533bcb7f2664ec6e4`의 PR·main·태그에서 Windows/macOS/Linux × Node 22/24, 합계 **18개 CI 작업이 성공**했습니다. 각 작업에서 Claude 회귀 252개와 신뢰된 브라우저 fixture 45개가 통과했습니다. 환경별 제외와 실제 설치·공개 ZIP의 바이트 검증은 [릴리스 검증 JSON](https://github.com/Technoetic/harness20/releases/download/v4.0.0/verification.json)에 기록했습니다. 이 결과는 해당 릴리스의 근거이며 새 프로젝트의 전체 20단계 완료를 보증하지 않습니다.
+
+[위험 10개별 통제·잔여 한계·향후 통합 조건](docs/SECURITY.md) · [의존성 검증 명령](docs/SECURITY.md#host-and-deployment-responsibilities): `npm --ignore-scripts run verify:security`
+
+---
+
 ## Workflow profiles / 새20와 기존36·50
 
 공개 저장소·플러그인·마켓플레이스 이름은 **harness20**입니다. Claude Code는 `/harness20:webapp <주제>`, Codex는 `$harness20:webapp <주제>`로 시작합니다. 새 실행은 schema2·`planning-first-20-v1`의 **20단계**를 선택합니다. 기존36의 17단계 요구사항 기획을 새1로 삼고 앞의 1–16단계를 새 실행에서 제거했습니다.
 
 초기화 관리자가 사용자 원문과 명시 조건을 TOPIC의 여섯 필드로 보존합니다.
 Codex는 `state.topic_sha256`에 TOPIC 해시를 고정하고 관리자가 현재 바이트를 검증합니다.
-Claude는 원문·여섯 필드를 보존하고 실행자의 TOPIC 수정을 금지하며, 기획·독립 검증자가
-입력 SHA-256을 확인·기록합니다. Claude 상태에는 TOPIC 해시의 자동 고정·검증이 구현돼 있지 않습니다.
+새 Claude 실행은 `step_archive/workflow-profile.json`에 `security_policy: owasp-v1`과
+`topic_sha256`을 자동 고정하고 현재 TOPIC 바이트를 검증합니다. 원문·여섯 필드를 보존하고
+실행자의 TOPIC 수정을 금지합니다. 해당 표식이 없는 과거 Claude 이력은 호환되지만 새로 해시를 고정한 증거로 간주하지 않습니다.
 첫 기획은 TOPIC·명시 제공 자료를 검토하며 삭제된 프리플라이트·도구·의존성 게이트 산출물을
 요구하지 않습니다. 입력은 사용자 요구, TOPIC, 제공 자료, **2단계 설계 계약**과 현재 측정 출력입니다.
 필수 API 대상·버전·스키마·인증·오류/재시도 계약이 없으면 누락 요구사항으로 남깁니다.
@@ -227,7 +252,7 @@ Skill discovery alone does not prove that the current host delivers continuation
 
 Windows PowerShell 원본 훅 실행, 프로젝트별 중단 상태, Codex 하위 에이전트 분리와 중단된 잠금 복구를 회귀 검사합니다. 두 호스트 모두 Node.js 22 이상이 필요합니다.
 
-Trust5는 폴더 존재에 점수를 주지 않습니다. 실제 테스트·린트·타입·보안 명령의 종료 코드와 85% 이상 커버리지를 확인하며, 없거나 오래된 증거는 미완료로 표시합니다. 최종 HTML은 Chromium 계열 브라우저의 데스크톱·모바일 화면에서 오류, 접근성, 가로 넘침을 검사합니다. 브라우저 백엔드는 두 가지입니다 — `browser-verifier/`에 격리된 Playwright(CI·허용 PC) 또는 Aside CLI(Playwright가 금지된 PC). `node scripts/verify-output.mjs --probe`로 가용 백엔드를 확인하고 `--backend auto|playwright|aside`로 선택합니다([브라우저 도구 안내](docs/BROWSER-TOOLS.md)). 설정과 실행 명령은 [품질 검증 안내](docs/QUALITY.md)를 참고하세요.
+Trust5는 폴더 존재에 점수를 주지 않습니다. 실제 테스트·린트·타입·보안 명령의 종료 코드와 85% 이상 커버리지를 확인하며, 없거나 오래된 증거는 미완료로 표시합니다. 최종 HTML의 데스크톱·모바일 오류, 접근성, 가로 넘침 검사는 호스트 네트워크 격리를 검증한 백엔드가 있어야 실행할 수 있습니다. 코드에는 Playwright(CI·허용 PC)와 Aside CLI 어댑터가 있지만, **현재 네이티브 어댑터는 격리 요구를 만족하지 못해 생성 HTML 실행을 거부합니다.** `--probe`나 `--backend auto|playwright|aside` 선택도 이 경계를 해제하지 않습니다. [보안·격리 경계](docs/SECURITY.md), [브라우저 도구 안내](docs/BROWSER-TOOLS.md), [품질 검증 안내](docs/QUALITY.md)를 참고하세요.
 
 자동 검사는 학습 효과나 디자인 완성도 점수를 대신하지 않습니다. 실제 생성물의 평가는 별도 주제별 실행과 사용자 검증이 필요합니다.
 
@@ -874,7 +899,7 @@ PASS/FAIL/INCOMPLETE 판정이며 점수는 없다. 진행 기록 훅은 새 `St
 | 7 | 가드 2종은 하네스 작업 공간에서만 동작하고, 명령 문자열 전체(따옴표 안 메시지·heredoc 본문 포함)를 검사. 차단 규칙은 단어 위치와 무관, 확인 규칙은 실행 명령 자리에서만 | 커밋 메시지나 PR 본문의 차단 문구도 승인할 수 없게 차단. 따옴표 안이 명령으로 시작하면(`"pip install …"`) 확인도 뜸. `remove sudo usage`처럼 문장 중간의 단어는 확인 대상이 아님 | Write로 파일에 쓴 뒤 `git commit -F <파일>`·`gh pr create --body-file <파일>`. 문맥을 인식하는 검사는 후속 |
 | 8 | 훅은 hooks.json 제한 시간 전에 스스로 멈추고 결정을 내리지 않음(POSIX는 직계 자식만 종료) | 부하가 크면 자동 승인 대신 권한 창 | — |
 | 9 | 가드 판정은 선형 시간이지만 입력 크기에 상한이 있음: 명령 256 KiB, 편집 내용 1 MiB | 명령이 상한을 넘으면 확인(ask), 편집 내용이 상한을 넘으면 자동 승인 보류(권한 창) | — |
-| 10 | 가드는 progress.json 상태에 따라 켜지며 보안 경계가 아님 | 모델이 진행 기록을 옮기거나 지우면 가드도 꺼짐. bypassPermissions에서 확인(ask)이 권한 창을 띄우는지는 호스트 동작을 따름 | 가드는 추가 방어. 호스트 권한 정책과 샌드박스를 대신하지 않음 |
+| 10 | 도구 가드는 하네스 실행이 있는 작업 공간의 등록된 어댑터 도구를 검사 | 멈춤·완료·손상·누락된 진행 메타데이터로 가드를 끌 수 없음. 실행이 없는 폴더·미등록 도구·독립 OS 프로그램은 호스트 권한 정책을 따름 | 호스트 권한·네트워크 정책·샌드박스와 함께 운영. [상세 경계](docs/SECURITY.md) |
 
 2.2부터 Bash와 WebFetch는 정상 권한 확인을 거칩니다. 위험 패턴 검사는 추가 방어이며,
 호스트 권한 정책이나 파일시스템 샌드박스를 대체하지 않습니다.
@@ -932,7 +957,3 @@ MIT License · Copyright (c) 2026 [Technoetic](https://github.com/Technoetic)
 [![Star this repo](https://img.shields.io/github/stars/Technoetic/harness20?style=for-the-badge&color=F59E0B)](https://github.com/Technoetic/harness20/stargazers)
 
 </div>
-
-## OWASP security hardening
-
-Hardening against the supplied OWASP 2026 reference adds deterministic tool/scope guards, bounded credential-filtered Jev calls with persistent user-wide quotas, and current evidence checks. Generated HTML requires verified all-transport host network isolation: the common dispatcher and direct backend entries reject execution because current native adapters cannot provide that guarantee. Read [security controls and deployment boundaries](docs/SECURITY.md). Validate reviewed dependency inputs with `npm --ignore-scripts run verify:security` before installation or release. Provider spending caps and OS process restrictions remain host responsibilities.
