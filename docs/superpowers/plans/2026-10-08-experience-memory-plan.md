@@ -30,7 +30,7 @@
 
 ### Task 1: Shared policy and verified failure/lesson store
 
-**Files:** Create `scripts/lib/memory-policy.mjs`, `scripts/lib/workflow-memory.mjs`, `codex/tests/workflow-memory.test.mjs`. Modify `codex/scripts/lib/workflow.mjs` only after the baseline test run finishes.
+**Files:** Create `scripts/lib/memory-policy.mjs`, `scripts/lib/workflow-memory.mjs`, `scripts/lib/read-budget.mjs`, `codex/tests/workflow-memory.test.mjs`. Modify `codex/scripts/lib/workflow.mjs` and `scripts/lib/quality-files.mjs` after the focused clean baseline checks.
 
 **Interfaces:**
 - `memoryWorkspace(workspaceRoot)` -> `{root, context, binding, base}`; unsupported generation throws a fixed typed memory error.
@@ -39,6 +39,7 @@
 - `inspectFailure(workspaceRoot,{step,attempt_id})` -> current/historical/missing advisory record.
 - `recordLesson(workspaceRoot,input)`, `inspectLessons(workspaceRoot,input)`, `observeLesson(workspaceRoot,input)`, `retireLesson(workspaceRoot,input)` -> bounded immutable advisory records/projections.
 - `inspectLessons` accepts `{task_id,sources,check_ids,max_results,max_bytes,as_of,origins?}`; origins are exact `{path,sha256}` selections. Export any safe JSON/source helpers needed downstream with stable signatures.
+- `withReadBudget(limit, async operation)` is request-scoped. The existing bounded reader reserves bytes before allocation and charges actual reads, including nested QA verification; default callers are unchanged. `inspectLessons` additionally accepts selected IDs and metrics omission for batched applicability checks.
 
 - [ ] Write meaningful tests for preserved failure behavior, secret/control rejection, immutable replay/conflicts, current QA-backed lesson registration, validity/scope/source changes and honest outcome denominators.
 - [ ] Run the new tests and record the expected missing-feature failures.
@@ -91,4 +92,4 @@
 
 ## Execution bookkeeping
 
-Root owns a Git-ignored `.superpowers/experience-memory-20261008/` ledger, task reports and review packages. Task 1/2/3 own disjoint files and may execute in parallel; Task 2 depends only on the agreed shared helper interfaces. Task 4 begins after these interfaces/tests are ready. Existing-file edits wait for the clean baseline run. Git commits are serialized by root, with explicit file lists. No worker publishes, merges, installs plugins or changes host settings.
+Root owns the Git-ignored `.superpowers/sdd/2026-10-08-experience-memory-plan/` ledger, task reports and review packages. Task 1/2/3 own disjoint files and may execute in parallel; Task 2 depends only on the agreed shared helper interfaces. Task 4 begins after these interfaces/tests are ready. Existing-file edits wait for focused clean baseline checks; the complete suite runs on the final source. Git commits are serialized by root, with explicit file lists. No worker publishes, merges, installs plugins or changes host settings.

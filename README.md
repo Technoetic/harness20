@@ -31,6 +31,19 @@
 
 ---
 
+## Verified experience memory
+
+Local auxiliary memory preserves sanitized failures and QA-backed repair lessons.
+Explicit CLIs inspect applicable advice, retrieve digest-pinned bounded context,
+validate declared work units/reads/checkpoints, and record actual later outcomes.
+Advice grants no execution, approval or completion authority; counts, receipts
+and existing step contracts remain with the state manager. No provider, installed
+settings, network service or automatic SessionStart memory injection is added.
+See [requests, schemas, limits and reference scope](docs/experience-memory.md).
+Generationless legacy workflows return an explicit unsupported memory result;
+their existing execution remains available. The offline evaluator is a public
+synthetic fixture, not an LLM or business-performance benchmark.
+
 ## OWASP 보안 철학과 적용 범위
 
 **모델이 악성 지시를 따를 수 있다는 전제에서, 실행 권한과 신뢰 경계를 호스트 코드가 강제합니다.** 웹·PDF·소스 문서 같은 외부 입력과 Jev의 응답은 자료·참고 판단입니다. 현재 사용자가 허용한 작업 범위, 도구·경로 접근, 입력의 무결성과 실행 한도를 임의로 바꿀 수 없습니다.
