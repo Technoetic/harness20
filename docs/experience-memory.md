@@ -139,6 +139,39 @@ semantic duplicates return the same lesson ID; related/superseded IDs must name
 existing records. Namespace paths are manager-derived, never caller directory
 components. Records remain immutable.
 
+Memory inspection applies its stricter path classification before every nested
+QA artifact/evidence body read, including rechecks; a QA round containing a
+control document or private configuration is not usable as memory proof even
+when the lesson's explicit source list contains only safe files. Ordinary QA
+callers retain the existing policy. The optional synchronous `inspectQa` `pathPolicy(path,
+kind)` callback narrows artifact/evidence reads only; it cannot authorize a
+candidate as an internal binding or QA metadata read. Current QA here means
+current recorded observations and matching file hashes, not proof that a command
+was executed.
+
+Registration also creates manager-derived
+`lifecycle/<lesson_id>.json` within its memory namespace. This bounded (16 KiB)
+metadata has `schema_version:1`, `kind:"lesson-lifecycle"`, `binding`, `lesson_id`,
+the immutable lesson's `record_sha256`, and two arrays: `supersessions` (up to 32
+`{lesson_id,record_sha256,from}` references) and `retirements` (up to 32
+`{retirement_id,record_sha256,retired_at}` references). These are exact provenance
+references, not caller-supplied applicability flags. Unlike the original records,
+this metadata is atomically replaced with monotonically accumulated references.
+A cooperative exclusive namespace `lifecycle.lock` prevents lost updates between
+memory writers; contention returns `MEMORY_CONFLICT` for later explicit retry.
+An abandoned lock fails closed and is never automatically stolen.
+
+Revocation references are saved before the immutable replacement/retirement
+record. A partial write therefore leaves incomplete proof and origin inspection
+abstains until an exact replay completes it. No older lesson lacking lifecycle
+proof is automatically upgraded, including by replay. Selected origin inspection
+reads only its exact lifecycle file and bounded named references, verifies their
+digests and bindings, and pins/rechecks lifecycle bytes before returning. Missing,
+invalid or unresolved proof omits that origin. Supersession takes effect at the
+replacement's `from` and remains effective after its retirement or expiry. This
+is a cooperating-writer protocol, not cryptographic authorship or an atomic
+snapshot of the whole filesystem; administrative rollback is outside its claim.
+
 `inspect` requires task ID, sources, check IDs, positive `max_results` (up to 128),
 `max_bytes` (1–64 KiB), and a millisecond UTC `as_of`. Optional `selected_ids`
 select exact lesson hashes, `include_metrics:false` avoids observation projections,
@@ -148,6 +181,11 @@ topic/task/source scope, current QA proof and hashes. Stale supplied references
 are rejected; supply newly verified references to learn that an old lesson no
 longer applies. Expiry, retirement, supersession and withdrawn proof remove
 applicability.
+
+Stored task IDs and QA check IDs (including lesson metadata in a context
+manifest) share the 1-80 character grammar `[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}`.
+Context source IDs and work-unit IDs retain their separate 1-64 character
+alphanumeric/underscore/hyphen contract.
 
 ```json
 {"task_id":"total-task","sources":[{"path":"src/app.mjs","file_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","start_byte":0,"end_byte":24,"range_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}],"check_ids":["total"],"max_results":8,"max_bytes":16384,"as_of":"2026-10-08T01:00:00.000Z","selected_ids":["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"],"include_metrics":false,"origins":[]}

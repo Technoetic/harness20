@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, readFile, writeFile, link } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, link, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { makeWorkspace, makeDirectoryLink } from './helpers/workspace.mjs';
@@ -345,4 +345,102 @@ test('superseded lessons cannot register applicable observations even with curre
   await assert.rejects(()=>api.observeLesson(f.root,{...attempt,observation_id:'after-replacement-expired',
     observed_at:'2026-10-11T00:00:00.000Z'}),error=>error.code==='MEMORY_UNVERIFIED');
   assert.deepEqual(await readState(f.root),stateBefore);
+});
+
+test('selected superseded origins stay revoked after generation change, replacement retirement and expiry', async () => {
+  const f=await lessonFixture(),original=await api.recordLesson(f.root,f.input);
+  const replacement=await api.recordLesson(f.root,{...f.input,repair_observation:'Replacement repair.',
+    validity:{from:'2026-10-09T00:00:00.000Z',until:'2026-10-10T00:00:00.000Z'},supersedes:[original.lesson_id]});
+  await api.retireLesson(f.root,{lesson_id:replacement.lesson_id,retired_at:'2026-10-09T00:00:00.000Z',reason:'Withdraw replacement.'});
+  const before=await readState(f.root);await writeStateAtomic(f.root,{...before,workflow_id:'origin-supersession-next',
+    continuation:{...before.continuation,workflow_id:'origin-supersession-next'}});
+  const selected={...query(f),origins:[{path:original.record_path,sha256:original.record_sha256}],selected_ids:[original.lesson_id],include_metrics:false};
+  for(const as_of of ['2026-10-09T00:00:00.000Z','2026-10-11T00:00:00.000Z']) {
+    const result=await api.inspectLessons(f.root,{...selected,as_of});
+    assert.equal(result.status,'current');assert.equal(result.lessons.length,0);
+    assert.ok(result.omitted.some(v=>v.lesson_id===original.lesson_id&&v.reason==='superseded'));
+  }
+  assert.equal((await api.inspectLessons(f.root,selected)).lessons.length,1,'historical query before supersession remains valid');
+});
+
+test('memory QA rejects nested forbidden artifacts and evidence before body I/O while default QA remains current', async () => {
+  for(const [kind,path] of [['artifact','AGENTS.md'],['artifact','src/CLAUDE.md'],
+    ['artifact','src/config.json'],['evidence','step_archive/outputs/AGENTS.md'],
+    ['evidence','step_archive/outputs/private.json'],['evidence','step_archive/outputs/settings.json'],
+    ['evidence','step_archive/outputs/config.json'],['evidence','step_archive/outputs/secret-data.txt']]) {
+    const f=await lessonFixture();await writeFile(join(f.root,path),'x'.repeat(512*1024));
+    const snap=await snapshotQa(f.root,1,{artifacts:['src/app.js',...(kind==='artifact'?[path]:[])],
+      checks:[{id:'total',requirement:'Observed seven.'}]});
+    const qa=await recordQa(f.root,1,{snapshot_id:snap.snapshot_id,verifier:{id:'reviewer',mode:'independent'},
+      outcomes:[{id:'total',status:'pass',observation:'Observed seven.',
+        evidence_paths:[kind==='evidence'?path:'step_archive/outputs/test.json'],next_check:''}],next_actions:[]});
+    assert.equal((await inspectQa(f.root,1)).status,'current',path);
+    await budgetApi.withReadBudget(128*1024,async()=>{
+      await assert.rejects(()=>api.recordLesson(f.root,{...f.input,verification:{...f.input.verification,report_sha256:qa.report_sha256}}),
+        error=>error.code==='MEMORY_UNVERIFIED',path);
+      assert.ok(budgetApi.readBudgetUsage().used<128*1024,'forbidden 512 KiB body was never reserved/read');
+    });
+  }
+});
+
+test('registered memory task and actual QA check IDs round-trip punctuation and 65-80 character boundaries', async () => {
+  for(const [task_id,check_id] of [['total.task','total:check'],['task:total','total.check'],['t'.repeat(65),'c'.repeat(65)],['t'.repeat(80),'c'.repeat(80)]]) {
+    const f=await lessonFixture();const snap=await snapshotQa(f.root,1,{artifacts:['src/app.js'],checks:[{id:check_id,requirement:'Observed seven.'}]});
+    const qa=await recordQa(f.root,1,{snapshot_id:snap.snapshot_id,verifier:{id:'reviewer',mode:'independent'},outcomes:[{id:check_id,status:'pass',observation:'Observed seven.',evidence_paths:['step_archive/outputs/test.json'],next_check:''}],next_actions:[]});
+    const input={...f.input,task_id,scope:{...f.input.scope,task_ids:[task_id],check_ids:[check_id]},verification:{...f.input.verification,report_sha256:qa.report_sha256,check_ids:[check_id]}};
+    const saved=await api.recordLesson(f.root,input),body=await readFile(join(f.root,saved.record_path));
+    const entry={id:'selected-lesson',kind:'lesson',role:'candidate',mandatory:false,reference:reference(saved.record_path,body),
+      lesson:{id:saved.lesson_id,record_path:saved.record_path,record_sha256:saved.record_sha256,task_id,sources:[f.source],check_ids:[check_id]}};
+    async function retrieve() {
+      const bytes=Buffer.from(JSON.stringify({schema_version:1,binding:(await policy.memoryWorkspace(f.root)).binding,sources:[entry]}));
+      await writeFile(join(f.root,'src/context.json'),bytes);
+      return retrieveTaskContext(f.root,{manifest_path:'src/context.json',manifest_sha256:hash(bytes),query:'calculation',budget_bytes:16384,as_of:now});
+    }
+    assert.equal((await retrieve()).sources.length,1);
+    entry.lesson.task_id='t'.repeat(81);await assert.rejects(retrieve,/Invalid task context/);entry.lesson.task_id=task_id;
+    entry.lesson.check_ids=['c'.repeat(81)];await assert.rejects(retrieve,/Invalid task context/);
+    await assert.rejects(()=>api.recordLesson(f.root,{...input,task_id:'t'.repeat(81)}));
+    await assert.rejects(()=>snapshotQa(f.root,1,{artifacts:['src/app.js'],checks:[{id:'c'.repeat(81),requirement:'Too long.'}]}));
+  }
+});
+
+test('origin lifecycle requires complete exact proof and does not scan unrelated old lessons or retirements', async () => {
+  const f=await lessonFixture(),saved=await api.recordLesson(f.root,f.input),w=await policy.memoryWorkspace(f.root);
+  const lifecyclePath=`${w.base}/lifecycle/${saved.lesson_id}.json`,lifecycle=await readFile(join(f.root,lifecyclePath));
+  await writeFile(join(f.root,`${w.base}/lessons/unrelated-invalid.json`),'not a lesson');
+  await mkdir(join(f.root,`${w.base}/retirements`),{recursive:true});
+  await writeFile(join(f.root,`${w.base}/retirements/unrelated-invalid.json`),'not a retirement');
+  const before=await readState(f.root);await writeStateAtomic(f.root,{...before,workflow_id:'origin-proof-next',
+    continuation:{...before.continuation,workflow_id:'origin-proof-next'}});
+  const selected={...query(f),origins:[{path:saved.record_path,sha256:saved.record_sha256}],include_metrics:false};
+  assert.equal((await api.inspectLessons(f.root,selected)).lessons.length,1,'exact complete proof remains usable despite unrelated origin files');
+  const missing=JSON.parse(lifecycle);missing.supersessions=[{lesson_id:'a'.repeat(64),record_sha256:'b'.repeat(64),from:now}];
+  await writeFile(join(f.root,lifecyclePath),JSON.stringify(missing));
+  let result=await api.inspectLessons(f.root,selected);assert.equal(result.lessons.length,0);assert.equal(result.omitted[0].reason,'stale-or-unverified');
+  await writeFile(join(f.root,lifecyclePath),lifecycle);
+  const wrong=JSON.parse(lifecycle);wrong.record_sha256='0'.repeat(64);await writeFile(join(f.root,lifecyclePath),JSON.stringify(wrong));
+  assert.equal((await api.inspectLessons(f.root,selected)).lessons.length,0);
+  await unlink(join(f.root,lifecyclePath));
+  result=await api.inspectLessons(f.root,selected);assert.equal(result.lessons.length,0);assert.equal(result.omitted[0].reason,'stale-or-unverified');
+});
+
+test('concurrent lifecycle writers reject contention or retain both revocations including the earlier start', async () => {
+  const f=await lessonFixture(),saved=await api.recordLesson(f.root,f.input),w=await policy.memoryWorkspace(f.root);
+  const variants=['2026-10-09T00:00:00.000Z','2026-10-10T00:00:00.000Z'].map((from,i)=>({...f.input,
+    repair_observation:`Concurrent replacement ${i}.`,supersedes:[saved.lesson_id],validity:{from,until:'2026-10-12T00:00:00.000Z'}}));
+  await writeFile(join(f.root,`${w.base}/lifecycle.lock`),'held-by-another-writer');
+  await assert.rejects(()=>api.recordLesson(f.root,variants[0]),error=>error.code==='MEMORY_CONFLICT');
+  await unlink(join(f.root,`${w.base}/lifecycle.lock`));
+  const attempts=await Promise.allSettled(variants.map(input=>api.recordLesson(f.root,input)));
+  assert.ok(attempts.some(result=>result.status==='fulfilled'));
+  for(let i=0;i<attempts.length;i++)if(attempts[i].status==='rejected') {
+    assert.equal(attempts[i].reason.code,'MEMORY_CONFLICT');await api.recordLesson(f.root,variants[i]);
+  }
+  const lifecycle=JSON.parse(await readFile(join(f.root,`${w.base}/lifecycle/${saved.lesson_id}.json`)));
+  assert.equal(lifecycle.supersessions.length,2);assert.deepEqual(lifecycle.supersessions.map(r=>r.from).sort(),variants.map(v=>v.validity.from));
+  const before=await readState(f.root);await writeStateAtomic(f.root,{...before,workflow_id:'concurrent-origin-next',
+    continuation:{...before.continuation,workflow_id:'concurrent-origin-next'}});
+  const result=await api.inspectLessons(f.root,{...query(f),as_of:variants[0].validity.from,
+    origins:[{path:saved.record_path,sha256:saved.record_sha256}],include_metrics:false});
+  assert.equal(result.lessons.length,0);assert.equal(result.omitted[0].reason,'superseded');
 });

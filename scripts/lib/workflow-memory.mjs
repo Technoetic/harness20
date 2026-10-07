@@ -1,7 +1,8 @@
 // Immutable advisory records. Workflow state, receipts and QA stay authoritative.
 import { open, lstat, readdir, realpath, unlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { readSafe, safePath, sha256 } from './quality-files.mjs';
+import { randomUUID } from 'node:crypto';
+import { readSafe, safePath, sha256, writeSafe } from './quality-files.mjs';
 import { inspectQa } from './qa-report.mjs';
 import {
   MemoryError, memoryError, memoryRequire as require, memoryObject as object, memoryText as text,
@@ -160,7 +161,8 @@ async function readSources(w,refs) {
   for(const ref of refs) { const loaded=await readMemorySource(w.root,ref,{}); total+=loaded.file_bytes; require(total<=32*1024*1024,'MEMORY_BUDGET'); }
 }
 async function currentQa(w,proof,refs) {
-  const qa=await inspectQa(w.root,proof.step);
+  const qa=await inspectQa(w.root,proof.step,{pathPolicy:(path,kind)=>
+    assertMemorySourcePath(path,kind==='artifact'?'repository-source':'approved-artifact')});
   require(qa.status==='current'&&qa.verdict==='PASS'&&qa.report_sha256===proof.report_sha256,'MEMORY_UNVERIFIED');
   require(proof.check_ids.every(check=>qa.preserve.includes(check)),'MEMORY_UNVERIFIED');
   require(refs.every(ref=>qa.artifacts.some(artifact=>artifact.path===ref.path&&artifact.sha256===ref.file_sha256)),'MEMORY_UNVERIFIED');
@@ -209,6 +211,77 @@ async function originQa(w,record) {
 async function registered(w,lessonIds) {
   for(const lessonId of lessonIds) await lessonRead(w,lessonPath(w,lessonId));
 }
+const originBase=record=>`step_archive/outputs/workflow-memory/${record.binding.workflow_profile}/${record.binding.workflow_generation}`;
+const lifecyclePath=record=>`${originBase(record)}/lifecycle/${record.lesson_id}.json`;
+// Cooperative namespace exclusion protects read/modify/replace against other
+// memory writers. Contention and abandoned locks fail closed; no stale stealing.
+async function lifecycleWrite(w,operation) {
+  await recheckMemoryWorkspace(w);
+  const path=`${w.base}/lifecycle.lock`,target=await safePath(w.root,path,{createParents:true});
+  let handle;
+  try {handle=await open(target,'wx',0o600);} catch(error) {
+    if(error?.code==='EEXIST')throw memoryError('MEMORY_CONFLICT');throw error;
+  }
+  const token=Buffer.from(randomUUID());
+  try {await handle.writeFile(token);await handle.sync();await handle.close();handle=null;return await operation();}
+  finally {
+    if(handle)await handle.close();
+    if((await readSafe(w.root,path,128)).equals(token))await unlink(await safePath(w.root,path));
+  }
+}
+async function lifecycleRead(w,lesson) {
+  const loaded=await recordRead(w,lifecyclePath(lesson.record)),value=loaded.value;
+  object(value,['schema_version','kind','binding','lesson_id','record_sha256','supersessions','retirements']);
+  require(value.schema_version===1&&value.kind==='lesson-lifecycle');
+  assertMemoryBinding(value.binding,lesson.record.binding);
+  require(value.lesson_id===lesson.record.lesson_id&&value.record_sha256===lesson.sha256,'MEMORY_CHANGED');
+  const replacements=list(value.supersessions,32).map(ref=>{
+    object(ref,['lesson_id','record_sha256','from']);hash(ref.lesson_id);hash(ref.record_sha256);time(ref.from);return ref.lesson_id;
+  });unique(replacements);
+  const retirements=list(value.retirements,32).map(ref=>{
+    object(ref,['retirement_id','record_sha256','retired_at']);hash(ref.retirement_id);hash(ref.record_sha256);time(ref.retired_at);return ref.retirement_id;
+  });unique(retirements);
+  return loaded;
+}
+async function lifecycleAppend(w,lesson,field,entry) {
+  const loaded=await lifecycleRead(w,lesson),value=loaded.value;
+  if(value[field].some(ref=>canonical(ref)===canonical(entry)))return;
+  value[field].push(entry);value[field].sort((a,b)=>canonical(a).localeCompare(canonical(b),'en'));
+  require(value[field].length<=32,'MEMORY_BUDGET');const bytes=encode(value);require(bytes.length<=LIMIT,'MEMORY_BUDGET');
+  const path=lifecyclePath(lesson.record);
+  require((await recordRead(w,path)).sha256===loaded.sha256,'MEMORY_CHANGED');
+  await recheckMemoryWorkspace(w);await writeSafe(w.root,path,bytes);
+  require((await recordRead(w,path)).sha256===sha256(bytes),'MEMORY_CHANGED');
+}
+async function lifecycleInitialize(w,record) {
+  const sha=sha256(encode(record)),lesson={record,sha256:sha};
+  try {await lifecycleRead(w,lesson);return;} catch(error) {if(error?.code!=='ENOENT')throw error;}
+  // Older/missing metadata cannot be reconstructed from an incomplete history.
+  try {await recordRead(w,lessonPath(w,record.lesson_id));throw memoryError('MEMORY_UNVERIFIED');}
+  catch(error) {if(error?.code!=='ENOENT')throw error;}
+  await writeOnce(w,lifecyclePath(record),{schema_version:1,kind:'lesson-lifecycle',binding:record.binding,
+    lesson_id:record.lesson_id,record_sha256:sha,supersessions:[],retirements:[]});
+}
+async function originLifecycle(w,lesson,asOf) {
+  const loaded=await lifecycleRead(w,lesson),base=originBase(lesson.record);let superseded=false,retired=false;
+  // These are exact named, bounded provenance reads, never an origin archive scan.
+  for(const ref of loaded.value.supersessions) {
+    const replacement=await lessonRead(w,`${base}/lessons/${ref.lesson_id}.json`,ref.record_sha256,true);
+    assertMemoryBinding(replacement.record.binding,lesson.record.binding);
+    require(replacement.record.supersedes.includes(lesson.record.lesson_id)&&replacement.record.validity.from===ref.from);
+    if(Date.parse(ref.from)<=Date.parse(asOf))superseded=true;
+  }
+  for(const ref of loaded.value.retirements) {
+    const retirement=await recordRead(w,`${base}/retirements/${ref.retirement_id}.json`),r=retirement.value;
+    require(retirement.sha256===ref.record_sha256&&sha256(canonical(r))===ref.retirement_id);
+    object(r,['schema_version','kind','binding','lesson_id','retired_at','reason']);
+    require(r.schema_version===1&&r.kind==='retirement'&&r.lesson_id===lesson.record.lesson_id&&r.retired_at===ref.retired_at);
+    assertMemoryBinding(r.binding,lesson.record.binding);time(r.retired_at);text(r.reason,512);
+    if(Date.parse(ref.retired_at)<=Date.parse(asOf))retired=true;
+  }
+  require((await recordRead(w,lifecyclePath(lesson.record))).sha256===loaded.sha256,'MEMORY_CHANGED');
+  return {sha256:loaded.sha256,superseded,retired};
+}
 export async function recordLesson(workspaceRoot,raw) {
   try {
     const input=structuredClone(raw); object(input,['task_id','failure','repair_observation','scope','sources','verification','validity','related_ids','supersedes']);
@@ -227,7 +300,14 @@ export async function recordLesson(workspaceRoot,raw) {
       validity:validity(input.validity),related_ids:related,supersedes};
     const record={...content,lesson_id:sha256(canonical(content))};validateLessonRecord(record);
     await readSources(w,refs);await currentQa(w,proof,refs);await recheckMemoryWorkspace(w);
-    const saved=await writeOnce(w,lessonPath(w,record.lesson_id),record);
+    const saved=await lifecycleWrite(w,async()=>{
+      await lifecycleInitialize(w,record);
+      // Publish revocations first. A partial registration leaves missing proof,
+      // which causes origin inspection to abstain until exact replay completes.
+      for(const lessonId of supersedes)await lifecycleAppend(w,await lessonRead(w,lessonPath(w,lessonId)),
+        'supersessions',{lesson_id:record.lesson_id,record_sha256:sha256(encode(record)),from:record.validity.from});
+      return writeOnce(w,lessonPath(w,record.lesson_id),record);
+    });
     return {status:'recorded',advisory:true,lesson_id:record.lesson_id,record_path:saved.path,record_sha256:saved.sha256,replayed:saved.replayed};
   } catch(error) { throw error instanceof MemoryError?error:memoryError('MEMORY_UNAVAILABLE'); }
 }
@@ -321,8 +401,13 @@ export async function inspectLessons(workspaceRoot,raw) {
       const record=candidate.record;
       if(input.selected_ids!==undefined&&!input.selected_ids.includes(record.lesson_id))continue;
       if(!appliesTo(record,input)) {omitted.push({lesson_id:record.lesson_id,reason:'inapplicable'});continue;}
-      if(!await active(w,record,input.as_of,candidate.origin)) {omitted.push({lesson_id:record.lesson_id,reason:'retired'});continue;}
       try {
+        if(candidate.origin) {
+          candidate.lifecycle=await originLifecycle(w,candidate,input.as_of);
+          if(candidate.lifecycle.superseded||candidate.lifecycle.retired) {
+            omitted.push({lesson_id:record.lesson_id,reason:candidate.lifecycle.superseded?'superseded':'retired'});continue;
+          }
+        } else if(!await active(w,record,input.as_of)) {omitted.push({lesson_id:record.lesson_id,reason:'retired'});continue;}
         await readSources(w,record.sources);
         if(candidate.origin) await originQa(w,record);else await currentQa(w,record.verification,record.sources);
         const failure=await recordRead(w,record.failure.record_path);require(failure.sha256===record.failure.record_sha256);
@@ -348,7 +433,10 @@ export async function inspectLessons(workspaceRoot,raw) {
       const c=applicable.find(candidate=>candidate.record.lesson_id===projection.lesson_id);
       await lessonRead(w,c.path,c.sha256,c.origin);
       if(c.origin)await originQa(w,c.record);else await currentQa(w,c.record.verification,c.record.sources);
-      require(await active(w,c.record,input.as_of,c.origin),'MEMORY_CHANGED');
+      if(c.origin) {
+        const lifecycle=await originLifecycle(w,c,input.as_of);
+        require(lifecycle.sha256===c.lifecycle.sha256&&!lifecycle.superseded&&!lifecycle.retired,'MEMORY_CHANGED');
+      } else require(await active(w,c.record,input.as_of),'MEMORY_CHANGED');
     }
     return result;
   } catch(error) { return auxiliary(error); }
@@ -382,9 +470,13 @@ export async function observeLesson(workspaceRoot,raw) {
 export async function retireLesson(workspaceRoot,raw) {
   try {
     const input=structuredClone(raw);object(input,['lesson_id','retired_at','reason']);hash(input.lesson_id);time(input.retired_at);text(input.reason,512);
-    const w=await memoryWorkspace(workspaceRoot);await lessonRead(w,lessonPath(w,input.lesson_id));
+    const w=await memoryWorkspace(workspaceRoot),lesson=await lessonRead(w,lessonPath(w,input.lesson_id));
     const record={schema_version:1,kind:'retirement',binding:w.binding,...input};
-    const saved=await writeOnce(w,`${w.base}/retirements/${sha256(canonical(record))}.json`,record);
+    const saved=await lifecycleWrite(w,async()=>{
+      const retirement_id=sha256(canonical(record));
+      await lifecycleAppend(w,lesson,'retirements',{retirement_id,record_sha256:sha256(encode(record)),retired_at:record.retired_at});
+      return writeOnce(w,`${w.base}/retirements/${retirement_id}.json`,record);
+    });
     return {status:'recorded',advisory:true,record_path:saved.path,record_sha256:saved.sha256,replayed:saved.replayed};
   } catch(error) {throw error instanceof MemoryError?error:memoryError('MEMORY_UNAVAILABLE');}
 }

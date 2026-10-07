@@ -10,6 +10,7 @@ import { initWorkflow, beginStep, failStep } from '../scripts/lib/workflow.mjs';
 import { captureFailure, recordLesson, retireLesson } from '../../scripts/lib/workflow-memory.mjs';
 import { snapshotQa, recordQa } from '../../scripts/lib/qa-report.mjs';
 import { readBudgetUsage, withReadBudget } from '../../scripts/lib/read-budget.mjs';
+import { readState, writeStateAtomic } from '../scripts/lib/state-store.mjs';
 
 async function fixture() {
   const root = await makeWorkspace();
@@ -116,7 +117,7 @@ test('actual pinned verified lesson records filter expiry, supersession, retirem
   async function retrieve(lesson,as_of=now) {
     const path=`${workspace.base}/lessons/${lesson.lesson_id}.json`,bytes=await readFile(join(root,path));
     const reference={path,file_sha256:sha256(bytes),start_byte:0,end_byte:bytes.length,range_sha256:sha256(bytes)};
-    const manifest={schema_version:1,binding:workspace.binding,sources:[{id:'lesson',kind:'lesson',role:'candidate',mandatory:false,reference,lesson:{id:lesson.lesson_id,record_path:path,record_sha256:sha256(bytes),task_id:'total-task',sources:[source],check_ids:['total']}}]};
+    const manifest={schema_version:1,binding:(await memoryWorkspace(root)).binding,sources:[{id:'lesson',kind:'lesson',role:'candidate',mandatory:false,reference,lesson:{id:lesson.lesson_id,record_path:path,record_sha256:sha256(bytes),task_id:'total-task',sources:[source],check_ids:['total']}}]};
     await mkdir(join(root,'docs'),{recursive:true});const raw=Buffer.from(JSON.stringify(manifest));await writeFile(join(root,'docs/context.json'),raw);
     return retrieveTaskContext(root,{manifest_path:'docs/context.json',manifest_sha256:sha256(raw),query:'repair',budget_bytes:8192,as_of});
   }
@@ -126,6 +127,11 @@ test('actual pinned verified lesson records filter expiry, supersession, retirem
   assert.equal((await retrieve(first)).sources.length,0);assert.equal((await retrieve(second)).sources.length,1);
   await retireLesson(root,{lesson_id:second.lesson_id,retired_at:now,reason:'Requirement withdrawn.'});
   assert.equal((await retrieve(second)).sources.length,0);
+  const stateBefore=await readState(root);await writeStateAtomic(root,{...stateBefore,workflow_id:'context-next-generation',
+    continuation:{...stateBefore.continuation,workflow_id:'context-next-generation'}});
+  assert.equal((await retrieve(first)).sources.length,0,'selecting only the superseded origin must omit it');
+  assert.equal((await retrieve(second)).sources.length,0,'retired origin remains inactive');
+  await writeStateAtomic(root,stateBefore);
   await writeFile(join(root,'step_archive/outputs/proof.json'),'changed');
   assert.equal((await retrieve(first)).sources.length,0);
   // The selected lesson JSON is small; its independently pinned QA evidence is

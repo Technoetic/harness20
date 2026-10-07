@@ -1,5 +1,5 @@
 // Retrieval is a bounded advisory projection of explicitly pinned, untrusted data.
-import { memoryWorkspace, assertMemoryBinding, memoryCanonical } from './memory-policy.mjs';
+import { memoryWorkspace, assertMemoryBinding, memoryCanonical, memoryId } from './memory-policy.mjs';
 import { withReadBudget } from './read-budget.mjs';
 import { inspectLessons, validateLessonRecord } from './workflow-memory.mjs';
 import { parseStrictJson } from './strict-json.mjs';
@@ -51,8 +51,8 @@ function validateEntry(entry,knownIds) {
   if(entry.kind==='lesson') {
     if(entry.mandatory||entry.role!=='candidate')throw Error('Invalid task context');
     const meta=entry.lesson;contractObject(meta,['id','record_path','record_sha256','task_id','sources','check_ids']);
-    contractHash(meta.id);contractHash(meta.record_sha256);contractId(meta.task_id);contractArray(meta.sources);meta.sources.forEach(contractReference);
-    contractArray(meta.check_ids).forEach(contractId);
+    contractHash(meta.id);contractHash(meta.record_sha256);memoryId(meta.task_id);contractArray(meta.sources);meta.sources.forEach(contractReference);
+    contractArray(meta.check_ids).forEach(memoryId);
     if(meta.record_path!==entry.reference.path||meta.record_sha256!==entry.reference.file_sha256)throw Error('Invalid task context');
   } else if(entry.lesson!==undefined)throw Error('Invalid task context');
 }
