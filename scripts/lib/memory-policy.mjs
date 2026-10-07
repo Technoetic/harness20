@@ -8,6 +8,7 @@ import { unsafeJevText } from './sensitive-data.mjs';
 export const MEMORY_LIMITS = Object.freeze({ manifest:256*1024, file:8*1024*1024,
   aggregate:32*1024*1024, excerpt:16*1024, query:2048, output:64*1024, sources:128 });
 const HASH = /^[a-f0-9]{64}$/;
+const CONTROL_DOCUMENT = /^(?:(?:agents|claude|gemini|codex)(?:\.(?:local|override))?|skill|memory|topic)\.md$/i;
 const SECRET = /(?:-----BEGIN [A-Z ]*PRIVATE KEY-----|\b(?:authorization|password|passwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token)\s*[:=]|\bbearer\s+\S+|\b(?:sk|ghp|github_pat)[_-][a-zA-Z0-9_-]{16,}|https?:\/\/[^\s/]+:[^\s/]+@)/i;
 const CODES = new Set(['MEMORY_INVALID','MEMORY_UNSUPPORTED','MEMORY_UNAVAILABLE','MEMORY_CHANGED','MEMORY_CONFLICT','MEMORY_BUDGET','MEMORY_UNVERIFIED']);
 export class MemoryError extends Error {
@@ -76,6 +77,9 @@ export function assertMemorySourcePath(path,kind='repository-source') {
   memoryRequire(['repository-source','approved-artifact','lesson'].includes(kind));
   memoryRequire(!path.includes('\\')&&!path.includes(':')&&!/[\r\n\t]/.test(path));
   const parts=path.split('/');
+  // Classify agent instructions and workflow controls before opening a source.
+  // Compatibility forms and case changes cannot turn controls into candidates.
+  memoryRequire(!parts.some(p=>CONTROL_DOCUMENT.test(p.normalize('NFKC'))));
   memoryRequire(parts.every(p=>p&&!p.startsWith('.')&&!/[. ]$/.test(p)
     && !/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(p)
     && !/^(?:id_rsa|id_ed25519|credentials?|secrets?|private|settings|config|token|password)(?:[._-]|$)/i.test(p)

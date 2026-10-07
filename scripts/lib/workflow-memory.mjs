@@ -247,6 +247,19 @@ async function active(w,record,asOf,origin=false) {
   }
   return true;
 }
+async function supersededIds(w,asOf,candidates) {
+  if(candidates===undefined) {
+    candidates=[];
+    for(const name of await names(w,`${w.base}/lessons`)) {
+      require(/^[a-f0-9]{64}\.json$/.test(name));
+      candidates.push(await lessonRead(w,`${w.base}/lessons/${name}`));
+    }
+  }
+  // A registered replacement revokes applicability from its validity start.
+  // Its later retirement or expiry does not reactivate the original lesson.
+  return new Set(candidates.filter(candidate=>Date.parse(candidate.record.validity.from)<=Date.parse(asOf))
+    .flatMap(candidate=>candidate.record.supersedes));
+}
 function observationShape(record,binding) {
   object(record,['schema_version','kind','binding','lesson_id','observation_id','applicable','outcome','observed_at','task_id','sources','check_ids','verification_current'],['verification']);
   require(record.schema_version===1&&record.kind==='observation');assertMemoryBinding(record.binding,binding);
@@ -319,8 +332,7 @@ export async function inspectLessons(workspaceRoot,raw) {
     }
     // Supersession is provenance, not a temporary ranking choice. Retiring or
     // expiring the replacement does not silently reactivate its predecessor.
-    const superseded=new Set(candidates.filter(candidate=>Date.parse(candidate.record.validity.from)<=Date.parse(input.as_of))
-      .flatMap(candidate=>candidate.record.supersedes));
+    const superseded=await supersededIds(w,input.as_of,candidates);
     for(const candidate of applicable.sort((a,b)=>a.record.lesson_id.localeCompare(b.record.lesson_id))) {
       if(superseded.has(candidate.record.lesson_id)) {omitted.push({lesson_id:candidate.record.lesson_id,reason:'superseded'});continue;}
       const projection={...candidate.record,record_path:candidate.path,record_sha256:candidate.sha256,
@@ -349,7 +361,8 @@ export async function observeLesson(workspaceRoot,raw) {
     const w=await memoryWorkspace(workspaceRoot),loaded=await lessonRead(w,lessonPath(w,input.lesson_id));
     const refs=sources(input.sources),checks=ids(input.check_ids,64,1);
     const applicable=appliesTo(loaded.record,{task_id:input.task_id,sources:refs,check_ids:checks,as_of:input.observed_at})
-      &&await active(w,loaded.record,input.observed_at);
+      &&await active(w,loaded.record,input.observed_at)
+      &&!(await supersededIds(w,input.observed_at)).has(loaded.record.lesson_id);
     require(applicable===input.applicable,'MEMORY_UNVERIFIED');
     await readSources(w,refs);
     let proof,verified=false;
