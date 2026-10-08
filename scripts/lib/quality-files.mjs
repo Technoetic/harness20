@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { lstat, mkdir, open, opendir, realpath, rename, unlink } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { reserveReadBudget, chargeReadBudget } from './read-budget.mjs';
 
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 export async function physicalWorkspace(root) {
@@ -40,26 +41,32 @@ export async function readSafe(root, name, limit = 8 * 1024 * 1024) {
   const path = await safePath(root, name);
   const before = await lstat(path, { bigint: true });
   const handle = await open(path, constants.O_RDONLY | (process.platform === 'win32' ? 0 : constants.O_NOFOLLOW ?? 0));
+  let reservation=null, observedRead=0;
   try {
     const stat = await handle.stat({ bigint: true });
     if (!stat.isFile() || stat.nlink !== 1n || stat.size > BigInt(limit) || stat.ino !== before.ino || stat.dev !== before.dev) throw new Error('Evidence changed or exceeds size limit');
+    reservation=reserveReadBudget(Number(stat.size));
     // Size checks alone race a growing file. Allocate only its observed bounded size,
     // then probe one extra byte, regardless of subsequent file growth.
     const bytes = Buffer.alloc(Number(stat.size));
     let offset = 0;
     while (offset < bytes.length) {
       const { bytesRead } = await handle.read(bytes, offset, bytes.length-offset, offset);
+      observedRead+=bytesRead;
       if (!bytesRead) break;
       offset += bytesRead;
     }
     const extra = Buffer.alloc(1);
-    if (offset !== bytes.length || (await handle.read(extra, 0, 1, offset)).bytesRead !== 0) throw new Error('Evidence changed during bounded reading');
+    if (offset !== bytes.length) throw new Error('Evidence changed during bounded reading');
+    const probeRead=(await handle.read(extra, 0, 1, offset)).bytesRead;
+    chargeReadBudget(probeRead);
+    if (probeRead !== 0) throw new Error('Evidence changed during bounded reading');
     const openedAfter = await handle.stat({ bigint: true });
     await safePath(root, name);
     const after = await lstat(path, { bigint: true });
     if (['ino','dev','nlink','size','mtimeNs','ctimeNs'].some(k => stat[k] !== after[k] || stat[k] !== openedAfter[k])) throw new Error('Evidence changed during reading');
     return bytes;
-  } finally { await handle.close(); }
+  } finally { try { reservation?.complete(observedRead); } finally { await handle.close(); } }
 }
 
 export async function writeSafe(root, name, bytes) {

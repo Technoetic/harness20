@@ -1,5 +1,6 @@
 import { DEFAULT_WORKFLOW_PROFILE, getWorkflowProfile, resolveWorkflowProfile } from "../../../scripts/lib/workflow-profiles.mjs";
 import { receiptMatchesState, receiptProfile } from "./receipts.mjs";
+import { captureFailure } from "../../../scripts/lib/workflow-memory.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import {
   link,
@@ -1156,7 +1157,7 @@ export async function failStep({
   requireText(attemptId, "attemptId", "ATTEMPT_INVALID");
   requireText(reason, "reason", "FAILURE_INVALID");
   return withMutation(workspaceRoot, now, async (paths, clock, guard) => {
-    frozenEvidence(evidence);
+    const capturedEvidence = frozenEvidence(evidence);
     await assertMutationGuard(guard);
     let state = assertMonotonicClock(await requireState(paths.workspaceRoot, guard), clock);
     if (state.status !== "running") fail("WORKFLOW_STATE", "fail requires a running workflow");
@@ -1206,6 +1207,15 @@ export async function failStep({
       });
     }
     await appendEvents(paths.workspaceRoot, events, clock, guard);
+    // The failure is already authoritative. Auxiliary memory can be unavailable
+    // without suppressing its count; control-path guard violations still escape.
+    await assertMutationGuard(guard);
+    try {
+      await captureFailure({ workspaceRoot: paths.workspaceRoot, workflowId: state.workflow_id,
+        topicSha256: state.topic_sha256, step, attemptId, failedAt: clock.iso,
+        reason, evidence: capturedEvidence });
+    } catch { /* Advisory capture never changes authoritative failure behavior. */ }
+    await assertMutationGuard(guard);
     return state;
   });
 }

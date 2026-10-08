@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "harness20 marketplace: planning-first20 new runs; preserve existing36/50 workflows.",
-    "version": "4.0.0"
+    "version": "4.1.0"
   },
   "plugins": [
     {
       "name": "harness20",
       "source": "./",
       "description": "Web tutorial generator with a 20-step planning-first autopilot for new runs and preserved existing 36/50-step workflows. One prompt drives hooks, quality gates, and independent verification. Windows + macOS/Linux.",
-      "version": "4.0.0",
+      "version": "4.1.0",
       "author": {
         "name": "Technoetic"
       },

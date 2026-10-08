@@ -104,7 +104,7 @@ test("Codex substitution executes the selected hook through the native host shel
   await mkdir(join(pluginRoot, "scripts", "lib"), { recursive: true });
   // Exact shared dependency closure for the two native hook entrypoints exercised here.
   for (const name of ["workflow-profiles.mjs", "json-io.mjs", "errors.mjs", "quality-files.mjs",
-    "strict-json.mjs", "tool-policy.mjs", "sensitive-data.mjs"]) {
+    "strict-json.mjs", "tool-policy.mjs", "sensitive-data.mjs", "read-budget.mjs"]) {
     await cp(join(checkoutRoot, "scripts", "lib", name), join(pluginRoot, "scripts", "lib", name));
   }
   assert.match(pluginRoot, /\s/);

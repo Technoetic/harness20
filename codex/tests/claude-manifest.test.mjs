@@ -24,7 +24,7 @@ function copyActivity(target) {
   fs.copyFileSync(activity, target);
   const shared = path.resolve(path.dirname(target), '../../scripts/lib');
   fs.mkdirSync(shared, { recursive: true });
-  for (const name of ['workflow-profiles.mjs', 'claude-profile.mjs', 'workflow-security.mjs', 'quality-files.mjs', 'strict-json.mjs']) fs.copyFileSync(path.join(repo, 'scripts/lib', name), path.join(shared, name));
+  for (const name of ['workflow-profiles.mjs', 'claude-profile.mjs', 'workflow-security.mjs', 'quality-files.mjs', 'read-budget.mjs', 'strict-json.mjs']) fs.copyFileSync(path.join(repo, 'scripts/lib', name), path.join(shared, name));
 }
 const expected = {
   SessionStart: [['', 'step-progress-loader', 30]],

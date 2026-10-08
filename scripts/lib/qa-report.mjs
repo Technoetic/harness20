@@ -55,12 +55,15 @@ function checks(value) {
   unique(result.map(check => check.id));
   return result;
 }
-async function hashes(root, paths, kind) {
+async function hashes(root, paths, kind, pathPolicy) {
   unique(paths);
   let total = 0;
   const result = [];
   for (const path of paths) {
     evidencePath(path, kind);
+    // The caller may narrow body reads; internal QA/binding metadata never uses
+    // this callback, and a body path cannot masquerade as an internal read.
+    if (pathPolicy !== undefined) pathPolicy(path, kind);
     const data = await readSafe(root, path);
     total += data.length;
     require(total <= 64 * 1024 * 1024);
@@ -76,8 +79,8 @@ function entries(value, kind, max) {
     return { ...entry };
   });
 }
-async function sameFiles(root, captured, kind) {
-  const current = await hashes(root, captured.map(entry => entry.path), kind);
+async function sameFiles(root, captured, kind, pathPolicy) {
+  const current = await hashes(root, captured.map(entry => entry.path), kind, pathPolicy);
   require(JSON.stringify(current) === JSON.stringify(captured));
 }
 async function json(root, path) {
@@ -207,6 +210,7 @@ export async function inspectQa(workspaceRoot, step, options = {}) {
   const empty = status => ({ status, step, verdict: 'INCOMPLETE', preserve: [] });
   try {
     stepNumber(step);
+    require(options.pathPolicy === undefined || typeof options.pathPolicy === 'function');
     const root = await physicalWorkspace(workspaceRoot);
     const context = await workflowContext(root, options);
     require(step <= context.profile.stepCount);
@@ -226,11 +230,11 @@ export async function inspectQa(workspaceRoot, step, options = {}) {
     require(claim.report_sha256 === loaded.digest);
     let current = true;
     try {
-      await sameFiles(root, snapshot.value.artifacts, 'artifact');
+      await sameFiles(root, snapshot.value.artifacts, 'artifact', options.pathPolicy);
       const evidence = [...new Map(report.outcomes.flatMap(outcome => outcome.evidence).map(entry => [entry.path, entry])).values()];
       require(evidence.length <= 128);
-      await sameFiles(root, evidence, 'evidence');
-      await sameFiles(root, snapshot.value.artifacts, 'artifact');
+      await sameFiles(root, evidence, 'evidence', options.pathPolicy);
+      await sameFiles(root, snapshot.value.artifacts, 'artifact', options.pathPolicy);
     } catch { current = false; }
     require((await json(root, pointerPath(step, base))).value.report_sha256 === loaded.digest);
     require((await json(root, `${base}/${loaded.digest}.report.json`)).digest === loaded.digest);
