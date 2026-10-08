@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { closeSync, openSync, unlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -13,7 +16,17 @@ const cli = fileURLToPath(new URL('../../scripts/workflow-memory.mjs', import.me
 const now = '2026-10-08T00:00:00.000Z';
 const diagnostic = {error:{code:'MEMORY_COMMAND_FAILED',message:'Workflow memory command failed'}};
 function run(args,input='') {
-  const r=spawnSync(process.execPath,[cli,...args],{input,encoding:'utf8',windowsHide:true,timeout:15000,maxBuffer:1024*1024});
+  const options={encoding:'utf8',windowsHide:true,timeout:15000,maxBuffer:1024*1024};
+  let r;
+  if(Buffer.byteLength(input)>256*1024) {
+    // A bounded reader may close a POSIX pipe before spawnSync finishes writing.
+    // Give the same oversized bytes through stdin without a parent pipe writer.
+    const path=join(tmpdir(),`harness20-memory-stdin-${randomUUID()}.json`);
+    writeFileSync(path,input,{flag:'wx'});
+    let fd;
+    try {fd=openSync(path,'r');r=spawnSync(process.execPath,[cli,...args],{...options,stdio:[fd,'pipe','pipe']});}
+    finally {if(fd!==undefined)closeSync(fd);unlinkSync(path);}
+  } else r=spawnSync(process.execPath,[cli,...args],{...options,input});
   assert.equal(r.error,undefined);assert.equal(r.signal,null);return r;
 }
 function call(root,command,input,exit=0) {

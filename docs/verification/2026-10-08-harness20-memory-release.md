@@ -25,7 +25,8 @@ results or the earlier v4.0.0 CI for those gates.
   stages across three profiles and dependency integrity inputs (one root and
   four browser-verifier packages). Dependency validation neither installs nor
   launches a browser and is not vulnerability certification. Release preparation
-  changes version metadata, its existing version expectations and documentation;
+  changes version metadata, its existing version expectations, documentation,
+  and oversized-stdin test transport;
   exact fresh targeted commands and final CI are retained separately.
 - `assumptions`: the user explicitly authorizes public release and installation
   into the existing Claude Code and Codex plugin configuration. Optional additive
@@ -80,3 +81,13 @@ source/topic/definition symlink case and unavailable file symlinks (`EPERM`).
 None is a new feature skip. Actual cross-platform and Node 22 behavior is
 established by the release's fresh public CI, not inferred from this Windows
 Node 24 implementation run.
+
+The first release PR CI run `37709966943` exposed POSIX `spawnSync` EPIPE in
+the two oversized-JSON CLI fixtures: the bounded reader closed stdin before
+the parent finished writing the oversized payload. The fixtures now pass the
+same oversized bytes through an inherited regular-file stdin descriptor;
+normal-sized inputs continue to use pipes. The input limit, refusal exit code,
+empty stdout, fixed diagnostic and child error/signal assertions are retained.
+This transport correction does not change product code or accept oversized input.
+The failed run and any superseded job cancellations remain separate history;
+only the final completed matrix qualifies as release evidence.
