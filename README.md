@@ -4,7 +4,7 @@
 
 ### 한 줄 요청 → 기획부터 20 step 자율주행 → 인터랙티브 웹 튜토리얼 1편
 
-패키지 버전: **[v4.0.0](https://github.com/Technoetic/harness20/releases/tag/v4.0.0)** · Claude Code와 Codex 지원 · 기획부터 새 실행 20단계, 기존 36·50단계 이력 보존 · 제공 OWASP 10개 위험의 적용 가능한 호스트 통제 보강. [OWASP 보안 원칙·적용 범위](#owasp-보안-철학과-적용-범위) · [릴리스·전환 안내](docs/releases/v4.0.0.md)
+패키지 버전: **[v4.1.0](https://github.com/Technoetic/harness20/releases/tag/v4.1.0)** · Claude Code와 Codex 지원 · 기획부터 새 실행 20단계, 기존 36·50단계 이력 보존 · 검증 근거를 보존하는 선택형 경험 기억 추가. [OWASP 보안 원칙·적용 범위](#owasp-보안-철학과-적용-범위) · [릴리스·전환 안내](docs/releases/v4.1.0.md)
 
 **`/harness20:webapp 논문 트렌드 분석 대시보드`** 한 줄을 던지면 요구사항 기획부터 20단계 완료나 명명된 멈춤 전까지 이어가는 결정론적 절차가 가동된다.<br/>
 모델을 똑똑하게 만드는 대신 **모델이 놓을 트랙을 좁힌다**.

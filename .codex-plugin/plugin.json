@@ -1,6 +1,6 @@
 {
   "name": "harness20",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "Run the Harness20 planning-first twenty-step workflow in Codex with explicit progress receipts and normal permissions; preserve existing36/50 runs.",
   "author": {
     "name": "Technoetic"
