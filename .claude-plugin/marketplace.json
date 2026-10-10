@@ -5,15 +5,15 @@
     "url": "https://github.com/Technoetic"
   },
   "metadata": {
-    "description": "harness20 marketplace: planning-first20 new runs; preserve existing36/50 workflows.",
-    "version": "4.1.0"
+    "description": "harness20 marketplace: planning-first14 new runs; preserve existing20/36/50 workflows.",
+    "version": "4.2.0"
   },
   "plugins": [
     {
       "name": "harness20",
       "source": "./",
-      "description": "Web tutorial generator with a 20-step planning-first autopilot for new runs and preserved existing 36/50-step workflows. One prompt drives hooks, quality gates, and independent verification. Windows + macOS/Linux.",
-      "version": "4.1.0",
+      "description": "Web tutorial generator with a 14-step planning-first workflow for new runs, preserved existing 20/36/50 workflows, and optional offline trials. Windows + macOS/Linux.",
+      "version": "4.2.0",
       "author": {
         "name": "Technoetic"
       },

@@ -4,7 +4,7 @@
 
 ### 한 줄 요청 → 기획부터 14 step 자율주행 → 인터랙티브 웹 튜토리얼 1편
 
-최신 공개 릴리스: **[v4.1.0](https://github.com/Technoetic/harness20/releases/tag/v4.1.0)**. 이 개발 소스에는 기본14단계와 Tower 기반 실행 비교 기능이 추가되어 있습니다. [기존 릴리스 안내](docs/releases/v4.1.0.md)
+최신 릴리스: **[v4.2.0](https://github.com/Technoetic/harness20/releases/tag/v4.2.0)**. 새 실행은 기본14단계와 Tower 기반 조건 고정·오프라인 비교·민감 본문 없는 이력 추출을 제공합니다. 실제 검증 범위와 결과는 [릴리스 안내](docs/releases/v4.2.0.md)와 [검증 JSON](https://github.com/Technoetic/harness20/releases/download/v4.2.0/verification.json)에서 확인합니다.
 
 **`/harness20:webapp 논문 트렌드 분석 대시보드`** 한 줄을 던지면 요구사항 기획부터 14단계 완료나 명명된 멈춤 전까지 이어가는 결정론적 절차가 가동된다.<br/>
 모델을 똑똑하게 만드는 대신 **모델이 놓을 트랙을 좁힌다**.
@@ -62,7 +62,7 @@ synthetic fixture, not an LLM or business-performance benchmark.
 
 벡터 검색·임베딩·시맨틱 캐시·모델 학습 데이터 수집은 현재 플러그인에 없습니다. 추가할 때는 별도 위협 모델과 검증이 필요합니다. OS 권한·네트워크 접근 정책·서비스 과금 상한·비공개 업무 정보 보호와 변경된 훅의 수동 신뢰 검토는 호스트·운영자가 관리합니다.
 
-**v4.0.0 검증 근거:** 릴리스 커밋 `a6966675cb1f8dc90a2eb8d533bcb7f2664ec6e4`과 동일한 소스 트리를 PR·main·태그에서 Windows/macOS/Linux × Node 22/24로 검사해, 합계 **18개 CI 작업이 성공**했습니다. 각 작업에서 Claude 회귀 252개와 신뢰된 브라우저 fixture 45개가 통과했습니다. 환경별 제외와 실제 설치·공개 ZIP의 바이트 검증은 [릴리스 검증 JSON](https://github.com/Technoetic/harness20/releases/download/v4.0.0/verification.json)에 기록했습니다. 이 결과는 해당 릴리스의 근거이며 새 프로젝트의 전체 20단계 완료를 보증하지 않습니다.
+**v4.0.0 당시 검증 근거:** 릴리스 커밋 `a6966675cb1f8dc90a2eb8d533bcb7f2664ec6e4`과 동일한 소스 트리를 PR·main·태그에서 Windows/macOS/Linux × Node 22/24로 검사해, 합계 **18개 CI 작업이 성공**했습니다. 각 작업에서 Claude 회귀 252개와 신뢰된 브라우저 fixture 45개가 통과했습니다. 환경별 제외와 실제 설치·공개 ZIP의 바이트 검증은 [릴리스 검증 JSON](https://github.com/Technoetic/harness20/releases/download/v4.0.0/verification.json)에 기록했습니다. 이 결과는 당시 기본20단계 소스의 릴리스 검증 범위에 한합니다. 실제 프로젝트의 20단계 완주나 v4.2.0의 새14단계 실행 결과를 보증하지 않습니다.
 
 [위험 10개별 통제·잔여 한계·향후 통합 조건](docs/SECURITY.md) · [의존성 검증 명령](docs/SECURITY.md#host-and-deployment-responsibilities): `npm --ignore-scripts run verify:security`
 
@@ -168,7 +168,7 @@ Noul은 참 확률, Choice는 보류 선택지를 갖춘 후보 선택, Score는
 ## Jev checkpoints / 새14의 5개 의미 판단
 
 Jev 사용과 선택 자료의 외부 전송이 승인된 작업에서는 Claude Code와 Codex가
-**1·2·9·15·19단계**에서 요구사항 반영,
+**1·2·3·9·13단계**에서 요구사항 반영,
 설계 대안의 차이, 설명문, E2E 시나리오, 최종 지적 사항을 자동으로 추가 검토합니다.
 이미 승인한 전송 범위는 재사용하며, 같은 입력의 유효한 결과도 재사용합니다.
 
@@ -276,23 +276,24 @@ v2.4.0은 Claude·Codex의 제품 QA에 [실패·검증 인계 보고서](docs/Q
 ```text
 사용자 →  /webapp 논문 트렌드 분석 대시보드
                         ↓
-   webapp-trigger.hook  원문 TOPIC 고정 + step001~020 부트스트랩
+   webapp-trigger.hook  원문 TOPIC 고정 + step001~014 부트스트랩
                         ↓
    step001.md  ───────►  요구사항 기획 (TOPIC·명시 제공 자료; 삭제된 선행 gate 없음)
-   step002.md  ───────►  통합 설계 (디자인 토큰·제외 계약·SVG·ARIA)
-   step003.md  ───────►  환경 준비 + 가용 브라우저 백엔드 확인·잠금
-   step009.md  ───────►  단일 HTML 인터랙티브 튜토리얼 구현
-   step010.md  ───────►  빌드 스모크 게이트 + TRUST 5 r1
-   step011.md  ───────►  독립 레이아웃 검증
-   step014.md  ───────►  클라이언트 사이드 라우팅 + TRUST 5 r2
-   step015.md  ───────►  E2E 테스트 (환경 step003의 실제 도구·서빙 근거)
-   step016~018 ───────► 독립 스크린샷·키보드·마우스 검증
-   step019.md  ───────►  최종 설계 검증
-   step020.md  ───────►  콘솔 에러 0 + 최종 build·전체 회귀 + TRUST 5 r3
+   step002.md  ───────►  통합 설계·독립 PASS → 환경 준비·브라우저 백엔드 잠금
+   step003.md  ───────►  작업 단위 소유권·인코딩 규칙 + 단일 HTML 구현
+   step004.md  ───────►  빌드·바이트 검사 + TRUST 5 r1
+   step005.md  ───────►  독립 레이아웃 검증
+   step006.md  ───────►  JavaScript 모듈화
+   step007.md  ───────►  CSS 분리
+   step008.md  ───────►  클라이언트 사이드 라우팅 + TRUST 5 r2
+   step009.md  ───────►  E2E 테스트 (환경 step002의 실제 도구·서빙 근거)
+   step010~012 ───────► 독립 스크린샷·키보드·마우스 검증
+   step013.md  ───────►  최종 설계 검증
+   step014.md  ───────►  콘솔 에러 0 + 최종 build·전체 회귀 + TRUST 5 r3
                         ↓
    Stop hook  ────►  진행 미완료면 {"decision":"block"} → 자동 재개
                         ↓
-            20 step 완주 또는 명명된 멈춤 전까지 이어감
+            14 step 완주 또는 명명된 멈춤 전까지 이어감
 ```
 
 > [!IMPORTANT]
@@ -329,7 +330,7 @@ history 모드에서 지원합니다. HTTP(S)에서는 사용 가능한 Navigati
 전체 화면을 각각 검증합니다. [화면 주소 계약](docs/ROUTING.md)과
 [실행 가능한 단일 파일 예제](examples/routed-single-file.html)를 참고하세요.
 
-**14단계는 ‘클라이언트 사이드 라우팅’입니다.** 2단계에서 설계하고 9단계에서 구현한
+**8단계는 ‘클라이언트 사이드 라우팅’입니다.** 2단계에서 설계하고 3단계에서 구현한
 화면 주소를 JS·CSS 구조 정리 뒤 다시 통합 점검합니다. 같은 HTML의 화면별 영역을
 URL에 따라 표시할 수 있으며, HTML 컴포넌트 추출은 필수가 아닙니다. 새 흐름은 14단계입니다.
 
@@ -491,7 +492,7 @@ graph TB
 
     subgraph six["6 기둥"]
         P1["1️⃣ 하네스<br/>엔지니어링"]
-        P2["2️⃣ 절차의<br/>원자화 20step"]
+        P2["2️⃣ 절차의<br/>원자화 14step"]
         P3["3️⃣ 질문 금지<br/>결단하는 AI"]
         P4["4️⃣ 자연 종료<br/>금지"]
         P5["5️⃣ AI Slop<br/>방지"]
@@ -581,14 +582,22 @@ harness20/
 │
 ├── assets/steps/                      ← 보존된 legacy50 본문
 ├── assets/profiles/research-free-36-v1/steps/ ← 보존된 기존36 본문
+├── assets/profiles/planning-first-20-v1/steps/ ← 보존된 기존20 본문
 └── assets/profiles/planning-first-14-v1/steps/ ← 새14 본문
     ├── step001.md  요구사항 기획
-    ├── step002.md  통합 설계 계약
-    ├── step003.md  환경 준비·브라우저 백엔드
-    ├── step010.md  ⭐ 빌드 스모크 + 품질 r1
-    ├── step014.md  ⭐ 라우팅 통합 + 품질 r2
-    ├── step015.md  E2E
-    └── step020.md  ⭐ 최종 콘솔·회귀 + 품질 r3
+    ├── step002.md  통합 설계·독립 PASS 후 환경 준비·브라우저 백엔드
+    ├── step003.md  작업 단위 소유권·인코딩 규칙·구현
+    ├── step004.md  ⭐ 빌드·바이트 검사 + 품질 r1
+    ├── step005.md  독립 레이아웃 검증
+    ├── step006.md  JavaScript 모듈화
+    ├── step007.md  CSS 분리
+    ├── step008.md  ⭐ 라우팅 통합 + 품질 r2
+    ├── step009.md  E2E
+    ├── step010.md  독립 스크린샷 E2E
+    ├── step011.md  독립 키보드 검증
+    ├── step012.md  독립 마우스 검증
+    ├── step013.md  최종 설계 검증
+    └── step014.md  ⭐ 최종 콘솔·빌드·전체 회귀 + 품질 r3
 ```
 
 ---
@@ -623,16 +632,16 @@ sequenceDiagram
     LLM->>Progress: completed += 1
     Note over LLM: ...9개 step 실행 뒤 실제 호스트 턴 종료...
     LLM-->>Stop: 턴 종료
-    Stop->>Progress: completed = 9 / 20 읽음
+    Stop->>Progress: completed = 9 / 14 읽음
     rect rgb(220, 60, 60)
     Stop-->>LLM: stdout {"decision":"block","reason":"step010부터 즉시 실행"}
     end
     Note over LLM: Stop hook이 block을 반환 → 자동으로 다음 턴 시작
     LLM->>LLM: step010 즉시 실행
     LLM->>LLM: step011 실행
-    Note over LLM,Progress: ...completed_steps == 20 도달까지 반복...
+    Note over LLM,Progress: ...completed_steps == 14 도달까지 반복...
     LLM-->>Stop: 턴 종료
-    Stop->>Progress: completed = 20 / 20 확인
+    Stop->>Progress: completed = 14 / 14 확인
     rect rgb(60, 180, 80)
     Stop-->>User: 정상 종료 허용 (자율주행 완료)
     end
@@ -734,6 +743,8 @@ claude plugin install harness20@harness20 --scope local
 
 ### 프로젝트 의존성 (1회)
 
+2단계의 독립 설계 PASS 이후, 선택된 설계와 프로젝트 manifest가 요구하는 항목만 정상 호스트 권한과 프로젝트의 도구 제한에 맞춰 준비합니다. 아래 명령은 해당 도구가 필요한 프로젝트의 의존성 선언 예시입니다.
+
 ```bash
 npm i -D @biomejs/biome stylelint vitest axe-core c8 jscpd madge
 ```
@@ -749,14 +760,14 @@ aside --version
 node scripts/verify-output.mjs --probe
 ```
 
-step003은 실제 가용하며 프로젝트에서 허용한 백엔드만 선택한다. Aside만 허용한 환경은 아래 `<selected>`에 `aside`를 넣는다. 선택한 백엔드를 `node scripts/verify-output.mjs --probe --backend <selected> --lock --workspace "<project-root>"`로 프로젝트의 `step_archive/outputs/browser-backend.json`에 고정한다. 이후 `--backend` 없는 브라우저 검증은 고정된 백엔드만 쓰므로 그 백엔드만 설치·복구하고, 다른 백엔드(예: Aside로 고정된 프로젝트의 Playwright·Chromium)는 설치하지 않는다.
+step002의 독립 설계 PASS 이후 환경 준비는 실제 가용하며 프로젝트에서 허용한 백엔드만 선택한다. Aside만 허용한 환경은 아래 `<selected>`에 `aside`를 넣는다. 선택한 백엔드를 `node scripts/verify-output.mjs --probe --backend <selected> --lock --workspace "<project-root>"`로 프로젝트의 `step_archive/outputs/browser-backend.json`에 고정한다. 이후 `--backend` 없는 브라우저 검증은 고정된 백엔드만 쓰므로 그 백엔드만 설치·복구하고, 다른 백엔드(예: Aside로 고정된 프로젝트의 Playwright·Chromium)는 설치하지 않는다.
 
-step015 E2E는 프로젝트의 `npm run e2e`를 실행한다 — 러너(Playwright test, Aside `repl` 스크립트 등)는 프로젝트가 정하고, step은 결과 전체 PASS만 본다.
+step009 E2E는 프로젝트의 `npm run e2e`를 실행한다 — 러너(Playwright test, Aside `repl` 스크립트 등)는 프로젝트가 정하고, step은 결과 전체 PASS만 본다.
 
 보안 검사에는 검토된 프로젝트별 규칙을 사용합니다. 의미 없는 명령이나 빈 규칙으로 PASS를 만들지 않습니다.
 
 > [!TIP]
-> step001은 요구사항 기획이다. step003 환경 준비가 실제 가용 도구와 브라우저 백엔드를 확인하며, 필요한 설치·복구도 정상 호스트 권한과 프로젝트의 도구 제한을 따른다.
+> step001은 요구사항 기획이다. step002의 독립 설계 PASS 이후 환경 준비가 실제 가용 도구와 브라우저 백엔드를 확인하며, 필요한 설치·복구도 정상 호스트 권한과 프로젝트의 도구 제한을 따른다. 환경 보고서·유효 잠금·현재 준비 증거가 있어야 step003 구현에 진입한다.
 
 ---
 
