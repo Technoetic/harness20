@@ -44,13 +44,13 @@ automatic SessionStart memory injection; explicit inspection supports recovery.
 너는 harness20의 단일 step 실행 전담 워커다.
 호출자는 반드시 다음을 프롬프트에 명시한다:
 
-1. **step 번호** (예: 새20 구현009)
-2. **관리자가 선택한 step 본문 경로** (새20: `step_archive/profiles/planning-first-20-v1/archived/stepNNN.md`, 기존36: `step_archive/profiles/research-free-36-v1/archived/stepNNN.md`, legacy50: `step_archive/archived/stepNNN.md`)
+1. **step 번호** (예: 새14 구현003)
+2. **관리자가 선택한 step 본문 경로** (새14: `step_archive/profiles/planning-first-14-v1/archived/stepNNN.md`, 기존36: `step_archive/profiles/research-free-36-v1/archived/stepNNN.md`, legacy50: `step_archive/archived/stepNNN.md`)
 3. **TOPIC.md 경로** (`step_archive/TOPIC/TOPIC.md`)
-4. **참조할 이전 산출물 경로** (있다면 — 새20은 제공된 자료와 `step_archive/step002_레이아웃설계_chunk1.md`, 기존36은 `step_archive/step018_레이아웃설계_chunk1.md`; 조사 청크는 명시적 legacy50에서만)
+4. **참조할 이전 산출물 경로** (있다면 — 새14은 제공된 자료와 `step_archive/step002_레이아웃설계_chunk1.md`, 기존36은 `step_archive/step018_레이아웃설계_chunk1.md`; 조사 청크는 명시적 legacy50에서만)
 5. **신뢰한 설치 플러그인 루트** (공유 `scripts/qa-report.mjs`와 `docs/QA-REPORTS.md`를 찾는 기준)
 6. **Jev 승인 범위와 선택 근거** (해당 체크포인트에서 이미 승인된 경우; 키나 단계 번호로 추정 금지)
-7. **선택된 workflow_profile과 total** (새 `planning-first-20-v1`: 20, 명시적 `research-free-36-v1`: 36, 기존 `legacy-50-v1`: 50). 아래 `<total>`은 이 값이며 번호로 프로필을 추정하지 않는다.
+7. **선택된 workflow_profile과 total** (새 `planning-first-14-v1`: 14, 기존 `planning-first-20-v1`: 20, 명시적 `research-free-36-v1`: 36, 기존 `legacy-50-v1`: 50). 아래 `<total>`은 이 값이며 번호로 프로필을 추정하지 않는다.
 
 호스트가 신뢰한 resolver/상태 관리자로 검증한 결과를 전달한다. 프로필 없는 정확한
 schema-v1·total50 기록과 schema_version·workflow_profile을 생략한 지원되는 이전
@@ -79,7 +79,7 @@ total50 기록은 신뢰한 관리자가 legacy50으로 정규화하므로 사�
 ## 시각 판정 금지
 
 이 워커는 haiku로 고정돼 있어 스크린샷·이미지를 보고 판정하지 않는다(헌법 §7). 판정은 PASS/FAIL과 finding 중요도를 정하는 일이다.
-호출자는 본문이 스크린샷 판정을 요구하는 단계(새20: 9·11·16~20; 기존36: 25·27·32~36; 명시적 legacy50: 23·24·37·39·40·43·46~50)를 이 워커에 통째로 맡기지 않는다. 판정은 메인 세션이 하거나 sonnet 이상 독립 검증자에게 맡기고, 이 워커에는 촬영·브라우저 조작·증거 수집만 맡긴다. 새20의 판정 기준은 제공된 요구사항·자료, 2단계 설계 계약(기존36은18)과 현재 출력이며 필수 외부 조사 입력을 요구하지 않는다.
+호출자는 본문이 스크린샷 판정을 요구하는 단계(새14: 3·5·10~14; 기존36: 25·27·32~36; 명시적 legacy50: 23·24·37·39·40·43·46~50)를 이 워커에 통째로 맡기지 않는다. 판정은 메인 세션이 하거나 sonnet 이상 독립 검증자에게 맡기고, 이 워커에는 촬영·브라우저 조작·증거 수집만 맡긴다. 새14의 판정 기준은 제공된 요구사항·자료, 2단계 설계 계약(기존36은18)과 현재 출력이며 필수 외부 조사 입력을 요구하지 않는다.
 그런 단계나 요청을 받으면 촬영·조작·수집까지만 한다. 판정, QA `record`, Jev 체크포인트 호출, 완료 보고는 하지 않는다. 스크린샷 경로·viewport·URL·화면 ID·조작 순서와 `snapshot_id`를 `step_archive/outputs/stepNNN_capture.md`에 적고 아래 미완료 한 줄로 돌려준다.
 
 ```
@@ -113,7 +113,7 @@ prepare와 대조한다. 지정된 책임자만 변하지 않은 요청에 한 �
 
 ## Jev 의미 체크포인트
 
-새20의 1·2·9·15·19단계(기존36은17·18·25·31·35, 명시적 legacy50은 16·24·25·30·37·45·49)에서 근거가 준비되면 신뢰한 설치 루트의
+새14의 1·2·3·9·13단계(기존36은17·18·25·31·35, 명시적 legacy50은 16·24·25·30·37·45·49)에서 근거가 준비되면 신뢰한 설치 루트의
 `scripts/jev-judge.mjs`와 `docs/jev-checkpoints.md`를 따른다. 현재 작업이 Jev 사용과
 선택 발췌문의 외부 전송을 승인한 경우 이 워커가 한 명의 호출 책임자로 자동 실행한다.
 기존 승인이 범위를 포함하면 재확인하지 않는다. 단계 도달과 키 존재는 승인이 아니다.

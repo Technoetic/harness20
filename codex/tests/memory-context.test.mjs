@@ -102,7 +102,7 @@ test('physical links and hardlink aliases are rejected before source content can
 
 test('actual pinned verified lesson records filter expiry, supersession, retirement and changed evidence',async()=>{
   const root=await makeWorkspace(), now='2026-10-08T00:00:00.000Z';
-  const state=await initWorkflow({workspaceRoot:root,topic:'Public repair task.',now,idFactory:()=> 'context-generation'});
+  const state=await initWorkflow({workflowProfile:'planning-first-20-v1',workspaceRoot:root,topic:'Public repair task.',now,idFactory:()=> 'context-generation'});
   const begun=await beginStep({workspaceRoot:root,step:1,marker:state.continuation,now:'2026-10-08T00:00:01.000Z',idFactory:()=> 'context-attempt'});
   await mkdir(join(root,'src'));await writeFile(join(root,'src/app.js'),'export const total = 7;');
   const text=await readFile(join(root,'src/app.js')),source={path:'src/app.js',file_sha256:sha256(text),start_byte:0,end_byte:text.length,range_sha256:sha256(text)};
@@ -152,7 +152,7 @@ test('actual pinned verified lesson records filter expiry, supersession, retirem
 
 test('lesson inspection batches bounded projections without silently losing a relevant late record',async()=>{
   const root=await makeWorkspace(),now='2026-10-08T00:00:00.000Z';
-  const state=await initWorkflow({workspaceRoot:root,topic:'Public bounded batch task.',now,idFactory:()=> 'batch-generation'});
+  const state=await initWorkflow({workflowProfile:'planning-first-20-v1',workspaceRoot:root,topic:'Public bounded batch task.',now,idFactory:()=> 'batch-generation'});
   const begun=await beginStep({workspaceRoot:root,step:1,marker:state.continuation,now:'2026-10-08T00:00:01.000Z',idFactory:()=> 'batch-attempt'});
   const failedAt='2026-10-08T00:00:02.000Z';await failStep({workspaceRoot:root,step:1,attemptId:begun.attempt.id,reason:'Repair required.',evidence:[],now:failedAt});
   assert.equal((await captureFailure({workspaceRoot:root,workflowId:begun.state.workflow_id,topicSha256:begun.state.topic_sha256,step:1,attemptId:begun.attempt.id,failedAt,reason:'Repair required.',evidence:[]})).status,'recorded');

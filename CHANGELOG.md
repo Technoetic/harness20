@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.2.0 - 2026-10-10
+
+- New runs default to `planning-first-14-v1`: remove the former new-run stages 3-8 and move necessary environment preparation after independent design PASS, implementation ownership/encoding contracts into implementation, and actual byte checks into build verification. Quality, QA and Jev checkpoints remain required.
+- Preserve existing20/36/50 profile definitions, historical bodies, state, receipts and recovery. New14 progress must be a contiguous completed prefix; rejected earlier gates cannot retain later completions.
+- Add explicit optional offline trial prepare/inspect/record/compare commands that freeze profile/generation, source and configuration hashes, evidence and budgets. Comparison uses caller-observed metrics and immutable records; it invokes no model or tools and changes no workflow authority.
+- Add a bounded Codex receipt-metadata trace export. It omits prompts, transcript bodies, commands and authentication; Claude-only trace sources are unsupported.
+- Adapt selected engineering ideas from Apache-2.0 Tower source commit `76268c2969f20ccbea66d6582206c26e81ba7983`; no upstream code or new dependency is copied. Preserve provider, generated-HTML isolation, manual hook trust and host permission boundaries.
+
 ## 4.0.0 - 2026-10-06
 
 - Rename the public repository, Claude/Codex plugin and marketplace identities to `harness20`. Canonical starts are `/harness20:webapp <topic>` and `$harness20:webapp <topic>`; Codex status/reset skills use `harness20-status` and `harness20-reset`. Preserve old parser aliases and installation caches; disable the previous identity before enabling the new one and preserve project disable settings.

@@ -1,3 +1,4 @@
+import { prepareEnvironmentFixture } from './helpers/environment.mjs';
 // Claude named pause (harness-rules 2-1). scripts/harness-pause.mjs is the only writer of paused and
 // pause_* in step_archive/progress.json. While a run is paused the Stop hook stays silent, the
 // SessionStart loader and the prompt guard say where it stopped, and the progress writer only
@@ -406,8 +407,8 @@ test('H3 the installed dispatcher delivers PowerShell output as UTF-8', { skip: 
   mkdirSync(fresh);
   const trigger = runDispatcher(f.plugin, 'webapp-trigger', { hook_event_name: 'UserPromptSubmit', prompt: '/webapp 분수', cwd: fresh }, { cwd: f.base, timeoutMs: 60000 });
   assert.equal(trigger.status, 0, trigger.stderr);
-  assert.ok(trigger.stdout.includes("On completion report 'Step 001/20 완료'"), trigger.stdout);
-  assert.ok(trigger.stdout.includes('Do NOT end the turn before step020 except by a named pause (harness-rules 2-1).'), trigger.stdout);
+  assert.ok(trigger.stdout.includes("On completion report 'Step 001/14 완료'"), trigger.stdout);
+  assert.ok(trigger.stdout.includes('Do NOT end the turn before step014 except by a named pause (harness-rules 2-1).'), trigger.stdout);
 });
 
 testEachName('H4 the loader reports a paused run with validated values only and writes nothing', (t, name) => {
@@ -524,12 +525,12 @@ testEachName('H10 /webapp replaces a paused run without completed steps and keep
   f.cli('pause', { reason: 'user-request', note: 'x' });
   const issued = f.hook('webapp-trigger', { hook_event_name: 'UserPromptSubmit', prompt: '/webapp fractions' }, variant);
   assert.match(issued, /<harness50-trigger>/);
-  assert.match(issued, /Do NOT end the turn before step020 except by a named pause \(harness-rules 2-1\)\./);
+  assert.match(issued, /Do NOT end the turn before step014 except by a named pause \(harness-rules 2-1\)\./);
   const fresh = f.read();
-  assert.equal(fresh.total_steps, 20);
+  assert.equal(fresh.total_steps, 14);
   for (const key of ['paused', ...PAUSE_KEYS]) assert.equal(Object.hasOwn(fresh, key), false, key);
 
-  // A separate legacy fixture: do not leave the fresh20 binding beside legacy metadata.
+  // A separate legacy fixture: do not leave the fresh14 binding beside legacy metadata.
   unlinkSync(join(f.archive, "workflow-profile.json"));
   f.write({ ...PROGRESS, completed_steps: [1], current_step: 2 });
   assert.equal(f.cli('pause', { reason: 'user-request', note: 'x' }).status, 0);
@@ -688,7 +689,7 @@ test('R2 reset creates nothing and refuses Codex, linked and malformed input', t
   assert.equal(f.hash(), hash);
 });
 
-testEachName('R3 /webapp alpha, three steps, /harness-reset, same-session Stop, /webapp beta', (t, name) => {
+testEachName('R3 /webapp alpha, three steps, /harness-reset, same-session Stop, /webapp beta', async (t, name) => {
   // One session (one transcript) from the first topic to the second. Native hook variant; with
   // H50_TEST_BASH=1 on Windows the .sh hooks run.
   const base = tempRoot(t, 'h50-reset-flow-');
@@ -713,10 +714,11 @@ testEachName('R3 /webapp alpha, three steps, /harness-reset, same-session Stop, 
   const alpha = f.read();
   assert.match(alpha.run_started_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/);
   assert.match(topic(), /\/webapp alpha/);
-  for (const step of ['001', '002', '003']) say(`Step ${step}/20 완료`);
-  const recorded = writeUntil(f, () => hook('step-progress-writer', stopEvent('Step 003/20 완료')), progress => progress.completed_steps.includes(3));
+  await prepareEnvironmentFixture(project);
+  for (const step of ['001', '002', '003']) say(`Step ${step}/14 완료`);
+  const recorded = writeUntil(f, () => hook('step-progress-writer', stopEvent('Step 003/14 완료')), progress => progress.completed_steps.includes(3));
   assert.deepEqual(recorded.completed_steps, [1, 2, 3]);
-  assert.match(hook('webapp-trigger', prompt('/webapp beta')), /already records 3\/20 completed steps/);
+  assert.match(hook('webapp-trigger', prompt('/webapp beta')), /already records 3\/14 completed steps/);
 
   const reset = cli(['reset', '--workspace', project]);
   assert.equal(reset.status, 0);
@@ -729,12 +731,12 @@ testEachName('R3 /webapp alpha, three steps, /harness-reset, same-session Stop, 
   assert.equal(hook('step-progress-writer', stopEvent(done)), '');
   assert.deepEqual(f.read(), afterReset, 'the writer leaves the reset run unchanged');
   assert.equal(hook('step-auto-continue', stopEvent(done)), '');
-  assert.match(hook('step-progress-loader', { hook_event_name: 'SessionStart', source: 'resume' }), /^=== Paused at step001 ===\n\[HARNESS\] PAUSED at step001\/20 \(reason=user-request, since /);
+  assert.match(hook('step-progress-loader', { hook_event_name: 'SessionStart', source: 'resume' }), /^=== Paused at step001 ===\n\[HARNESS\] PAUSED at step001\/14 \(reason=user-request, since /);
   assert.equal(hook('step-obedience-guard', prompt('다음은?')), pausedLine(afterReset));
   // webapp-trigger answers /webapp <topic>; the guard adds no contradicting PAUSED line.
   assert.equal(hook('step-obedience-guard', prompt('/webapp beta')), '');
   assert.match(topic(), /\/webapp alpha/, 'reset leaves TOPIC.md alone');
-  assert.equal(readdirSync(join(f.archive, 'profiles/planning-first-20-v1/archived')).filter(file => /^step\d{3}\.md$/.test(file)).length, 20);
+  assert.equal(readdirSync(join(f.archive, 'profiles/planning-first-14-v1/archived')).filter(file => /^step\d{3}\.md$/.test(file)).length, 14);
 
   assert.match(hook('webapp-trigger', prompt('/webapp beta')), /<harness50-trigger>/);
   assert.match(topic(), /\/webapp beta/);
@@ -743,9 +745,9 @@ testEachName('R3 /webapp alpha, three steps, /harness-reset, same-session Stop, 
   for (const key of ['paused', ...PAUSE_KEYS]) assert.equal(Object.hasOwn(beta, key), false, key);
   assert.ok(Date.parse(beta.run_started_at) >= Date.parse(afterReset.run_started_at));
   // Same session again: the alpha completions stay behind the beta boundary.
-  hook('step-progress-writer', stopEvent('Step 001/20 시작'));
+  hook('step-progress-writer', stopEvent('Step 001/14 시작'));
   assert.deepEqual(f.read().completed_steps, []);
-  assert.match(JSON.parse(hook('step-auto-continue', stopEvent('Step 001/20 시작'))).reason, /step001/);
+  assert.match(JSON.parse(hook('step-auto-continue', stopEvent('Step 001/14 시작'))).reason, /step001/);
 });
 
 test('R4 a run without run_started_at (2.9.0 and earlier) still counts the whole transcript', t => {

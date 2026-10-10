@@ -1,66 +1,63 @@
 # harness20 for Codex
 
-Harness20의 Codex 어댑터는 기획부터 시작하는 기본20 절차를 20개의 검증 가능한 단계로 실행하되, Codex의 정상 권한 확인과 명시적인 후크 신뢰 절차를 유지합니다. Claude Code 설치와 기존 동작은 [루트 안내서](../README.md)를 참고하세요.
+Harness20의 Codex 어댑터는 기획부터 시작하는 기본14 절차를 14개의 검증 가능한 단계로 실행하되, Codex의 정상 권한 확인과 명시적인 후크 신뢰 절차를 유지합니다. Claude Code 설치와 기존 동작은 [루트 안내서](../README.md)를 참고하세요.
 
-## Workflow profiles / 새20와 기존36·50
+## Workflow profiles / 새14와 기존20·36·50
 
-공개 저장소·플러그인·마켓플레이스 이름은 **harness20**입니다. Claude Code는 `/harness20:webapp <주제>`, Codex는 `$harness20:webapp <주제>`로 시작합니다. 새 실행은 schema2·`planning-first-20-v1`의 **20단계**를 선택합니다. 기존36의 17단계 요구사항 기획을 새1로 삼고 앞의 1–16단계를 새 실행에서 제거했습니다.
+저장소·플러그인 이름은 **harness20**입니다. 새 실행은 schema2
+`planning-first-14-v1`의 **14단계**를 사용합니다. 이전 기본20의 step3–8을
+독립 단계에서 제거하고 환경 준비는 설계2의 마지막으로, 작업 단위 소유권과
+UTF-8 무BOM·LF 작성 규칙은 구현3으로, 실제 바이트 검사는 빌드4로 옮겼습니다.
+설계의 독립 PASS 이후에만 환경 준비를 수행하며, 환경 보고서·유효한 브라우저
+잠금·실제 준비 증거가 없으면 구현에 진입하지 않습니다. 의존성 설치는 필요한
+선언 항목에 한해 정상 권한 흐름으로 수행합니다.
 
-초기화 관리자가 사용자 원문과 명시 조건을 TOPIC의 여섯 필드로 보존합니다.
-Codex는 `state.topic_sha256`에 TOPIC 해시를 고정하고 관리자가 현재 바이트를 검증합니다.
-새 Claude 실행은 원문·여섯 필드를 보존하고 원문 TOPIC 해시를 자동 고정·검증합니다.
-과거 미표식 Claude 바인딩은 호환 실행이며 새 정책의 자동 고정이 적용됐다고 표시하지 않습니다.
-첫 기획은 TOPIC·명시 제공 자료를 검토하며 삭제된 프리플라이트·도구·의존성 게이트 산출물을
-요구하지 않습니다. 입력은 사용자 요구, TOPIC, 제공 자료, **2단계 설계 계약**과 현재 측정 출력입니다.
-필수 API 대상·버전·스키마·인증·오류/재시도 계약이 없으면 누락 요구사항으로 남깁니다.
-이전 단계 완료를 만들어 내거나 테스트 통과를 외부 사실의 최신성 증명으로 쓰지 않습니다.
+TOPIC의 사용자 원문·여섯 필드와 해시는 유지합니다. 없는 API 계약이나 입력은
+누락으로 남기며, 기획·설계가 현재 외부 사실을 확인했다고 추정하지 않습니다.
+Codex는 `begin.step_target`, Claude는 resolver의 `step_body`를 읽습니다.
+새 본문은 `assets/profiles/planning-first-14-v1/steps/`와
+`codex/assets/profiles/planning-first-14-v1/steps/`, Claude 보관 본문은
+`step_archive/profiles/planning-first-14-v1/archived/`에 있습니다.
 
-명시적 `research-free-36-v1`은 36단계와 기존 기획17·설계18·구현25·E2E31·최종36을,
-`legacy-50-v1`과 프로필 없는 schema-v1 이력은 원래50단계를 유지합니다. 진행 중·멈춤·차단·완료,
-Claude 가져오기, archived 본문, 복구와 영수증 replay의 번호·해시·의미를 보존합니다.
-기존 이력을 새 번호나 새 증거로 바꾸지 않습니다. Codex reset은 제어 메타데이터를 보관하고
-비활성화하며 다음 명시적 시작이 기본20을 선택합니다. Claude reset은 선택 프로필을 보존하고
-새 실행 경계에서 멈춥니다. 손상된 메타데이터/바인딩은 일관된 기록을 복원한 뒤 재시도하며
-reset으로 추정 복구하지 않습니다.
+기존 `planning-first-20-v1`, `research-free-36-v1`, `legacy-50-v1`과
+미표식 schema-v1의50단계 실행은 번호·본문·해시·pause/resume·완료 영수증을
+유지합니다. 새 기본값으로 기존 실행을 재해석하지 않습니다. Codex reset 이후
+새 시작은14를 선택하고, Claude reset은 기존 실행의 선택 프로필을 보존합니다.
+손상된 상태나 바인딩은 일관된 기록을 복원한 뒤 진행합니다.
 
-새 본문: Claude `assets/profiles/planning-first-20-v1/steps/`,
-Codex `codex/assets/profiles/planning-first-20-v1/steps/`입니다. 기존36은 각 호스트의
-`assets/profiles/research-free-36-v1/steps/`, legacy50은 `assets/steps/`를 유지합니다.
-Codex는 `begin.step_target`을 플러그인 루트 기준으로 읽고, Claude는 resolver의 `step_body`와
-`body_directory`를 읽습니다. 새 Claude archive는 `step_archive/profiles/planning-first-20-v1/archived/`,
-기존36 archive는 `step_archive/profiles/research-free-36-v1/archived/`이며 바인딩은
-`step_archive/workflow-profile.json`입니다. 프로필·개수·본문·바인딩 불일치는 실행을 차단합니다.
-상태·완료 인계의 분모와 QA/Jev 증거 경로는 선택된 프로필과 실행 세대에서 가져옵니다.
-
-새20의 기획1·설계2 뒤 환경 준비3이 실제 가용 브라우저 백엔드 확인과 잠금을 맡습니다.
-기존36·50의 도구3과 환경19·31은 원래 의미를 유지합니다. 새20 품질 게이트는 **10·14·20**,
-독립 QA는 **11·16·17·18**, E2E는 **15**, 최종 설계는 **19**입니다.
-Jev 체크포인트는 **1·2·9·15·19**이며, 최대5라운드·필수 finding·접근성·키보드·마우스·회귀
-검증은 그대로 요구합니다. 기획부터 시작해도 권한이나 완료 기준을 완화하지 않습니다.
-
-| New | Original | Role |
+| 새 단계 | 원번호 | 역할 |
 | --- | --- | --- |
-| 1 | 25 | Requirements-based planning |
-| 2 | 30 | Integrated design |
-| 3 | 31 | Environment and browser backend |
-| 4 | 32 | File allocation and index |
-| 5 | 33 | Duplication baseline |
-| 6 | 34 | Unused-code baseline |
-| 7 | 35 | Context policy |
-| 8 | 36 | Encoding policy |
-| 9 | 37 | Implementation |
-| 10 | 38 | Build smoke and quality round 1 |
-| 11 | 39 | Independent layout verification |
-| 12 | 41 | JavaScript modules |
-| 13 | 42 | CSS separation |
-| 14 | 44 | Routing integration and quality round 2 |
-| 15 | 45 | E2E |
-| 16 | 46 | Independent screenshot E2E |
-| 17 | 47 | Independent keyboard visual verification |
-| 18 | 48 | Independent mouse visual verification |
-| 19 | 49 | Final design verification |
-| 20 | 50 | Console, final build and full regression; quality round 3 |
+| 1 | 25 | 요구사항 기획 |
+| 2 | 30 | 통합 설계·독립 PASS 후 환경 준비·브라우저 잠금 |
+| 3 | 37 | 작업 단위 소유권 선언·구현·인코딩 규칙 |
+| 4 | 38 | 빌드·바이트 검사·품질1 |
+| 5 | 39 | 독립 레이아웃 검증 |
+| 6 | 41 | JavaScript 모듈 분리 |
+| 7 | 42 | CSS 분리 |
+| 8 | 44 | 라우팅 통합·품질2 |
+| 9 | 45 | E2E |
+| 10 | 46 | 독립 스크린샷 E2E |
+| 11 | 47 | 독립 키보드 검증 |
+| 12 | 48 | 독립 마우스 검증 |
+| 13 | 49 | 최종 설계 검증 |
+| 14 | 50 | 최종 빌드·전체 회귀·품질3 |
 
+품질은 **4·8·14**, 독립 QA는 **5·10·11·12**, Jev는 **1·2·3·9·13**입니다.
+기존20의 품질10·14·20과 QA11·16·17·18, 기존36/50 좌표는 유지합니다.
+필수 finding, 최대5라운드와 접근성·키보드·마우스·회귀 기준도 유지합니다.
+
+현재 브라우저 검증기는 생성 HTML의 호스트 네트워크 격리 어댑터가 없으면
+`FAIL`로 차단합니다. 이 제약을 단계 축소로 해제하지 않습니다. 상태 기계의
+합성14/14 시험은 실제 브라우저·실모델·배포 완료의 증거가 아닙니다.
+
+### Tower에서 가져온 실행 비교 기능
+
+명시적 오프라인 도구 [workflow-trials](../docs/workflow-trials.md)는 실행 조건과
+선택 근거를 고정하고, 같은 조건의 baseline/candidate 관측을 비교하며, 민감한
+본문을 제외한 현재 Codex 영수증 구조를 추출합니다. QA·근거가 낡았거나 한쪽
+관측이 없거나 중대한 오류가 있으면 비교를 보류합니다. 기록된 수치는 호출자가
+관측한 값이며, 도구 자체가 모델을 실행하거나 업무 효과를 측정하지 않습니다.
+비교 결과는 기존 품질·QA·완료 판정의 권한을 대신하지 않습니다.
 
 ## Host commands / 호스트 명령
 

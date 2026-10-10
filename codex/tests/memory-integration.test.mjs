@@ -26,7 +26,7 @@ const reference=(path,bytes)=>({path,file_sha256:sha256(bytes),start_byte:0,end_
 
 test('real workflow repair survives a fresh process and memory cannot mutate state, counts or receipts',async()=>{
   const root=await makeWorkspace(),pluginRoot=await makePluginFixture({workflowProfile:'planning-first-20-v1'});
-  const initial=await initWorkflow({workspaceRoot:root,topic:'Repair a public total calculation; required total seven.',now,idFactory:()=> 'integration-generation'});
+  const initial=await initWorkflow({workflowProfile:'planning-first-20-v1',workspaceRoot:root,topic:'Repair a public total calculation; required total seven.',now,idFactory:()=> 'integration-generation'});
   const begun=await beginStep({workspaceRoot:root,step:1,marker:initial.continuation,now,idFactory:()=> 'first-attempt'});
   await mkdir(join(root,'src'));await mkdir(join(root,'docs'));
   const candidate=join(root,'src/app.mjs');await writeFile(candidate,'export const total = 6;\n');

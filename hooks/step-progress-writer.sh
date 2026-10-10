@@ -176,6 +176,13 @@ for line in response.split("\n"):
 
 valid={n for n in found if (os.path.isfile(os.path.join(a_dir,f"step{n:03d}.md")) or os.path.isfile(os.path.join(os.path.dirname(a_dir),f"step{n:03d}.md")))}
 existing=set(int(x) for x in (progress.get("completed_steps") or []))
+ordered_profile=profile["workflow_profile"]=="planning-first-14-v1"
+if ordered_profile and (len(progress.get("completed_steps") or [])!=len(existing)
+    or existing!=set(range(1,len(existing)+1)) or len(existing)>total
+    or any(type(n) is not int for n in (progress.get("completed_steps") or []))):
+    if mode!="probe": print("New14 completed prefix is inconsistent: preserving progress.")
+    else: print("idle")
+    raise SystemExit(0)
 first=next((n for n in range(1,total+1) if n not in existing),None)
 cursor=progress.get("current_step")
 aligned=first is None or (type(cursor) is int and cursor==first)
@@ -215,6 +222,22 @@ deadline=time.monotonic()+20
 def remaining():
     return max(1.0, deadline-time.monotonic())
 if total == profile["total"]:
+    if profile["workflow_profile"] == "planning-first-14-v1":
+        environment_step=profile["milestones"]["environment"]
+        if environment_step in (valid-existing):
+            environment_passed=False
+            try:
+                environment_inspector=os.path.join(os.path.dirname(os.environ["H50_WRITER_INSPECTOR"]), "environment-report.mjs")
+                inspected=subprocess.run(["node",environment_inspector,"inspect","--workspace",workspace],
+                    capture_output=True,text=True,encoding="utf-8",timeout=remaining())
+                result=json.loads(inspected.stdout)
+                environment_passed=inspected.returncode==0 and result.get("status")=="current" and result.get("verdict")=="PASS"
+            except (OSError,ValueError,subprocess.TimeoutExpired):
+                pass
+            if not environment_passed:
+                valid.discard(environment_step)
+                refuse(environment_step,"environment","unavailable","FAIL","environment-evidence-missing-invalid-or-stale")
+                print(f"Step {environment_step} remains incomplete: environment evidence missing, invalid, failed, or stale.")
     # The r1 (step 38) and r2 (step 44) milestones need current measured quality, as on Codex
     # (codex/scripts/lib/acceptance.mjs); the trust5 Stop block cannot enforce them during
     # continuous runs (stop_hook_active). Inspection only, with a deadline.
@@ -270,6 +293,17 @@ if final in valid and final not in existing:
         valid.discard(final)
         refuse(final, "final", "", verdict, detail)
         print(f"Step {final} remains incomplete: final quality/browser routing evidence missing, failed, or stale.")
+
+if ordered_profile:
+    # Withhold every dependent completion after a missing or rejected step.
+    # Historical profiles keep their original non-prefix merge semantics.
+    expected=len(existing)+1
+    for step in sorted(valid-existing):
+        if step!=expected:
+            valid.discard(step)
+            refuse(step,"dependency","unavailable","FAIL","earlier-step-incomplete")
+        else:
+            expected+=1
 
 # Replaced or removed on every write, through a temp file and rename (mirrors the .ps1).
 refusal_path=os.path.join(os.path.dirname(p_path),"progress-refusals.json")

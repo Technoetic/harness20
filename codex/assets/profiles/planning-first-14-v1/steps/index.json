@@ -1,0 +1,1412 @@
+{
+  "schema_version": 2,
+  "workflow_profile": "planning-first-14-v1",
+  "total_steps": 14,
+  "steps": [
+    {
+      "number": 1,
+      "id": "step001",
+      "title": "기획: 요구사항 기반 (독립 검증 루프)",
+      "phase": "planning",
+      "source": "assets/profiles/planning-first-14-v1/steps/step001.md",
+      "target": "codex/assets/profiles/planning-first-14-v1/steps/step001.md",
+      "source_sha256": "24f0a774f8c4679086f7c3d7f2456730bb561569b5aa7dcec94693ec8aaff994",
+      "inputs": [
+        "step_archive/TOPIC/TOPIC.md"
+      ],
+      "outputs": [
+        "step_archive/step001_planning_chunk1.md",
+        "step_archive/outputs/step001_검증.md"
+      ],
+      "requires": [],
+      "optional_requires": [],
+      "network": true,
+      "visual_review": false,
+      "acceptance": [
+        {
+          "id": "base-planning-snapshot",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the topic-complete base planning snapshot with a bounded manifest.",
+          "path": "step_archive/step001_planning_chunk1.md"
+        },
+        {
+          "id": "planning-verification-report",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores every bounded independent review round in one report.",
+          "path": "step_archive/outputs/step001_검증.md"
+        },
+        {
+          "id": "topic-fidelity",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms every topic, audience, interaction, application, and constraint field is reflected."
+        },
+        {
+          "id": "requirements-traceability",
+          "kind": "check",
+          "required": true,
+          "description": "Traces every requirement and decision to the user request, TOPIC and explicitly supplied materials with source locations and digests."
+        },
+        {
+          "id": "planning-chunks-bounded",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms the declared planning manifest matches a snapshot of at most 500 lines."
+        },
+        {
+          "id": "bounded-independent-review",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms an independent reviewer used no more than five evidence-first rounds."
+        },
+        {
+          "id": "pass-verdict",
+          "kind": "check",
+          "required": true,
+          "description": "Requires a fully evidenced PASS; FAIL and skipped findings never satisfy completion."
+        },
+        {
+          "id": "provided-api-contract",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms target, version, schema, auth, rate-limit, error and retry requirements come from supplied materials or an explicitly declared contract; missing requirements block, and N/A requires evidence that no external API is used. Tests do not establish external fact currency."
+        }
+      ],
+      "ported": true,
+      "next": "step002"
+    },
+    {
+      "number": 2,
+      "id": "step002",
+      "title": "통합 설계와 환경 준비 (레이아웃 + 전체)",
+      "phase": "planning",
+      "source": "assets/profiles/planning-first-14-v1/steps/step002.md",
+      "target": "codex/assets/profiles/planning-first-14-v1/steps/step002.md",
+      "source_sha256": "fb19aa6c8834771f49169d478255ae783efa05242a21f70040cc9bcce6d634dd",
+      "inputs": [
+        "step_archive/TOPIC/TOPIC.md",
+        "step_archive/step001_planning_chunk1.md",
+        "step_archive/outputs/step001_검증.md"
+      ],
+      "outputs": [
+        "step_archive/outputs/step002_설계대안.md",
+        "step_archive/outputs/step002_설계선택.md",
+        "step_archive/step002_레이아웃설계_chunk1.md",
+        "step_archive/step002_전체설계_chunk1.md",
+        "step_archive/outputs/step002_최종검증.md",
+        "step_archive/step002_환경준비.md",
+        "step_archive/outputs/browser-backend.json"
+      ],
+      "requires": [
+        "step001"
+      ],
+      "optional_requires": [],
+      "network": true,
+      "visual_review": false,
+      "acceptance": [
+        {
+          "id": "design-alternatives",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores three materially distinct layout, architecture, and responsive alternatives.",
+          "path": "step_archive/outputs/step002_설계대안.md"
+        },
+        {
+          "id": "design-selection",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the independent selector's one evidence-based choice without modifying alternatives.",
+          "path": "step_archive/outputs/step002_설계선택.md"
+        },
+        {
+          "id": "layout-design-chunk-1",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the bounded final layout and interaction design selected from the alternatives.",
+          "path": "step_archive/step002_레이아웃설계_chunk1.md"
+        },
+        {
+          "id": "overall-design-chunk-1",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the bounded final class architecture and asynchronous design.",
+          "path": "step_archive/step002_전체설계_chunk1.md"
+        },
+        {
+          "id": "final-design-verification",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores every bounded final independent verification round in one report.",
+          "path": "step_archive/outputs/step002_최종검증.md"
+        },
+        {
+          "id": "structured-brainstorming-first",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms structured brainstorming and alternative exploration was the first design activity."
+        },
+        {
+          "id": "independent-selector",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms a separate selector chose exactly one alternative without editing it."
+        },
+        {
+          "id": "class-architecture-contract",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms SRP classes, composition, constructor injection, state ownership, and public/private APIs."
+        },
+        {
+          "id": "async-lifecycle-contract",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms asynchronous initialization, start, I/O, cancellation, errors, parallelism, and performance contracts."
+        },
+        {
+          "id": "responsive-accessibility-contract",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms responsive breakpoints, states, keyboard, focus, reduced motion, touch, and contrast contracts."
+        },
+        {
+          "id": "design-exclusion-contract",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms the layout design holds exactly one visual token and exclusion contract that merges the host default and TOPIC exclusions and records a reason for every adopted exception."
+        },
+        {
+          "id": "design-chunks-bounded",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms design manifests match declared chunks of at most 500 lines."
+        },
+        {
+          "id": "pass-verdict",
+          "kind": "check",
+          "required": true,
+          "description": "Requires the final independent verifier to record an evidenced PASS."
+        },
+        {
+          "id": "provided-api-contract",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms target, version, schema, auth, rate-limit, error and retry requirements come from supplied materials or an explicitly declared contract; missing requirements block, and N/A requires evidence that no external API is used. Tests do not establish external fact currency."
+        },
+        {
+          "id": "environment-preparation-report",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the selected-design, project-manifest, dependency, version, and smoke-check evidence.",
+          "path": "step_archive/step002_환경준비.md",
+          "validator": "environment-report"
+        },
+        {
+          "id": "selected-design-and-manifests",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms the selected Step 2 design and every present project manifest and lockfile were inspected."
+        },
+        {
+          "id": "required-dependencies-only",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms only dependencies required by the selected design were considered for installation."
+        },
+        {
+          "id": "bounded-resolution-smoke",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms every required dependency resolved, reported a version, and passed a bounded smoke check."
+        },
+        {
+          "id": "permission-preservation",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms conditional installation kept the normal permission flow and never auto-approved a command."
+        },
+        {
+          "id": "browser-backend-lock",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the current environment-selected browser backend lock after actual availability verification.",
+          "path": "step_archive/outputs/browser-backend.json",
+          "validator": "browser-backend-lock"
+        },
+        {
+          "id": "bounded-browser-readiness",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms the allowed selected backend is available, its lock matches the observed version and a real readiness smoke succeeds; missing readiness blocks after at most three normal-permission attempts."
+        }
+      ],
+      "ported": true,
+      "next": "step003"
+    },
+    {
+      "number": 3,
+      "id": "step003",
+      "title": "구현",
+      "phase": "implementation",
+      "source": "assets/profiles/planning-first-14-v1/steps/step003.md",
+      "target": "codex/assets/profiles/planning-first-14-v1/steps/step003.md",
+      "source_sha256": "8472d20e52c735c96fa9f347063544f3dc8e559383d4368e9d79c0bfc0477af0",
+      "inputs": [
+        "step_archive/TOPIC/TOPIC.md",
+        "step_archive/outputs/step002_설계선택.md",
+        "step_archive/step002_레이아웃설계_chunk1.md",
+        "step_archive/step002_전체설계_chunk1.md",
+        "step_archive/step002_환경준비.md",
+        "step_archive/outputs/browser-backend.json"
+      ],
+      "outputs": [
+        "step_archive/step003_구현manifest.md",
+        "step_archive/screenshots/implementation/step003-current.png"
+      ],
+      "requires": [
+        "step002"
+      ],
+      "optional_requires": [],
+      "network": true,
+      "visual_review": true,
+      "acceptance": [
+        {
+          "id": "implementation-manifest",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores implemented files, digests, owners, tests, and traceability to the selected design and topic.",
+          "path": "step_archive/step003_구현manifest.md"
+        },
+        {
+          "id": "implementation-current-screenshot",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the current rendered application screenshot actually inspected against selected design tokens.",
+          "path": "step_archive/screenshots/implementation/step003-current.png"
+        },
+        {
+          "id": "topic-field-fidelity",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms topic, audience, interactive, real-world application, and constraint fields are reflected without modifying TOPIC."
+        },
+        {
+          "id": "selected-design-only",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms implementation follows only the selected Step 2 design without reopening selection."
+        },
+        {
+          "id": "class-async-accessibility",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms Class boundaries, asynchronous lifecycle, interactions, and accessibility contracts are implemented."
+        },
+        {
+          "id": "incremental-test-evidence",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms each owned module was implemented through a failing-test, minimal-change, passing-test cycle."
+        },
+        {
+          "id": "visual-evidence-inspection",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms the required screenshot was actually opened and CSS decisions trace to observed regions."
+        },
+        {
+          "id": "independent-implementation-verifier",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms a non-modifying independent verification pass checked the implementation and manifest."
+        },
+        {
+          "id": "implementation-ownership-and-encoding",
+          "kind": "check",
+          "required": true,
+          "description": "Declares non-overlapping one-to-three-file work units and dependencies before edits, and writes UTF-8 without BOM using LF."
+        }
+      ],
+      "ported": true,
+      "next": "step004"
+    },
+    {
+      "number": 4,
+      "id": "step004",
+      "title": "빌드 스모크 테스트 (구현 완료 게이트)",
+      "phase": "implementation",
+      "source": "assets/profiles/planning-first-14-v1/steps/step004.md",
+      "target": "codex/assets/profiles/planning-first-14-v1/steps/step004.md",
+      "source_sha256": "69bc6f16450d09cfcab7d62ed402d635073dd85832dca51a15d883fdeb58da2e",
+      "inputs": [
+        "step_archive/step003_구현manifest.md",
+        "step_archive/step002_환경준비.md",
+        "step_archive/outputs/browser-backend.json"
+      ],
+      "outputs": [
+        "step_archive/step004_smoke_test.md",
+        "step_archive/outputs/trust5_r1.md",
+        "dist/index.html"
+      ],
+      "requires": [
+        "step002",
+        "step003"
+      ],
+      "optional_requires": [],
+      "network": false,
+      "visual_review": false,
+      "acceptance": [
+        {
+          "id": "build-smoke-report",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the exact build, dist HTML, zero-cycle, and advisory diagnostic results.",
+          "path": "step_archive/step004_smoke_test.md"
+        },
+        {
+          "id": "implementation-milestone",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the first 38-step quality milestone only after both mandatory gates pass.",
+          "path": "step_archive/outputs/trust5_r1.md"
+        },
+        {
+          "id": "dist-index-html",
+          "kind": "artifact",
+          "required": true,
+          "description": "Requires the build-produced dist/index.html artifact.",
+          "path": "dist/index.html"
+        },
+        {
+          "id": "project-build-command",
+          "kind": "command",
+          "required": true,
+          "description": "Runs the exact non-optional build script declared by the project manifest.",
+          "command_pattern": "^(?:npm run|pnpm(?: run)?|yarn(?: run)?|bun run) (?:build|[A-Za-z0-9][A-Za-z0-9:_-]*build[A-Za-z0-9:_-]*)$"
+        },
+        {
+          "id": "dist-html-boundary",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms dist/index.html is a regular nonempty file with opening and closing HTML boundaries."
+        },
+        {
+          "id": "zero-cycle-gate",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms a declared local cycle tool or deterministic local fallback reports zero cycles."
+        },
+        {
+          "id": "advisory-diagnostics",
+          "kind": "check",
+          "required": true,
+          "description": "Records lint, formatting, and type diagnostics without substituting for either mandatory gate."
+        },
+        {
+          "id": "pass-only-build-gate",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms both mandatory gates passed before the report and milestone count as completion evidence."
+        },
+        {
+          "id": "measured-quality-report",
+          "kind": "check",
+          "required": false,
+          "description": "Runtime-populated current measured-quality PASS with validated immutable report digest; required for every new completion."
+        },
+        {
+          "id": "source-output-byte-encoding",
+          "kind": "check",
+          "required": true,
+          "description": "Checks relevant source and rebuilt output bytes with strict UTF-8, no BOM, CR or replacement characters; failures block completion."
+        }
+      ],
+      "ported": true,
+      "next": "step005"
+    },
+    {
+      "number": 5,
+      "id": "step005",
+      "title": "레이아웃 스크린샷 검증 (독립 검증 루프)",
+      "phase": "review",
+      "source": "assets/profiles/planning-first-14-v1/steps/step005.md",
+      "target": "codex/assets/profiles/planning-first-14-v1/steps/step005.md",
+      "source_sha256": "49f864b46ad0282ed042a484d05be329e07926362c244b04ec8a48ceb8eb9435",
+      "inputs": [
+        "step_archive/step002_레이아웃설계_chunk1.md",
+        "step_archive/step002_전체설계_chunk1.md",
+        "step_archive/step003_구현manifest.md",
+        "step_archive/step004_smoke_test.md",
+        "step_archive/outputs/trust5_r1.md",
+        "dist/index.html"
+      ],
+      "outputs": [
+        "step_archive/screenshots/layout-verify-desktop-r1.png",
+        "step_archive/screenshots/layout-verify-tablet-r1.png",
+        "step_archive/screenshots/layout-verify-mobile-r1.png",
+        "step_archive/outputs/step005_검증_r1.md"
+      ],
+      "requires": [
+        "step002",
+        "step003",
+        "step004"
+      ],
+      "optional_requires": [],
+      "network": false,
+      "visual_review": true,
+      "acceptance": [
+        {
+          "id": "layout-desktop-screenshot",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the final 1920x1080 layout verification capture after any fixes.",
+          "path": "step_archive/screenshots/layout-verify-desktop-r1.png"
+        },
+        {
+          "id": "layout-tablet-screenshot",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the final 768x1024 layout verification capture after any fixes.",
+          "path": "step_archive/screenshots/layout-verify-tablet-r1.png"
+        },
+        {
+          "id": "layout-mobile-screenshot",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the final 390x844 layout verification capture after any fixes.",
+          "path": "step_archive/screenshots/layout-verify-mobile-r1.png"
+        },
+        {
+          "id": "layout-verification-report",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores every bounded independent layout review round and the final evidenced verdict.",
+          "path": "step_archive/outputs/step005_검증_r1.md"
+        },
+        {
+          "id": "exact-layout-viewports",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms captures use exactly the declared desktop, tablet, and mobile viewports."
+        },
+        {
+          "id": "design-responsive-accessibility",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms design fidelity, responsive behavior, and accessibility are all independently checked."
+        },
+        {
+          "id": "independent-layout-verifier",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms the non-modifying verifier is distinct from the layout remediator."
+        },
+        {
+          "id": "visual-inspection-required",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms the verifier actually opens every final screenshot and deterministic checks never replace visual inspection."
+        },
+        {
+          "id": "bounded-pass-loop",
+          "kind": "check",
+          "required": true,
+          "description": "Requires an evidenced PASS within five rounds with no unresolved Critical or Important finding."
+        }
+      ],
+      "ported": true,
+      "next": "step006"
+    },
+    {
+      "number": 6,
+      "id": "step006",
+      "title": "JavaScript 모듈화",
+      "phase": "review",
+      "source": "assets/profiles/planning-first-14-v1/steps/step006.md",
+      "target": "codex/assets/profiles/planning-first-14-v1/steps/step006.md",
+      "source_sha256": "2a30f3ff4a06d6c019a6b91419bfca691a24e39e964e42305533dc6d68116c3d",
+      "inputs": [
+        "step_archive/step002_전체설계_chunk1.md",
+        "step_archive/step003_구현manifest.md",
+        "step_archive/step004_smoke_test.md",
+        "dist/index.html",
+        "step_archive/outputs/step005_검증_r1.md"
+      ],
+      "outputs": [
+        "step_archive/step006_js모듈화.md"
+      ],
+      "requires": [
+        "step002",
+        "step003",
+        "step004",
+        "step005"
+      ],
+      "optional_requires": [],
+      "network": false,
+      "visual_review": false,
+      "acceptance": [
+        {
+          "id": "javascript-modularization-report",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores module boundaries, behavior checks, async lifecycle evidence, build results, and independent review.",
+          "path": "step_archive/step006_js모듈화.md"
+        },
+        {
+          "id": "project-build-command",
+          "kind": "command",
+          "required": true,
+          "description": "Runs the exact non-optional build script declared by the project manifest.",
+          "command_pattern": "^(?:npm run|pnpm(?: run)?|yarn(?: run)?|bun run) (?:build|[A-Za-z0-9][A-Za-z0-9:_-]*build[A-Za-z0-9:_-]*)$"
+        },
+        {
+          "id": "external-javascript-modules",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms JavaScript lives in external src/js modules with no inline script implementation."
+        },
+        {
+          "id": "class-boundaries",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms cohesive Class boundaries and lightweight constructors preserve the selected architecture."
+        },
+        {
+          "id": "async-lifecycle",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms async initialization, start, I/O, concurrency, yielding, cancellation, and error handling."
+        },
+        {
+          "id": "behavior-preservation",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms behavior, accessibility, and the current dist HTML boundary remain intact after modularization."
+        },
+        {
+          "id": "independent-javascript-verifier",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms a non-modifying independent verifier checks source, behavior, build, and report evidence."
+        }
+      ],
+      "ported": true,
+      "next": "step007"
+    },
+    {
+      "number": 7,
+      "id": "step007",
+      "title": "CSS 파일 분리 (컨텍스트 최적화)",
+      "phase": "review",
+      "source": "assets/profiles/planning-first-14-v1/steps/step007.md",
+      "target": "codex/assets/profiles/planning-first-14-v1/steps/step007.md",
+      "source_sha256": "9e5a89b6bc5eb925b5259aaba19a89e11259516d73ca74f79ce46882940ea179",
+      "inputs": [
+        "step_archive/step002_레이아웃설계_chunk1.md",
+        "step_archive/step002_전체설계_chunk1.md",
+        "step_archive/step003_구현manifest.md",
+        "step_archive/step006_js모듈화.md"
+      ],
+      "outputs": [
+        "step_archive/step007_css분리.md"
+      ],
+      "requires": [
+        "step002",
+        "step003",
+        "step006"
+      ],
+      "optional_requires": [],
+      "network": false,
+      "visual_review": false,
+      "acceptance": [
+        {
+          "id": "css-separation-report",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores CSS responsibility boundaries, reference order, responsive and accessibility checks, build results, and independent review.",
+          "path": "step_archive/step007_css분리.md"
+        },
+        {
+          "id": "project-build-command",
+          "kind": "command",
+          "required": true,
+          "description": "Runs the exact non-optional build script declared by the project manifest.",
+          "command_pattern": "^(?:npm run|pnpm(?: run)?|yarn(?: run)?|bun run) (?:build|[A-Za-z0-9][A-Za-z0-9:_-]*build[A-Za-z0-9:_-]*)$"
+        },
+        {
+          "id": "external-css-files",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms styles live in responsibility-based src/css files with no style element or style attribute."
+        },
+        {
+          "id": "stylesheet-order-and-references",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms stylesheet order, tokens, breakpoints, and HTML references remain correct."
+        },
+        {
+          "id": "css-accessibility-preserved",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms focus, reduced motion, contrast, and responsive behavior remain intact."
+        },
+        {
+          "id": "independent-css-verifier",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms a non-modifying independent verifier checks CSS boundaries, behavior, build, and report evidence."
+        }
+      ],
+      "ported": true,
+      "next": "step008"
+    },
+    {
+      "number": 8,
+      "id": "step008",
+      "title": "클라이언트 사이드 라우팅",
+      "phase": "review",
+      "source": "assets/profiles/planning-first-14-v1/steps/step008.md",
+      "target": "codex/assets/profiles/planning-first-14-v1/steps/step008.md",
+      "source_sha256": "e3c4d260dc22310587aa726826b4e15dd74ed9985465e84b24a0cc20af5c75b3",
+      "inputs": [
+        "step_archive/step002_레이아웃설계_chunk1.md",
+        "step_archive/step002_전체설계_chunk1.md",
+        "step_archive/step004_smoke_test.md",
+        "step_archive/outputs/trust5_r1.md",
+        "dist/index.html",
+        "step_archive/step006_js모듈화.md",
+        "step_archive/step007_css분리.md",
+        "step_archive/outputs/step005_검증_r1.md"
+      ],
+      "outputs": [
+        "step_archive/step008_routing검증.md",
+        "step_archive/outputs/trust5_r2.md"
+      ],
+      "requires": [
+        "step002",
+        "step004",
+        "step006",
+        "step007",
+        "step005"
+      ],
+      "optional_requires": [],
+      "network": false,
+      "visual_review": false,
+      "acceptance": [
+        {
+          "id": "routing-integration-report",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores routing integration, semantic structure, source reference integrity, accessibility, current build evidence, and independent review.",
+          "path": "step_archive/step008_routing검증.md"
+        },
+        {
+          "id": "review-milestone",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the second quality milestone only after routing, build, structure, and accessibility gates pass.",
+          "path": "step_archive/outputs/trust5_r2.md"
+        },
+        {
+          "id": "project-build-command",
+          "kind": "command",
+          "required": true,
+          "description": "Runs the exact non-optional build script declared by the project manifest.",
+          "command_pattern": "^(?:npm run|pnpm(?: run)?|yarn(?: run)?|bun run) (?:build|[A-Za-z0-9][A-Za-z0-9:_-]*build[A-Za-z0-9:_-]*)$"
+        },
+        {
+          "id": "external-assets-only",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms development JavaScript and CSS remain external while the build bundles them into one self-contained HTML with its inert route manifest."
+        },
+        {
+          "id": "accessibility-reference-integrity",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms landmarks, labels, keyboard and focus behavior, and every asset reference remain intact."
+        },
+        {
+          "id": "dist-html-boundary",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms the current build produces a regular nonempty dist/index.html with valid HTML boundaries."
+        },
+        {
+          "id": "independent-milestone-verifier",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms a non-modifying independent verifier checks routing integration, build, structure, accessibility, and evidence."
+        },
+        {
+          "id": "pass-only-quality-milestone",
+          "kind": "check",
+          "required": true,
+          "description": "Requires all mandatory checks to PASS before the second milestone is created."
+        },
+        {
+          "id": "routing-screen-url-map",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms the canonical route manifest, screen roots, visible screen, title, active navigation, and focus agree after source modularization."
+        },
+        {
+          "id": "routing-deep-link-traversal",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms direct entry, reload, initial restoration and unknown-route replacement for every route; real outgoing links and Back/Forward are required for multiple screens, or recorded not-applicable: single-screen."
+        },
+        {
+          "id": "routing-navigation-backends",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms one capable Navigation API backend or the declared History/hash fallback, including unavailable and partial-capability environments without changing URL mode."
+        },
+        {
+          "id": "routing-server-fallback",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms mode-specific fallback configuration and local direct entry; hash/file records why rewrites are unnecessary, while actual deployment verification remains in Step 9."
+        },
+        {
+          "id": "routing-native-behavior",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms document anchors, forms, modified clicks, new tabs, downloads, and external links retain native behavior without duplicate rendering or history entries."
+        },
+        {
+          "id": "measured-quality-report",
+          "kind": "check",
+          "required": false,
+          "description": "Runtime-populated current measured-quality PASS with validated immutable report digest; required for every new completion."
+        }
+      ],
+      "ported": true,
+      "next": "step009"
+    },
+    {
+      "number": 9,
+      "id": "step009",
+      "title": "E2E 테스트",
+      "phase": "e2e",
+      "source": "assets/profiles/planning-first-14-v1/steps/step009.md",
+      "target": "codex/assets/profiles/planning-first-14-v1/steps/step009.md",
+      "source_sha256": "d784b9cc4f56235673427e05fecd634802e2bae1637ff19bfb71ee25547a9560",
+      "inputs": [
+        "step_archive/TOPIC/TOPIC.md",
+        "step_archive/step002_레이아웃설계_chunk1.md",
+        "step_archive/step002_전체설계_chunk1.md",
+        "step_archive/step004_smoke_test.md",
+        "dist/index.html",
+        "step_archive/step008_routing검증.md",
+        "step_archive/outputs/trust5_r2.md",
+        "step_archive/step002_환경준비.md",
+        "step_archive/outputs/browser-backend.json"
+      ],
+      "outputs": [
+        "step_archive/step009_e2e테스트결과.md"
+      ],
+      "requires": [
+        "step002",
+        "step004",
+        "step008"
+      ],
+      "optional_requires": [],
+      "network": true,
+      "visual_review": false,
+      "acceptance": [
+        {
+          "id": "e2e-test-report",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the project-specific scenarios, edge cases, exact E2E command, attempts, and final independent verdict.",
+          "path": "step_archive/step009_e2e테스트결과.md"
+        },
+        {
+          "id": "project-e2e-command",
+          "kind": "command",
+          "required": true,
+          "description": "Runs the exact non-optional local project E2E script without implicit package download.",
+          "command_pattern": "^(?:npm run|pnpm(?: run)?|yarn(?: run)?|bun run) (?:e2e|test:e2e|e2e:[A-Za-z0-9][A-Za-z0-9:_-]*|[A-Za-z0-9][A-Za-z0-9:_-]*:e2e)$"
+        },
+        {
+          "id": "project-e2e-runner-only",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms only the project-declared E2E runner (`npm run e2e`) and preserved project configuration are used; the runner implementation is not inspected."
+        },
+        {
+          "id": "bounded-browser-readiness",
+          "kind": "check",
+          "required": true,
+          "description": "Limits a missing browser installation to three normal-permission attempts and blocks if readiness is unavailable."
+        },
+        {
+          "id": "dynamic-scenario-coverage",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms scenarios derive from the topic, design, built application, and implemented user flows."
+        },
+        {
+          "id": "edge-case-coverage",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms at least two project-specific edge cases are exercised."
+        },
+        {
+          "id": "independent-e2e-verifier",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms a non-modifying independent verifier checks the entire E2E suite and evidence."
+        },
+        {
+          "id": "bounded-pass-loop",
+          "kind": "check",
+          "required": true,
+          "description": "Requires an evidenced PASS within five rounds with no unresolved Critical or Important finding."
+        }
+      ],
+      "ported": true,
+      "next": "step010"
+    },
+    {
+      "number": 10,
+      "id": "step010",
+      "title": "스크린샷 기반 상세 E2E 테스트",
+      "phase": "e2e",
+      "source": "assets/profiles/planning-first-14-v1/steps/step010.md",
+      "target": "codex/assets/profiles/planning-first-14-v1/steps/step010.md",
+      "source_sha256": "2f66405f5e8d9312e7cf10b81b2011231d70d36076d8fd6f20b9fe5429864aaa",
+      "inputs": [
+        "step_archive/step002_레이아웃설계_chunk1.md",
+        "step_archive/step002_전체설계_chunk1.md",
+        "step_archive/step004_smoke_test.md",
+        "dist/index.html",
+        "step_archive/outputs/step005_검증_r1.md",
+        "step_archive/step008_routing검증.md",
+        "step_archive/outputs/trust5_r2.md",
+        "step_archive/step009_e2e테스트결과.md"
+      ],
+      "outputs": [
+        "step_archive/step010_screenshot_e2e.md",
+        "step_archive/screenshots/e2e/step010-primary.png"
+      ],
+      "requires": [
+        "step002",
+        "step004",
+        "step005",
+        "step008",
+        "step009"
+      ],
+      "optional_requires": [],
+      "network": false,
+      "visual_review": true,
+      "acceptance": [
+        {
+          "id": "detailed-e2e-report",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the viewport, screen, and state matrix, exact command, screenshot manifest, rounds, and final verdict.",
+          "path": "step_archive/step010_screenshot_e2e.md"
+        },
+        {
+          "id": "e2e-primary-screenshot",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the final primary detailed-E2E screenshot after any remediation.",
+          "path": "step_archive/screenshots/e2e/step010-primary.png"
+        },
+        {
+          "id": "screenshot-e2e-command",
+          "kind": "command",
+          "required": true,
+          "description": "Runs the exact non-optional local project screenshot E2E script without implicit package download.",
+          "command_pattern": "^(?:npm run|pnpm(?: run)?|yarn(?: run)?|bun run) (?:e2e|test:e2e|e2e:[A-Za-z0-9][A-Za-z0-9:_-]*|[A-Za-z0-9][A-Za-z0-9:_-]*:e2e)$"
+        },
+        {
+          "id": "viewport-screen-state-matrix",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms every selected viewport, reachable screen, and meaningful state is exercised."
+        },
+        {
+          "id": "independent-screenshot-verifier",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms the non-modifying verifier is distinct from the detailed-E2E remediator."
+        },
+        {
+          "id": "visual-inspection-required",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms every final screenshot is actually opened and deterministic checks never replace visual inspection."
+        },
+        {
+          "id": "bounded-pass-loop",
+          "kind": "check",
+          "required": true,
+          "description": "Requires an evidenced PASS within five rounds with no unresolved Critical or Important finding."
+        }
+      ],
+      "ported": true,
+      "next": "step011"
+    },
+    {
+      "number": 11,
+      "id": "step011",
+      "title": "키보드 인터랙션 시각 검증",
+      "phase": "e2e",
+      "source": "assets/profiles/planning-first-14-v1/steps/step011.md",
+      "target": "codex/assets/profiles/planning-first-14-v1/steps/step011.md",
+      "source_sha256": "e053e7f532ffc3f0923f6144d4f7e0259fabc5808c6d9cfbb927b31eaa12aaa2",
+      "inputs": [
+        "step_archive/step002_레이아웃설계_chunk1.md",
+        "step_archive/step004_smoke_test.md",
+        "dist/index.html",
+        "step_archive/step008_routing검증.md",
+        "step_archive/outputs/trust5_r2.md",
+        "step_archive/step010_screenshot_e2e.md",
+        "step_archive/screenshots/e2e/step010-primary.png"
+      ],
+      "outputs": [
+        "step_archive/step011_keyboard검증.md",
+        "step_archive/screenshots/keyboard/step011-primary-before.png",
+        "step_archive/screenshots/keyboard/step011-primary-after.png"
+      ],
+      "requires": [
+        "step002",
+        "step004",
+        "step008",
+        "step010"
+      ],
+      "optional_requires": [],
+      "network": false,
+      "visual_review": true,
+      "acceptance": [
+        {
+          "id": "keyboard-verification-report",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the applicability matrix, interaction traces, screenshot manifest, rounds, and final verdict.",
+          "path": "step_archive/step011_keyboard검증.md"
+        },
+        {
+          "id": "keyboard-primary-before-screenshot",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the final primary keyboard state before interaction.",
+          "path": "step_archive/screenshots/keyboard/step011-primary-before.png"
+        },
+        {
+          "id": "keyboard-primary-after-screenshot",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the final primary keyboard state after interaction.",
+          "path": "step_archive/screenshots/keyboard/step011-primary-after.png"
+        },
+        {
+          "id": "keyboard-interaction-matrix",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms Tab, Shift+Tab, Enter or Space, arrows, Escape, shortcuts, and input behavior are tested where applicable."
+        },
+        {
+          "id": "input-three-state-evidence",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms applicable input flows preserve before, during, and after visual evidence."
+        },
+        {
+          "id": "genuine-na-only",
+          "kind": "check",
+          "required": true,
+          "description": "Allows N/A only with application evidence while accessibility requirements can never be N/A."
+        },
+        {
+          "id": "independent-keyboard-verifier",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms the non-modifying verifier is distinct from the keyboard remediator."
+        },
+        {
+          "id": "visual-inspection-required",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms every final keyboard screenshot is actually opened and deterministic checks never replace visual inspection."
+        },
+        {
+          "id": "bounded-pass-loop",
+          "kind": "check",
+          "required": true,
+          "description": "Requires an evidenced PASS within five rounds with no unresolved Critical or Important finding."
+        }
+      ],
+      "ported": true,
+      "next": "step012"
+    },
+    {
+      "number": 12,
+      "id": "step012",
+      "title": "마우스 인터랙션 시각 검증",
+      "phase": "e2e",
+      "source": "assets/profiles/planning-first-14-v1/steps/step012.md",
+      "target": "codex/assets/profiles/planning-first-14-v1/steps/step012.md",
+      "source_sha256": "0140c9efe5eac4e88be69ead86d8aedb310dd4c5bacce2e0d7b91c43a6226b36",
+      "inputs": [
+        "step_archive/step002_레이아웃설계_chunk1.md",
+        "step_archive/step004_smoke_test.md",
+        "dist/index.html",
+        "step_archive/step008_routing검증.md",
+        "step_archive/outputs/trust5_r2.md",
+        "step_archive/step010_screenshot_e2e.md",
+        "step_archive/screenshots/e2e/step010-primary.png",
+        "step_archive/step011_keyboard검증.md",
+        "step_archive/screenshots/keyboard/step011-primary-before.png",
+        "step_archive/screenshots/keyboard/step011-primary-after.png"
+      ],
+      "outputs": [
+        "step_archive/step012_마우스검증.md",
+        "step_archive/screenshots/mouse/step012-primary-before.png",
+        "step_archive/screenshots/mouse/step012-primary-after.png"
+      ],
+      "requires": [
+        "step002",
+        "step004",
+        "step008",
+        "step010",
+        "step011"
+      ],
+      "optional_requires": [],
+      "network": false,
+      "visual_review": true,
+      "acceptance": [
+        {
+          "id": "mouse-verification-report",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the applicability matrix, interaction traces, screenshot manifest, rounds, and final verdict.",
+          "path": "step_archive/step012_마우스검증.md"
+        },
+        {
+          "id": "mouse-primary-before-screenshot",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the final primary mouse state before interaction.",
+          "path": "step_archive/screenshots/mouse/step012-primary-before.png"
+        },
+        {
+          "id": "mouse-primary-after-screenshot",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the final primary mouse state after interaction.",
+          "path": "step_archive/screenshots/mouse/step012-primary-after.png"
+        },
+        {
+          "id": "mouse-interaction-matrix",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms hover, click, context click, double click, drag and drop, and scroll are tested where applicable."
+        },
+        {
+          "id": "intermediate-state-evidence",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms applicable drag and scroll flows preserve intermediate visual evidence."
+        },
+        {
+          "id": "genuine-na-only",
+          "kind": "check",
+          "required": true,
+          "description": "Allows N/A only when application evidence proves the interaction does not exist."
+        },
+        {
+          "id": "independent-mouse-verifier",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms the non-modifying verifier is distinct from the mouse remediator."
+        },
+        {
+          "id": "visual-inspection-required",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms every final mouse screenshot is actually opened and deterministic checks never replace visual inspection."
+        },
+        {
+          "id": "bounded-pass-loop",
+          "kind": "check",
+          "required": true,
+          "description": "Requires an evidenced PASS within five rounds with no unresolved Critical or Important finding."
+        }
+      ],
+      "ported": true,
+      "next": "step013"
+    },
+    {
+      "number": 13,
+      "id": "step013",
+      "title": "디자인 시각 검증 (독립 검증 루프)",
+      "phase": "e2e",
+      "source": "assets/profiles/planning-first-14-v1/steps/step013.md",
+      "target": "codex/assets/profiles/planning-first-14-v1/steps/step013.md",
+      "source_sha256": "6d277f3267866eb4b75a8d6c52a70e956b82c7ba13b98cc170e958f12d10db9f",
+      "inputs": [
+        "step_archive/step002_레이아웃설계_chunk1.md",
+        "step_archive/step002_전체설계_chunk1.md",
+        "step_archive/step004_smoke_test.md",
+        "dist/index.html",
+        "step_archive/step008_routing검증.md",
+        "step_archive/outputs/trust5_r2.md",
+        "step_archive/step011_keyboard검증.md",
+        "step_archive/step012_마우스검증.md",
+        "step_archive/outputs/step005_검증_r1.md"
+      ],
+      "outputs": [
+        "step_archive/outputs/step013_검증_r1.md",
+        "step_archive/screenshots/design/step013-primary-r1.png"
+      ],
+      "requires": [
+        "step002",
+        "step004",
+        "step008",
+        "step011",
+        "step012",
+        "step005"
+      ],
+      "optional_requires": [],
+      "network": true,
+      "visual_review": true,
+      "acceptance": [
+        {
+          "id": "design-visual-report",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the deterministic component sample, eight-axis visual findings, remediation rounds, and final verdict.",
+          "path": "step_archive/outputs/step013_검증_r1.md"
+        },
+        {
+          "id": "design-primary-screenshot",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the final primary design screenshot after evidence-bound remediation.",
+          "path": "step_archive/screenshots/design/step013-primary-r1.png"
+        },
+        {
+          "id": "eight-axis-design-review",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms layout, color, typography, responsive behavior, spacing, overlap or overflow, completeness, and interaction or accessibility."
+        },
+        {
+          "id": "design-token-contract-traceability",
+          "kind": "check",
+          "required": true,
+          "description": "Traces every finding to declared requirements, selected design tokens, current code and an observed screenshot region."
+        },
+        {
+          "id": "stable-component-sample",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms a stable sorted sample covers min(10, component count) components without arbitrary font bans."
+        },
+        {
+          "id": "independent-design-verifier",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms the non-modifying design judge is distinct from the visual remediator."
+        },
+        {
+          "id": "visual-inspection-required",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms persisted evidence and every final screenshot are actually opened rather than inferred."
+        },
+        {
+          "id": "bounded-pass-loop",
+          "kind": "check",
+          "required": true,
+          "description": "Requires an evidenced PASS within five rounds with no unresolved Critical or Important finding."
+        }
+      ],
+      "ported": true,
+      "next": "step014"
+    },
+    {
+      "number": 14,
+      "id": "step014",
+      "title": "콘솔 에러 수집 및 해결",
+      "phase": "e2e",
+      "source": "assets/profiles/planning-first-14-v1/steps/step014.md",
+      "target": "codex/assets/profiles/planning-first-14-v1/steps/step014.md",
+      "source_sha256": "a94fce42feea526b3d80a2b94283cf9f87d2fdbf448bc248708a65a14d060713",
+      "inputs": [
+        "step_archive/step004_smoke_test.md",
+        "dist/index.html",
+        "step_archive/step008_routing검증.md",
+        "step_archive/outputs/trust5_r2.md",
+        "step_archive/step009_e2e테스트결과.md",
+        "step_archive/step010_screenshot_e2e.md",
+        "step_archive/screenshots/e2e/step010-primary.png",
+        "step_archive/step011_keyboard검증.md",
+        "step_archive/screenshots/keyboard/step011-primary-before.png",
+        "step_archive/screenshots/keyboard/step011-primary-after.png",
+        "step_archive/step012_마우스검증.md",
+        "step_archive/screenshots/mouse/step012-primary-before.png",
+        "step_archive/screenshots/mouse/step012-primary-after.png",
+        "step_archive/outputs/step013_검증_r1.md",
+        "step_archive/screenshots/design/step013-primary-r1.png",
+        "step_archive/step002_환경준비.md",
+        "step_archive/outputs/browser-backend.json"
+      ],
+      "outputs": [
+        "step_archive/outputs/step014_콘솔에러.md",
+        "step_archive/outputs/trust5_r3.md",
+        "step_archive/outputs/browser-output.json",
+        "step_archive/screenshots/verified-desktop.png",
+        "step_archive/screenshots/verified-mobile.png"
+      ],
+      "requires": [
+        "step002",
+        "step004",
+        "step008",
+        "step009",
+        "step010",
+        "step011",
+        "step012",
+        "step013"
+      ],
+      "optional_requires": [],
+      "network": false,
+      "visual_review": true,
+      "acceptance": [
+        {
+          "id": "console-error-report",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the reachable-state manifest, redacted event findings, bounded settle evidence, rounds, and final verdict.",
+          "path": "step_archive/outputs/step014_콘솔에러.md"
+        },
+        {
+          "id": "final-quality-milestone",
+          "kind": "artifact",
+          "required": true,
+          "description": "Stores the third quality milestone only after console, final build, dist, and independent verification gates pass.",
+          "path": "step_archive/outputs/trust5_r3.md"
+        },
+        {
+          "id": "final-dist-index-html",
+          "kind": "artifact",
+          "required": true,
+          "description": "Requires the final build-produced dist/index.html artifact.",
+          "path": "dist/index.html",
+          "validator": "html-document"
+        },
+        {
+          "id": "browser-output-report",
+          "kind": "artifact",
+          "required": true,
+          "description": "Requires passing desktop and mobile browser measurements bound to the final dist/index.html digest.",
+          "path": "step_archive/outputs/browser-output.json",
+          "validator": "browser-output"
+        },
+        {
+          "id": "console-errors-zero",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms zero page errors, unhandled rejections, console errors, required-request failures, and crashes across every reachable state."
+        },
+        {
+          "id": "final-build",
+          "kind": "command",
+          "required": true,
+          "description": "Runs the exact non-optional build script declared by the project manifest after console verification passes.",
+          "command_pattern": "^(?:npm run|pnpm(?: run)?|yarn(?: run)?|bun run) (?:build|[A-Za-z0-9][A-Za-z0-9:_-]*build[A-Za-z0-9:_-]*)$"
+        },
+        {
+          "id": "final-dist-html-boundary",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms the final dist/index.html is a regular nonempty file with valid HTML boundaries."
+        },
+        {
+          "id": "reachable-state-manifest",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms initial, navigation, prerequisite input, and hidden reachable states are enumerated and exercised."
+        },
+        {
+          "id": "warning-classification",
+          "kind": "check",
+          "required": true,
+          "description": "Classifies every warning with evidence without silently treating an error as a warning."
+        },
+        {
+          "id": "bounded-settle-no-fixed-sleep",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms state-specific bounded settle conditions are used instead of fixed sleeps."
+        },
+        {
+          "id": "secret-redaction",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms reports redact credentials, tokens, cookies, authorization values, and sensitive query data."
+        },
+        {
+          "id": "independent-console-verifier",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms the non-modifying verifier is distinct from the console-error remediator."
+        },
+        {
+          "id": "receipt-first-completion",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms durable Step 14 receipt creation precedes completed state and any 14/14 report."
+        },
+        {
+          "id": "pass-only-final-milestone",
+          "kind": "check",
+          "required": true,
+          "description": "Requires every mandatory gate to PASS before the final report and third milestone count as evidence."
+        },
+        {
+          "id": "measured-quality-report",
+          "kind": "check",
+          "required": false,
+          "description": "Runtime-populated current measured-quality PASS with validated immutable report digest; required for every new completion."
+        },
+        {
+          "id": "final-regression-report",
+          "kind": "check",
+          "required": false,
+          "description": "Runtime-populated final regression PASS binding all six matrices to the final HTML and immutable QA report digest; required for new completion."
+        },
+        {
+          "id": "final-desktop-screenshot",
+          "kind": "artifact",
+          "required": true,
+          "path": "step_archive/screenshots/verified-desktop.png",
+          "description": "Records the current final browser screenshot for visual inspection."
+        },
+        {
+          "id": "final-mobile-screenshot",
+          "kind": "artifact",
+          "required": true,
+          "path": "step_archive/screenshots/verified-mobile.png",
+          "description": "Records the current final browser screenshot for visual inspection."
+        },
+        {
+          "id": "final-visual-inspection",
+          "kind": "check",
+          "required": true,
+          "description": "Confirms actual visual inspection of final desktop/mobile evidence and full screenshot/design regression matrices."
+        }
+      ],
+      "ported": true,
+      "next": null
+    }
+  ]
+}

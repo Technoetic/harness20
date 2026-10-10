@@ -32,7 +32,10 @@ PROGRESS_FILE="$PROJECT_ROOT/step_archive/progress.json"
 [ -f "$PROGRESS_FILE" ] || exit 0
 # The path goes in as an argument, never pasted into the Python source.
 CUR="$(python3 -c 'import json,sys;print(int(json.load(open(sys.argv[1],encoding="utf-8")).get("current_step",1)))' "$PROGRESS_FILE" 2>/dev/null || echo 1)"
-[ "$CUR" -lt 15 ] && exit 0
+command -v node >/dev/null 2>&1 || exit 0
+THRESHOLD="$(node "$(dirname "${BASH_SOURCE[0]}")/lib/mx-stage.mjs" "$PROJECT_ROOT" 2>/dev/null)" || exit 0
+case "$THRESHOLD" in ''|*[!0-9]*) exit 0 ;; esac
+[ "$CUR" -lt "$THRESHOLD" ] && exit 0
 
 case "$FP" in
   */step_archive/*|*/.claude/*|*/node_modules/*|*/.git/*|*/plugins/harness20/*|*/plugins/harness36/*|*/plugins/harness50/*) exit 0 ;;

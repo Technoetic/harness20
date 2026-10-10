@@ -327,8 +327,8 @@ testEachName('D1 webapp-trigger bootstraps /webapp without eval_rounds or trust5
   assert.ok(existsSync(join(root, 'step_archive', 'TOPIC', 'TOPIC.md')), 'TOPIC.md was not written');
   const progress = readJson(join(root, 'step_archive', 'progress.json'));
   assert.equal(progress.current_step, 1);
-  assert.equal(progress.total_steps, 20);
-  assert.equal(progress.workflow_profile, "planning-first-20-v1");
+  assert.equal(progress.total_steps, 14);
+  assert.equal(progress.workflow_profile, "planning-first-14-v1");
   assert.equal(Object.hasOwn(progress, 'eval_rounds'), false);
   assert.equal(Object.hasOwn(progress, 'trust5_results'), false);
 });

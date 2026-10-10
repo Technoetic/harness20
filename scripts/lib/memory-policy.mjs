@@ -4,6 +4,7 @@ import { physicalWorkspace, readSafe, sha256 } from './quality-files.mjs';
 import { workflowContext } from './workflow-context.mjs';
 import { parseStrictJson } from './strict-json.mjs';
 import { unsafeJevText } from './sensitive-data.mjs';
+import { WORKFLOW_PROFILE_IDS, LEGACY_WORKFLOW_PROFILE } from './workflow-profiles.mjs';
 
 export const MEMORY_LIMITS = Object.freeze({ manifest:256*1024, file:8*1024*1024,
   aggregate:32*1024*1024, excerpt:16*1024, query:2048, output:64*1024, sources:128 });
@@ -90,7 +91,12 @@ export function assertMemorySourcePath(path,kind='repository-source') {
     memoryRequire(/^step_archive\/(?:outputs|specs|screenshots)\//.test(path));
     memoryRequire(!/^step_archive\/outputs\/(?:workflow-memory|qa-reports|quality-reports|jev)(?:\/|$)/i.test(path));
   }
-  if(kind==='lesson') memoryRequire(/^step_archive\/outputs\/workflow-memory\/(?:planning-first-20-v1|research-free-36-v1)\/[a-f0-9]{64}\/lessons\/[a-f0-9]{64}\.json$/.test(path));
+  if(kind==='lesson') {
+    const match=/^step_archive\/outputs\/workflow-memory\/([^/]+)\/[a-f0-9]{64}\/lessons\/[a-f0-9]{64}\.json$/.exec(path);
+    // Legacy unmarked runs have no generation-scoped memory. Accept only
+    // registered modern profiles; record readers still verify exact bindings.
+    memoryRequire(match && match[1] !== LEGACY_WORKFLOW_PROFILE && WORKFLOW_PROFILE_IDS.includes(match[1]));
+  }
   return path;
 }
 export function memorySourceReference(reference) {

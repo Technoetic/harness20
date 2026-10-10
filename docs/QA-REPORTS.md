@@ -63,7 +63,7 @@ node "<plugin-root>/scripts/qa-report.mjs" record --workspace "<project-root>" -
 
 `snapshot` and `record` each read one UTF-8 JSON object from standard input, limited
 to 64 KiB. Supply it through a structured tool or a UTF-8 pipe; do not interpolate
-observations into shell command text. Steps are integers within the selected profile: fresh20 1–20, explicit research-free36 1–36 and legacy50 1–50. Unknown, repeated
+observations into shell command text. Steps are integers within the selected profile: fresh14 1–14, existing20 1–20, explicit research-free36 1–36 and legacy50 1–50. Unknown, repeated
 or misplaced flags are rejected. `inspect` accepts no `--input` flag and never
 accepts an arbitrary report path.
 
@@ -125,20 +125,20 @@ step report, not as a `fail` outcome.
 | `inspect`: `stale`, `missing` or `invalid` | 2 | Current successful QA is not established |
 | Invalid command/input or reporter failure | 2 | Generic diagnostic on stderr; no input or exception details echoed |
 
-## Final candidate regression at Step 20
+## Final candidate regression at Step 14
 
-This section describes fresh planning-first20 (matrices15–20, snapshot20). Explicit
+This section describes fresh planning-first14 (matrices9–14, snapshot14). Existing20 retains matrices15–20 and snapshot20. Explicit
 research-free36 retains matrices31–36 and snapshot36; legacy50 uses matrices45–50 and snapshot50 with the same six mandatory IDs and historical semantics.
 
 The final build invalidates earlier QA whenever its bytes change. After the last
 repair and final build, keep the candidate read-only and rerun the complete
-Step 15 E2E scenarios, Step 16 screenshot matrix, Step 17 keyboard matrix,
-Step 18 mouse matrix, Step 19 design review and Step 20 reachable-state console
+Step 9 E2E scenarios, Step 10 screenshot matrix, Step 11 keyboard matrix,
+Step 12 mouse matrix, Step 13 design review and Step 14 reachable-state console
 matrix. Retain their full scenario inventories and add newly introduced states;
-an entry-page smoke test cannot replace them. Reuse Step 15's recorded serving
+an entry-page smoke test cannot replace them. Reuse Step 9's recorded serving
 mode and local server URL; history routing requires an HTTP server with fallback.
 
-Create one fresh Step 20 snapshot immediately before these runs. Include
+Create one fresh Step 14 snapshot immediately before these runs. Include
 `dist/index.html` and any additional source/configuration files that affect the
 candidate. The snapshot must declare all six check IDs below; additional
 product-specific requirements may also be declared.
@@ -147,19 +147,19 @@ product-specific requirements may also be declared.
 {
   "artifacts": ["dist/index.html"],
   "checks": [
-    { "id": "e2e-regression", "requirement": "All Step 15 scenarios pass on the final build" },
-    { "id": "screenshot-regression", "requirement": "All Step 16 screens and viewports are reviewed on the final build" },
-    { "id": "keyboard-regression", "requirement": "All Step 17 keyboard interactions pass on the final build" },
-    { "id": "mouse-regression", "requirement": "All Step 18 mouse interactions pass on the final build" },
-    { "id": "design-regression", "requirement": "All Step 19 design requirements pass on the final build" },
-    { "id": "console-regression", "requirement": "All Step 20 reachable states have no required console or request errors" }
+    { "id": "e2e-regression", "requirement": "All Step 9 scenarios pass on the final build" },
+    { "id": "screenshot-regression", "requirement": "All Step 10 screens and viewports are reviewed on the final build" },
+    { "id": "keyboard-regression", "requirement": "All Step 11 keyboard interactions pass on the final build" },
+    { "id": "mouse-regression", "requirement": "All Step 12 mouse interactions pass on the final build" },
+    { "id": "design-regression", "requirement": "All Step 13 design requirements pass on the final build" },
+    { "id": "console-regression", "requirement": "All Step 14 reachable states have no required console or request errors" }
   ]
 }
 ```
 
-Run the existing `snapshot` and `record` commands with `--step 20`; each outcome
+Run the existing `snapshot` and `record` commands with `--step 14`; each outcome
 must reference newly collected, sanitized evidence for its complete matrix.
-Fresh20 and explicit research-free36 final completion requires a recorded `independent` verifier that actually
+Fresh14, existing20 and explicit research-free36 final completion require a recorded `independent` verifier that actually
 performed the checks. If unavailable, record `same-agent` honestly as diagnostic
 evidence and leave final completion incomplete. Legacy50 retains its existing
 verifier semantics. Neither copying
@@ -168,7 +168,7 @@ a rerun. Any fix or rebuild during this phase requires another snapshot and all
 six matrices again. Bound the final repair/rerun cycle to five rounds; failures
 or unexecuted checks remain incomplete when that limit is reached.
 
-Fresh Step 20 completion in either host inspects this current report, the six
+Fresh Step 14 completion in either host inspects this current report, the six
 required categories and the final HTML binding, alongside measured quality and
 browser evidence. The inspector executes no tests itself. The immutable report
 hash is included in new Codex completion evidence. Earlier step receipts remain
@@ -177,7 +177,8 @@ history and are not overwritten to simulate rerunning them.
 ## Storage and limits
 
 Snapshots, immutable reports and each step's current reference live under
-`step_archive/outputs/qa-reports/planning-first-20-v1/<workflow-generation>/` for fresh20;
+`step_archive/outputs/qa-reports/planning-first-14-v1/<workflow-generation>/` for fresh14;
+existing20 keeps `step_archive/outputs/qa-reports/planning-first-20-v1/<workflow-generation>/`;
 explicit research-free36 keeps `step_archive/outputs/qa-reports/research-free-36-v1/<workflow-generation>/`.
 New schema2 evidence binds workflow_profile and workflow_generation. Legacy50 keeps
 schema1 and the flat `step_archive/outputs/qa-reports/` paths. Resolve the active
@@ -208,3 +209,7 @@ instructions or copy evidence contents into its report.
 This auxiliary report supplements the measured checks in [QUALITY.md](QUALITY.md).
 It does not replace quality-gate or browser evidence, the step's acceptance
 contract, independent verification where required, or host workflow authority.
+
+Explicit `planning-first-20-v1` runs keep environment3, implementation9, E2E15,
+final20, quality10/14/20, QA11/16/17/18 and Jev1/2/9/15/19, with their original
+profile/generation evidence paths. Existing20/36/50 bodies and indexes are preserved.

@@ -4,7 +4,7 @@
 # 정식 4종 태그로 코드 레벨 컨텍스트를 AI에게 전달.
 #
 # 검증 대상 확장자: .js .jsx .ts .tsx .mjs .cjs .html .css .py .go .rs
-# 검증 시기: 구현 Step(step015 이후) 생성 코드에 한해 권고. 미준수 시 경고만 출력 (fail-open).
+# 검증 시기: 선택 프로필의 구현 단계부터 권고(legacy50은 역사적15 유지). 경고만 출력.
 #
 # @MX 태그 정식 규격 (MoAI 표준):
 #   // @MX:NOTE   - 컨텍스트·의도 전달 (매직 상수, 비즈니스 규칙 등)
@@ -64,7 +64,7 @@ $targetExts = @('.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '.html', '.css', '
 $ext = [System.IO.Path]::GetExtension($filePath).ToLower()
 if ($targetExts -notcontains $ext) { exit 0 }
 
-# Step 015 이후 구현 단계에서만 검증 (이전은 도구 설치/조사 Step)
+# 선택 프로필의 구현 좌표를 읽기 전용 검사기로 확인한다.
 $projectRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } elseif ($harnessEvent.cwd) { [string]$harnessEvent.cwd } else { [System.IO.Directory]::GetCurrentDirectory() }
 $progressFile = Join-Path $projectRoot "step_archive\progress.json"
 if (-not (Test-Path -LiteralPath $progressFile)) { exit 0 }
@@ -77,8 +77,13 @@ try {
 }
 
 $currentStep = [int]$progress.current_step
-if ($currentStep -lt 15) {
-    # 구현 Step 진입 전 — @MX 태그 미요구
+try {
+    $mxThresholdRaw = & node (Join-Path $PSScriptRoot 'lib\mx-stage.mjs') $projectRoot 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]$mxThresholdRaw -notmatch '^\d+$') { exit 0 }
+    $mxThreshold = [int]$mxThresholdRaw
+} catch { exit 0 }
+if ($currentStep -lt $mxThreshold) {
+    # 구현 단계 진입 전 — @MX 태그 미요구
     exit 0
 }
 

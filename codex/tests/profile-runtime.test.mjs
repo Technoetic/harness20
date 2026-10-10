@@ -112,11 +112,11 @@ test('runtime profile contracts reject source drift and invalid dependency refer
  const other=await makePluginFixture({workflowProfile:profile});const path=join(other,`codex/assets/profiles/${profile}/steps/index.json`);const index=JSON.parse(await readFile(path,'utf8'));index.steps[0].requires=['step037'];await writeFile(path,JSON.stringify(index));
  await assert.rejects(()=>loadStepContract(other,1,profile),{code:'STEP_CONTRACT_INVALID'});
 });
-test('CLI defaults20 and session context reflects selected total',async()=>{
+test('CLI defaults14 and session context reflects selected total',async()=>{
  const workspaceRoot=await makeWorkspace();
  const result=await runCli(['init','--workspace',workspaceRoot,'--input','-'],{input:{topic:'Fresh public CLI36'}});
- assert.equal(result.code,0,result.stderr);const state=JSON.parse(result.stdout);assert.equal(state.total_steps,20);assert.equal(state.workflow_profile,'planning-first-20-v1');
- const hook=await handleSessionStart({}, {workspaceRoot});assert.match(hook.hookSpecificOutput.additionalContext,/0\/20 complete/);
+ assert.equal(result.code,0,result.stderr);const state=JSON.parse(result.stdout);assert.equal(state.total_steps,14);assert.equal(state.workflow_profile,'planning-first-14-v1');
+ const hook=await handleSessionStart({}, {workspaceRoot});assert.match(hook.hookSpecificOutput.additionalContext,/0\/14 complete/);
  const rejected=await runCli(['begin','--workspace',workspaceRoot,'--step','37','--input','-'],{input:{marker:state.continuation}});
  assert.notEqual(rejected.code,0);assert.equal(JSON.parse(rejected.stderr).error.code,'STEP_RANGE');
  await assert.rejects(()=>failStep({workspaceRoot,step:37,attemptId:'bad',reason:'bad',evidence:[]}),{code:'STEP_RANGE'});
@@ -126,7 +126,7 @@ test('schema2 importer rejects string counts and reset archives legacy without r
  const workspaceRoot=await makeWorkspace();const before=await initWorkflow({workspaceRoot,workflowProfile:'legacy-50-v1',topic:'Legacy reset'});
  const {backupPath}=await resetWorkflow({workspaceRoot});const archived=JSON.parse(await readFile(join(backupPath,'state.json'),'utf8'));
  assert.deepEqual(archived,before);assert.equal((await showWorkflow({workspaceRoot})).active,false);
- const fresh=await initWorkflow({workspaceRoot:await makeWorkspace(),topic:'Explicit fresh run after retained archive'});assert.equal(fresh.workflow_profile,'planning-first-20-v1');
+ const fresh=await initWorkflow({workspaceRoot:await makeWorkspace(),topic:'Explicit fresh run after retained archive'});assert.equal(fresh.workflow_profile,'planning-first-14-v1');
 });
 test('canonical final36 preserves console, screenshots, current HTML and six-matrix independent evidence',async()=>{
  const contract=await loadStepContract(resolve(import.meta.dirname,'../..'),36,profile);

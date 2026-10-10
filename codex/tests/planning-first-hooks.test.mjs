@@ -13,6 +13,7 @@ import { spawnSync } from 'node:child_process';
 
 const variants = windows ? ['ps1', ...(gitBash ? ['sh'] : [])] : ['sh'];
 const planning = 'planning-first-20-v1';
+const fresh = 'planning-first-14-v1';
 const readProgress = root => JSON.parse(readFileSync(join(root, 'step_archive/progress.json'), 'utf8'));
 const codexState = (profile, total, extra = {}) => ({ schema_version: 2, workflow_profile: profile,
   workflow_id: 'planning-hook-fixture', total_steps: total, status: 'running', current_step: 1, completed_steps: [], ...extra });
@@ -90,29 +91,29 @@ for (const variant of variants) {
     }
     assert.fail(`Step ${step}/${total} was not recorded`);
   };
-  test(`${variant} fresh planning20 starts without removed preflight artifacts and follows selected instructions`, t => {
+  test(`${variant} fresh planning14 starts without removed preflight artifacts and follows selected instructions`, t => {
     const base = tempRoot(t, 'h36-planning-hooks-'); const plugin = installPlugin(base);
     const root = join(base, 'project'); mkdirSync(root);
     const trigger = run(plugin, 'webapp-trigger', root, { prompt: '/harness20:webapp Requirements planning fixture' });
     const state = readProgress(root);
-    assert.equal(state.workflow_profile, planning); assert.equal(state.total_steps, 20);
+    assert.equal(state.workflow_profile, fresh); assert.equal(state.total_steps, 14);
     assert.equal(state.schema_version, 2); assert.equal(state.current_step, 1); assert.deepEqual(state.completed_steps, []);
     const topic = readFileSync(join(root, 'step_archive/TOPIC/TOPIC.md'), 'utf8');
     assert.match(topic, /Requirements planning fixture/);
     assert.equal(hasCompleteTopicContract(topic), true, 'Planning begins with the frozen six-field contract');
     assert.match(trigger, /required-input-missing/);
-    const directory = `step_archive/profiles/${planning}/archived`;
-    assert.equal(readdirSync(join(root, directory)).filter(name => /^step\d{3}\.md$/.test(name)).length, 20);
+    const directory = `step_archive/profiles/${fresh}/archived`;
+    assert.equal(readdirSync(join(root, directory)).filter(name => /^step\d{3}\.md$/.test(name)).length, 14);
     assert.equal(existsSync(join(root, 'step_archive/step016_gate_status.md')), false);
     assert.equal(existsSync(join(root, 'step_archive/step001_preflight.md')), false);
     assert.equal(readRun(root).phase, 'active');
     for (const name of ['step-progress-loader', 'spec-generator', 'step-progress-writer', 'step-auto-continue']) {
       assert.equal(shouldRunHook(name, JSON.stringify({ cwd: root }), { CLAUDE_PROJECT_DIR: '' }), true, name);
     }
-    assert.match(trigger, /total=20/); assert.match(trigger, /001\/20/); assert.match(trigger, /step020/);
-    assert.match(trigger, /profiles\/planning-first-20-v1\/archived\/step001\.md/);
+    assert.match(trigger, /total=14/); assert.match(trigger, /001\/14/); assert.match(trigger, /step014/);
+    assert.match(trigger, /profiles\/planning-first-14-v1\/archived\/step001\.md/);
     assert.doesNotMatch(trigger, /research-free-36-v1|step036|001\/36/);
-    assert.match(run(plugin, 'step-progress-loader', root), /profiles\/planning-first-20-v1\/archived\/step001\.md/);
+    assert.match(run(plugin, 'step-progress-loader', root), /profiles\/planning-first-14-v1\/archived\/step001\.md/);
     // Prior flat archives remain history and cannot change a profile's instruction count.
     const oldFlat = join(root, 'step_archive/step050.md');
     writeFileSync(oldFlat, '# Preserved legacy instruction\n');
@@ -121,15 +122,15 @@ for (const variant of variants) {
     assert.deepEqual(readFileSync(oldFlat), oldBytes);
     run(plugin, 'spec-generator', root);
     const spec = readFileSync(join(root, 'step_archive/specs/SPEC-001.md'), 'utf8');
-    assert.match(spec, /workflow_profile: planning-first-20-v1/);
-    assert.match(spec, /profiles\/planning-first-20-v1\/archived\/step001\.md/);
-    complete(plugin, root, 1, 20);
+    assert.match(spec, /workflow_profile: planning-first-14-v1/);
+    assert.match(spec, /profiles\/planning-first-14-v1\/archived\/step001\.md/);
+    complete(plugin, root, 1, 14);
     assert.deepEqual(readProgress(root).completed_steps, [1]);
-    assert.match(run(plugin, 'step-auto-continue', root), /profiles\/planning-first-20-v1\/archived\/step002\.md/);
-    for (const step of [10, 11, 14, 16, 17, 18, 20]) {
+    assert.match(run(plugin, 'step-auto-continue', root), /profiles\/planning-first-14-v1\/archived\/step002\.md/);
+    for (const step of [4, 5, 8, 10, 11, 12, 14]) {
       writeFileSync(join(root, 'step_archive/progress.json'), JSON.stringify({ ...state, current_step: step,
         completed_steps: Array.from({ length: step - 1 }, (_, i) => i + 1) }));
-      run(plugin, 'step-progress-writer', root, { last_assistant_message: `Step ${step}/20 완료` });
+      run(plugin, 'step-progress-writer', root, { last_assistant_message: `Step ${step}/14 완료` });
       assert.equal(readProgress(root).completed_steps.includes(step), false, `Gate ${step} requires measured evidence`);
     }
   });
@@ -194,20 +195,20 @@ for (const variant of variants) {
     assert.deepEqual(readFileSync(join(root, 'step_archive/progress.json')), before);
   });
 
-  test(`${variant} planning20 final completion requires and accepts current measured browser and six-matrix evidence`, async t => {
+  test(`${variant} planning14 final completion requires and accepts current measured browser and six-matrix evidence`, async t => {
     const base = tempRoot(t, 'h36-planning20-final-'); const plugin = installPlugin(base);
     const root = join(base, 'project'); mkdirSync(root);
     run(plugin, 'webapp-trigger', root, { prompt: '/webapp Measured final fixture' });
     const state = readProgress(root);
-    writeFileSync(join(root, 'step_archive/progress.json'), JSON.stringify({ ...state, current_step: 20,
-      completed_steps: Array.from({ length: 19 }, (_, i) => i + 1) }));
+    writeFileSync(join(root, 'step_archive/progress.json'), JSON.stringify({ ...state, current_step: 14,
+      completed_steps: Array.from({ length: 13 }, (_, i) => i + 1) }));
     mkdirSync(join(root, 'dist')); mkdirSync(join(root, 'step_archive/outputs'));
     writeFileSync(join(root, 'dist/index.html'), completionHtml);
     writeFileSync(join(root, 'step_archive/outputs/browser-output.json'), JSON.stringify(passingBrowserReport(sha256(completionHtml))));
-    await prepareFinalRegression(root, { workflowProfile: planning });
+    await prepareFinalRegression(root, { workflowProfile: fresh });
     await prepareQuality(root);
-    complete(plugin, root, 20, 20);
-    assert.deepEqual(readProgress(root).completed_steps, Array.from({ length: 20 }, (_, i) => i + 1));
+    complete(plugin, root, 14, 14);
+    assert.deepEqual(readProgress(root).completed_steps, Array.from({ length: 14 }, (_, i) => i + 1));
     assert.equal(readRun(root).phase, 'finished');
     assert.equal(run(plugin, 'step-auto-continue', root).trim(), '');
   });

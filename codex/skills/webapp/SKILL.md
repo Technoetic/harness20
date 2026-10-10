@@ -23,7 +23,7 @@ Hook availability is not a prerequisite for this active-turn execution.
 Resolve these installed resources relative to this SKILL.md, not from the current working directory:
 
 - State manager: `../../scripts/harness-state.mjs`
-- Codex step selected by the manager: `begin.step_target` (relative to the plugin root). Fresh runs use `codex/assets/profiles/planning-first-20-v1/steps/stepNNN.md` (20 steps); explicit research-free36 uses `codex/assets/profiles/research-free-36-v1/steps/stepNNN.md`; legacy50 runs use `codex/assets/steps/stepNNN.md`.
+- Codex step selected by the manager: `begin.step_target` (relative to the plugin root). Fresh runs use `codex/assets/profiles/planning-first-14-v1/steps/stepNNN.md` (14 steps); explicit old20 uses `codex/assets/profiles/planning-first-20-v1/steps/stepNNN.md`; explicit research-free36 uses `codex/assets/profiles/research-free-36-v1/steps/stepNNN.md`; legacy50 runs use `codex/assets/steps/stepNNN.md`.
 - Shared QA reporter: `../../../scripts/qa-report.mjs`
 - QA report protocol and input schema: `../../../docs/QA-REPORTS.md`
 - Verified experience memory CLI: `../../../scripts/workflow-memory.mjs`
@@ -73,12 +73,20 @@ Do not ask the user to supply these six internal fields or move to another works
 because their new request is short. Fresh Step 1 is requirements planning and checks meaning and fidelity against the original
 request; generated defaults are not additional user decisions. Existing-work branches above
 remain unchanged, and normalization never rewrites an already-frozen TOPIC.
-Fresh initialization selects schema2 `planning-first-20-v1`, total20. Planning reads TOPIC
+Fresh initialization selects schema2 `planning-first-14-v1`, total14. Planning reads TOPIC
 and explicitly provided sources without deleted preflight, tool or dependency-gate artifacts.
-Missing essential requirements stay missing. Step 2 owns design, Step 3 environment and
-browser backend verification/locking, Step 9 implementation, Step 15 E2E and Step 19 final design.
-Quality gates remain at 10/14/20 and independent QA at 11/16/17/18. Explicit old36/50
+Missing essential requirements stay missing. Step 2 owns design and, after independent design PASS, environment preparation and
+browser backend verification/locking. Step 3 owns implementation, Step 9 E2E and Step 13 final design.
+Quality gates remain at 4/8/14 and independent QA at 5/10/11/12. Explicit old20/36/50
 resumes keep their instruction paths, counts, evidence and hashes; never renumber them.
+
+Explicit `planning-first-20-v1` retains its twenty bodies and original coordinates
+(environment3, implementation9, E2E15, quality10/14/20, QA11/16/17/18, Jev1/2/9/15/19).
+Never rewrite or renumber those existing runs. Fresh design2 uses the required
+`environment-report.mjs inspect --workspace ROOT` inspection and current generation-bound
+observations before completing. Implementation3 declares work ownership before edits;
+build4 checks strict UTF-8/no-BOM/LF bytes. Current native generated-HTML verification
+remains blocked by the host isolation gate; synthetic fixtures are not product PASS.
 
 ## `$webapp resume`
 
@@ -245,7 +253,7 @@ work transparently. All acceptance gates, reviewers, tests and state writers rem
 
 ## Optional Jev checkpoint routing
 
-For fresh `planning-first-20-v1`, use steps 1, 2, 9, 15 and 19. Explicit
+For fresh `planning-first-14-v1`, use steps 1, 2, 3, 9 and 13. Explicit
 `research-free-36-v1` retains 17, 18, 25, 31 and 35; explicit
 `legacy-50-v1` retains steps 16, 24, 25, 30, 37, 45 and 49. After selected evidence is ready and before
 the existing independent review, use `../../../scripts/jev-judge.mjs` according to
@@ -270,7 +278,7 @@ proven failure. The optional API exception does not grant general browsing or ex
 the step's collection scope. This advisory route leaves required Acceptance,
 independent reviewers, actual screenshots, project E2E, the QA writer and all manager
 mutations unchanged. A Jev result, exit zero or `current` never completes a step.
-The planning-first20 planning1 and implementation9 routes, and the retained
+The planning-first14 planning1 and implementation3 routes, and the retained
 research-free36 planning17 and implementation25 routes, use the generic helper only;
 the legacy `jev-review.mjs` is only for legacy50 planning25. That
 adapter stays compatible and is not invoked again for the same judgment.

@@ -35,7 +35,7 @@ node scripts/verify-output.mjs --probe
 prints `{ "backends": { "playwright": true|false, "aside": true|false }, "selected": "playwright"|"aside"|null, "tool_version": "..." }`
 without launching a browser and exits 0 only when a backend was selected.
 
-A project whose Step 3 recorded a [backend lock](#backend-lock-step-3) uses only the
+A project whose selected environment stage recorded a [backend lock](#backend-lock-step-3) uses only the
 locked backend under `auto`. Without a lock, the selection order for `--backend auto`
 (the default) is:
 
@@ -82,7 +82,16 @@ Check with the tool hook: `bash hooks/validate-tools.sh aside` or
 
 ## Backend lock (Step 3)
 
-Fresh planning-first20 environment Step 3 probes the actually available, permitted
+The heading and shared diagnostic text retain historical Step 3 naming. Fresh14
+locks inside design2 after independent design PASS; existing20 retains environment3
+and old36/50 retain their original tool3. Follow the selected profile, not the number
+in a historical error message. Fresh14 completion also requires the current
+`step002_환경준비.md` structured `harness20-environment` observations and
+`node "<plugin-root>/scripts/environment-report.mjs" inspect --workspace ROOT` PASS.
+This reads and verifies the recorded evidence; it does not measure readiness.
+
+
+Fresh planning-first14 environment preparation after independent design Step 2 probes the actually available, permitted
 backend and records its choice inside the project. Planning Step 1 and design Step 2
 do not require a deleted browser preflight. Explicit research-free36 and legacy50
 keep their original tool Step 3 and environment Steps 19/31. Later steps reuse the
@@ -94,7 +103,7 @@ node scripts/verify-output.mjs --probe --backend <selected> --lock --workspace "
 ```
 
 Explicit old36/50 bodies retain their original tool-Step-3 command below. This is
-compatibility notation; fresh20 uses the explicitly permitted backend above:
+compatibility notation; fresh14 uses the explicitly permitted backend above:
 
 ```text
 node scripts/verify-output.mjs --probe --lock --workspace "<project-root>"
@@ -140,7 +149,7 @@ other than `playwright`/`aside`, a non-string `tool_version`, an unparseable
   or its Chromium download. In that case `hooks/validate-tools.*` report Playwright as
   "not needed" instead of printing the install hint. A project locked to `playwright`
   keeps the Playwright install path and is not pointed at Aside.
-- **Only Step 3 writes the lock**, and only after the workflow is initialized. A Codex
+- **Only the selected environment owner writes the lock**, and only after the workflow is initialized. A Codex
   workspace must not contain `step_archive/outputs/` before `$webapp` init. `--lock`
   refuses to run without `--probe` and an explicit `--workspace`, so the lock never lands
   in the checkout itself.
@@ -153,8 +162,9 @@ other than `playwright`/`aside`, a non-string `tool_version`, an unparseable
   `--backend <name> --lock`. The same command repairs an invalid lock. A project started
   before the lock existed can record the backend named in
   the original `step_archive/step003_playwright_test.md` this way only for old36/50
-  (their environment Steps 19/31 keep this recovery). Fresh20 records environment
-  and backend evidence in `step_archive/step003_환경준비.md`; it does not require that old file.
+  (their environment Steps 19/31 keep this recovery). Fresh14 records environment
+  and backend evidence in `step_archive/step002_환경준비.md`; explicit20 keeps
+  `step_archive/step003_환경준비.md` and its original environment3 boundary.
 - The lock prevents accidental switches. It is not a security boundary: deleting the
   file or passing an explicit backend bypasses it.
 
@@ -266,7 +276,7 @@ scheme, language, DPR and installed extensions**, and a reviewer must not treat 
 dark-scheme ko-KR shared-profile screenshot as equivalent to a light-scheme fresh-context
 capture. When both backends are available at Step 3, `auto` selects and locks
 `playwright`. Once a project is locked, keep the locked backend for all evidence,
-including the fresh final Step 20 report (old36/50 retain final36/50), and do not install the other backend to replace it.
+including the fresh final Step 14 report (old36/50 retain final36/50), and do not install the other backend to replace it.
 
 ## 요약 (한국어)
 
@@ -277,7 +287,7 @@ including the fresh final Step 20 report (old36/50 retain final36/50), and do no
 - `node scripts/verify-output.mjs --probe`로 가용 백엔드를 확인하고,
   `--backend auto|playwright|aside`(또는 환경변수 `HARNESS50_BROWSER_BACKEND`)로 선택한다.
   잠금 파일이 없을 때 auto는 Playwright → Aside 순서다.
-- 새20의 환경 준비 Step 3(기존36·50은 원래 도구3)은 `node scripts/verify-output.mjs --probe --backend <selected> --lock --workspace "<project-root>"`로 선택을
+- 새14의 설계 후 환경 준비 Step 2(기존36·50은 원래 도구3)은 `node scripts/verify-output.mjs --probe --backend <selected> --lock --workspace "<project-root>"`로 선택을
   `step_archive/outputs/browser-backend.json`에 고정한다. 그 뒤 `--backend` 없는 검증은 고정
   백엔드만 쓰고, 사용할 수 없으면 다른 백엔드로 넘어가지 않고 그 백엔드의 복구 방법만 안내한다.
   명시적 `--backend`/환경변수가 우선하며, 잘못된 잠금 파일은 실패로 처리한다(fail closed).
@@ -296,3 +306,7 @@ including the fresh final Step 20 report (old36/50 retain final36/50), and do no
 - 보고서의 `environment` 블록은 백엔드·격리 수준·색 구성표·언어·DPR 등을 공개한다.
   공유 프로필 증거는 사용자 환경(다크 모드, ko-KR, 확장 프로그램)을 노출하므로 검토자가
   구분해 읽어야 한다. CI는 Playwright를 유지한다.
+
+Explicit `planning-first-20-v1` runs keep environment3, implementation9, E2E15,
+final20, quality10/14/20, QA11/16/17/18 and Jev1/2/9/15/19, with their original
+profile/generation evidence paths. Existing20/36/50 bodies and indexes are preserved.

@@ -11,6 +11,8 @@ import { isAbsolute, join, relative, resolve, sep, win32 } from "node:path";
 import { HarnessError } from "./errors.mjs";
 import { sanitizeEvidence } from "./receipts.mjs";
 import { validateHtmlBytes } from "../../../scripts/lib/html-document.mjs";
+import { parseBackendLock } from "../../../scripts/lib/browser-backend-lock.mjs";
+import { inspectEnvironmentReport } from "../../../scripts/lib/environment-report.mjs";
 import { readBrowserReportBytes } from "../../../scripts/lib/browser-report.mjs";
 import { readRouteManifestBytes, validateRouteManifest } from "../../../scripts/lib/route-contract.mjs";
 import { inspectQualityReport, REPORT_PATH as QUALITY_REPORT_PATH } from "../../../scripts/lib/quality.mjs";
@@ -228,7 +230,7 @@ function validateAcceptanceDeclarations(contract) {
         ? [...ACCEPTANCE_COMMON_KEYS, hasCommand ? "command" : "command_pattern"]
         : ACCEPTANCE_COMMON_KEYS;
     exactFields(declaration, fields, "STEP_CONTRACT_INVALID", "acceptance declaration");
-    if (Object.hasOwn(declaration, "validator") && !["html-document", "browser-output"].includes(declaration.validator)) {
+    if (Object.hasOwn(declaration, "validator") && !["html-document", "browser-output", "browser-backend-lock", "environment-report"].includes(declaration.validator)) {
       fail("STEP_CONTRACT_INVALID", "artifact validator is unknown");
     }
     if (
@@ -425,9 +427,10 @@ async function hashStableArtifact(workspaceRoot, declaration, suppliedDigest, af
     if (initialRead.byteCount !== handleBefore.size) {
       fail("ACCEPTANCE_ARTIFACT_CHANGED", "artifact size changed during initial hashing");
     }
-    if (declaration.validator === "html-document" || declaration.validator === "browser-output") {
+    if (["html-document", "browser-output", "browser-backend-lock", "environment-report"].includes(declaration.validator)) {
       try {
-        const limit = declaration.validator === "html-document" ? 8 * 1024 * 1024 : 1024 * 1024;
+        const limit = declaration.validator === "html-document" ? 8 * 1024 * 1024
+          : declaration.validator === "browser-backend-lock" ? 4096 : 1024 * 1024;
         if (handleBefore.size > BigInt(limit)) throw new Error("Artifact exceeds its content validation limit");
         const content = await handle.readFile();
         if (createHash("sha256").update(content).digest("hex") !== initialRead.digest) throw new Error("Artifact changed during content validation");
@@ -436,7 +439,11 @@ async function hashStableArtifact(workspaceRoot, declaration, suppliedDigest, af
           if (browserBindings?.requireRouting && declaration.path === "dist/index.html") {
             browserBindings.htmlRoutes.set(declaration.path, readRouteManifestBytes(content));
           }
-        } else browserBindings.reports.set(declaration.id, readBrowserReportBytes(content));
+        } else if (declaration.validator === "browser-backend-lock") parseBackendLock(content);
+        else if (declaration.validator === "environment-report") {
+          if ((await inspectEnvironmentReport(root, { reportBytes: content })).verdict !== 'PASS') throw new Error('Environment evidence is missing, invalid or stale');
+        }
+        else browserBindings.reports.set(declaration.id, readBrowserReportBytes(content));
       } catch (error) {
         fail("ACCEPTANCE_ARTIFACT_CONTENT", error.message, { acceptance_id: declaration.id });
       }
