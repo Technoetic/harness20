@@ -21,7 +21,7 @@ async function fixture() {
   assert.equal(typeof policy.memoryWorkspace, 'function', 'memory policy API must exist');
   assert.equal(typeof api.captureFailure, 'function', 'failure memory API must exist');
   const root = await makeWorkspace();
-  const state = await initWorkflow({ workspaceRoot: root, topic: 'Implement bounded memory.', now,
+  const state = await initWorkflow({ workflowProfile:'planning-first-20-v1',workspaceRoot: root, topic: 'Implement bounded memory.', now,
     idFactory: () => 'memory-fixture' });
   const begun = await beginStep({ workspaceRoot: root, step: 1, marker: state.continuation,
     now: '2026-10-08T00:00:01.000Z', idFactory: () => 'memory-attempt' });

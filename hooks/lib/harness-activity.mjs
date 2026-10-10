@@ -107,6 +107,10 @@ export function classifyProgress(state) {
   const done = state.completed_steps;
   if (!Array.isArray(done) || !done.every(step => Number.isInteger(step) && step >= 1 && step <= total) ||
       new Set(done).size !== done.length) return { phase: 'invalid' };
+  // Fresh compact runs cannot retain later work past a rejected prerequisite.
+  // Older profiles keep their published nonprefix history semantics.
+  if (state.workflow_profile === 'planning-first-14-v1' &&
+      [...done].sort((a, b) => a - b).some((step, index) => step !== index + 1)) return { phase: 'invalid' };
   const finished = new Set(done);
   let next = null;
   for (let step = 1; step <= total; step += 1) {

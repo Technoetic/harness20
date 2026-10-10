@@ -2,7 +2,7 @@
 
 Harness50 2.2 replaces the old Trust5 directory-presence score with measured checks. Missing tools, nonzero exits, timeouts, missing coverage and changed source never earn partial credit or PASS. These checks do not measure teaching effectiveness or visual taste.
 
-Fresh planning-first20 quality gates are 10/14/20, with prefinal inspection after 19; explicit research-free36 retains 26/30/36 and prefinal35, and legacy50 retains 38/44/50 and prefinal49. New reports bind workflow_profile and workflow_generation (schema2); legacy schema1 reports keep their old meaning. Reset leftovers cannot satisfy the current run.
+Fresh planning-first14 quality gates are 4/8/14, with prefinal inspection after 13; explicit research-free36 retains 26/30/36 and prefinal35, and legacy50 retains 38/44/50 and prefinal49. New reports bind workflow_profile and workflow_generation (schema2); legacy schema1 reports keep their old meaning. Reset leftovers cannot satisfy the current run.
 
 ## Project checks
 
@@ -34,7 +34,7 @@ node "<plugin-root>/scripts/quality-gate.mjs" --inspect --workspace "<project-ro
 
 Each command is bounded to two minutes and 1 MiB output. The report records exit codes without storing raw command output that could contain secrets. Diagnose failures in a normal foreground invocation. Source fingerprints exclude dependencies, Git metadata, coverage and `step_archive`; they include project configuration and final dist files. Changes require another run. Reports go to `step_archive/outputs/quality-gate.json`.
 
-Claude's progress writer records a fresh Step 10 or 14 only when `quality-gate.mjs --inspect` reports PASS, and a fresh Step 20 only on the final PASS (`--inspect-final`); a refused completion is named in the next continue instruction. Unlike the Codex state manager, which inspects when a completion is submitted, the writer inspects at the next Stop against the sources as they are then: when a later step in the same turn changed them, the report is stale and `quality-gate.mjs` must run again. Claude Stop hooks also inspect saved evidence once 10, 14 and 19 contiguous steps are complete and write `trust5_r1.md`, `trust5_r2.md` and `trust5_r3.md`. They neither execute configured commands nor download tools. Missing or failed evidence requests a repair once; an already active Stop turn is not recursively blocked. Incomplete gates must not be presented as product completion. Codex steps explicitly run the same checks through normal permissions, and the state manager independently inspects current measured quality before accepting a new completion at 10, 14 or 20. It records the validated report digest; missing, failed or stale quality cannot create a new completion receipt. Older receipts retain their historical recovery meaning.
+Claude's progress writer records a fresh Step 4 or 8 only when `quality-gate.mjs --inspect` reports PASS, and a fresh Step 14 only on the final PASS (`--inspect-final`); a refused completion is named in the next continue instruction. Unlike the Codex state manager, which inspects when a completion is submitted, the writer inspects at the next Stop against the sources as they are then: when a later step in the same turn changed them, the report is stale and `quality-gate.mjs` must run again. Claude Stop hooks also inspect saved evidence once 4, 8 and 13 contiguous steps are complete and write `trust5_r1.md`, `trust5_r2.md` and `trust5_r3.md`. They neither execute configured commands nor download tools. Missing or failed evidence requests a repair once; an already active Stop turn is not recursively blocked. Incomplete gates must not be presented as product completion. Codex steps explicitly run the same checks through normal permissions, and the state manager independently inspects current measured quality before accepting a new completion at 4, 8 or 14. It records the validated report digest; missing, failed or stale quality cannot create a new completion receipt. Explicit20 retains writer gates10/14/final20 and Stop inspections after10/14/19; explicit36 retains26/30/final36 and inspections after26/30/35; legacy50 retains38/44/final50 and inspections after38/44/49. Older receipts retain their historical recovery meaning.
 
 ## Final browser output
 
@@ -59,7 +59,7 @@ node scripts/verify-output.mjs --workspace "<project-root>" --backend auto
 `--probe` prints which backends are available and which one `auto` would select,
 without launching a browser. `--backend playwright|aside` (or the environment
 variable `HARNESS50_BROWSER_BACKEND`) forces one; `auto` prefers Playwright and falls
-back to Aside. Fresh environment Step 3 locks its actually available, explicitly permitted selection (old36/50 retain their tool Step 3) in `step_archive/outputs/browser-backend.json`
+back to Aside. Fresh environment Step 2 locks its actually available, explicitly permitted selection (explicit20 retains environment3; old36/50 retain their tool Step 3) in `step_archive/outputs/browser-backend.json`
 with `node scripts/verify-output.mjs --probe --backend <selected> --lock --workspace "<project-root>"`.
 Use `aside` as `<selected>` where Playwright is prohibited; do not install another backend
 merely because a generic example lists it. After that, `auto` uses only the locked backend and fails instead of falling back, so
@@ -102,15 +102,15 @@ fallback inside the verifier does not establish that a deployment server has rew
 
 Fresh completion requires version 3 evidence with both scenarios, from either backend
 (the gate reads named report fields only and ignores `environment`). Both hosts also
-require a current [final regression report](QA-REPORTS.md#final-candidate-regression-at-step-20)
+require a current [final regression report](QA-REPORTS.md#final-candidate-regression-at-step-14)
 covering E2E, screenshots, keyboard, mouse, design and console on the same final HTML.
-Fresh20 and retained research-free36 final regression also requires a recorded independent verifier; a same-agent
+Fresh14, existing20 and retained research-free36 final regression also require a recorded independent verifier; a same-agent
 report remains diagnostic and cannot satisfy that completion gate. Legacy50 keeps
 its original evidence and recovery semantics.
 Run these complete matrices after the last repair and build. Any subsequent
 candidate change invalidates that assessment and requires rerunning the matrices.
 Claude's writer inspects current quality, browser and regression evidence before
-recording a fresh Step 20; its final Stop quality report covers all three.
+recording a fresh Step 14; its final Stop quality report covers all three.
 `quality-gate.mjs --inspect-final --workspace "<project-root>"`
 performs the same read-only inspection without launching browsers or project commands.
 Historical completed records and Codex receipts retain their recovery semantics.
@@ -125,7 +125,7 @@ step's report before a relevant retry, snapshot explicit candidate files after
 the build and before QA, then record that round before completion or failure
 handoff. Changed candidate or evidence files make prior success claims stale.
 The report does not run checks, discover product-specific requirements, change workflow
-state or replace measured quality/browser evidence. Fresh Step 20 enforces the six final
+state or replace measured quality/browser evidence. Fresh Step 14 enforces the six final
 regression categories and their final HTML binding. Failed, missing and
 unexecuted required checks remain incomplete even when a retry limit is reached.
 
@@ -154,11 +154,11 @@ permission or replace deterministic tests, independent review or completion writ
 ## Advisory semantic checkpoints
 
 The [Jev checkpoint protocol](jev-checkpoints.md) adds bounded text judgments at
-fresh20 steps 1, 2, 9, 15 and 19 (explicit research-free36 retains 17/18/25/31/35, and legacy50 retains 16/24/25/30/37/45/49). Hosts call it automatically only when the active
+fresh14 steps 1, 2, 3, 9 and 13 (explicit research-free36 retains 17/18/25/31/35, and legacy50 retains 16/24/25/30/37/45/49). Hosts call it automatically only when the active
 task authorizes Jev and sending the selected excerpts, reusing existing authorization.
 It evaluates requirements, distinct alternatives,
 explanation text, scenario coverage and finding classification. It does not execute
-tests or inspect images. Fresh Step 9 persists selected implementation prose as evidence
+tests or inspect images. Fresh Step 3 persists selected implementation prose as evidence
 first; the judgment concerns that text, not executable correctness.
 
 Before reusing a report, compare current prepare metadata with inspect: request,
@@ -173,3 +173,7 @@ their authority. One batch per unchanged checkpoint is host policy, not a runtim
 ## Release verification and product evaluation
 
 `npm test` covers adapter/state/security contracts. `npm run test:browser` checks working and deliberately broken HTML fixtures in a real browser, always through the Playwright backend from `browser-verifier/` (the suite pins `backend: 'playwright'`; Aside runs are exercised manually with `node scripts/verify-output.mjs --backend aside`). Rating real generated tutorials also requires multiple topics, repeated full runs, cost/latency records and user evaluation. This release does not fabricate those results.
+
+Explicit `planning-first-20-v1` runs keep environment3, implementation9, E2E15,
+final20, quality10/14/20, QA11/16/17/18 and Jev1/2/9/15/19, with their original
+profile/generation evidence paths. Existing20/36/50 bodies and indexes are preserved.

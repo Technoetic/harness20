@@ -8,8 +8,8 @@ const profiles = await import("../../scripts/lib/workflow-profiles.mjs").catch((
 
 test("fresh selection is explicit while unmarked v1 records retain fifty steps", () => {
   assert.equal(typeof profiles.defaultWorkflowProfile, "function", "shared registry must exist");
-  assert.equal(profiles.defaultWorkflowProfile().id, "planning-first-20-v1");
-  assert.equal(profiles.defaultWorkflowProfile().stepCount, 20);
+  assert.equal(profiles.defaultWorkflowProfile().id, "planning-first-14-v1");
+  assert.equal(profiles.defaultWorkflowProfile().stepCount, 14);
   assert.equal(profiles.resolveWorkflowProfile({ total_steps: 50 }).id, "legacy-50-v1");
   assert.equal(profiles.resolveWorkflowProfile({ schema_version: 1, total_steps: 50 }).stepCount, 50);
   assert.equal(profiles.resolveWorkflowProfile({ schema_version: 2, workflow_profile: "research-free-36-v1", total_steps: 36 }).stepCount, 36);

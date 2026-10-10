@@ -1,9 +1,11 @@
 # Routing integration: current profiles and legacy report migration
 
-Fresh `planning-first-20-v1` routing is Step14 and writes
+Fresh `planning-first-14-v1` routing is Step8 and writes
+`step_archive/step008_routing검증.md` using `routing-integration-report`; Steps9–14 consume it.
+Existing `planning-first-20-v1` routing retains Step14 and writes
 `step_archive/step014_routing검증.md` using `routing-integration-report`; Steps15–20 consume it.
 Explicit `research-free-36-v1` retains Step30, `step_archive/step030_routing검증.md`
-and consumers31–36. Neither profile has the old044 artifact fallback; missing current
+and consumers31–36. These profiles have no old044 artifact fallback; missing current
 routing checks remain incomplete. Existing legacy50 uses Step44 and the unchanged
 historical receipt/input rules below. Never renumber old evidence.
 

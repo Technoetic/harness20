@@ -236,7 +236,7 @@ function validateStrictAcceptance(entry) {
         ? [...ACCEPTANCE_COMMON_KEYS, hasCommand ? "command" : "command_pattern"]
         : ACCEPTANCE_COMMON_KEYS;
     exactKeys(item, expectedKeys, `${label} acceptance`);
-    if (Object.hasOwn(item, "validator") && !["html-document", "browser-output"].includes(item.validator)) fail(`${label}.validator is unknown`);
+    if (Object.hasOwn(item, "validator") && !["html-document", "browser-output", "browser-backend-lock", "environment-report"].includes(item.validator)) fail(`${label}.validator is unknown`);
     requireString(item.id, `${label}.id`);
     if (ids.has(item.id)) fail(`${entry.id}.acceptance ids must be unique`);
     ids.add(item.id);

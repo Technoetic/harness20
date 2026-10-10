@@ -65,7 +65,7 @@ test("the constitution defines the five host styles by role and CSS and puts the
   assert.ok(section.includes("`harness50-design-contract`") && section.includes("`docs/DESIGN-CONTRACT.md`"));
   assert.match(section, /계약의 제외 목록 > Awwwards 참조 충실도/);
   assert.match(section, /`adopted: true`[^]*`exception_reason`[^]*결정\/사유/);
-  assert.match(rules, /^\| 설계 계약 \| `step_archive\/step002_레이아웃설계_chunk1\.md` \| `step_archive\/step018_레이아웃설계_chunk1\.md` \| `step_archive\/step030_레이아웃설계_chunk1\.md` \|$/m);
+  assert.match(rules, /^\| 설계 계약 \| `step_archive\/step002_레이아웃설계_chunk1\.md` \| `step_archive\/step002_레이아웃설계_chunk1\.md` \| `step_archive\/step018_레이아웃설계_chunk1\.md` \| `step_archive\/step030_레이아웃설계_chunk1\.md` \|$/m);
 });
 
 test("the shared format document lists every item, both host defaults and the fallback", async () => {
@@ -124,9 +124,9 @@ function assertHostSplit({ doc, rules, evaluator, claude30, codex30, claude43, c
 
   const s11 = /^## 11\. 검증 판정과 finding 형식\n([^]*?)(?=^## |^---$)/m.exec(rules)?.[1];
   assert.ok(s11, "harness-rules has no section 11");
-  assert.match(s11, /계약이 없는 이전 legacy50 실행은 §5의 수치를 기준으로 쓴다\. 새20·기존36의 필수 계약 누락은 INCOMPLETE다\. 이 실행에서는 계약을 복원하지 않으며, §5 '기본 제외 목록'\(`host` 5종\)은 필수 기준이 아니다/);
+  assert.match(s11, /계약이 없는 이전 legacy50 실행은 §5의 수치를 기준으로 쓴다\. 새14·기존20·36의 필수 계약 누락은 INCOMPLETE다\. 이 실행에서는 계약을 복원하지 않으며, §5 '기본 제외 목록'\(`host` 5종\)은 필수 기준이 아니다/);
   assert.match(evaluator, /계약 블록이 없는 이전 legacy 실행은 헌법 §11대로 계약을 복원하지 않고 §5의 수치만 기준으로 쓴다\(`host` 제외 항목은 필수 기준이 아니다\)\./);
-  assert.match(evaluator, /새20·기존36의 필수 계약 누락은 `INCOMPLETE`/);
+  assert.match(evaluator, /새14·기존20·36의 필수 계약 누락은 `INCOMPLETE`/);
 }
 
 async function hostSplitInputs() {

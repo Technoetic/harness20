@@ -4,7 +4,8 @@
 report with three fixed headings. It is a report, not a gate: it never decides or records
 completion, and a missing or malformed source only adds a `확인 불가` line.
 
-Fresh planning-first20 scans steps015–020 and uses final20/SPEC020; explicit
+Fresh planning-first14 scans steps009–014 and uses final14/SPEC014. Existing
+planning-first20 retains steps015–020 and final20/SPEC020; explicit
 research-free36 keeps steps031–036 and final36/SPEC036; legacy50 retains
 steps045–050 and final50/SPEC050. QA/Jev evidence is selected by profile/generation
 so prior reset runs and same-number reports do not become current evidence.
@@ -36,7 +37,7 @@ never printed.
 |---|---|---|
 | `dist/index.html` | size, SHA-256, route manifest (mode, screens, fallback) | 변경 |
 | the three inspections of `quality-gate.mjs --inspect-final` | quality, browser and selected final-step regression verdicts, lowest coverage | 발견; any verdict other than PASS also in 사용자 확인 필요 |
-| selected E2E-to-final reports (fresh `step_archive/step015_*.md` to `step020_*.md`, plus `step_archive/outputs/step020_*.md`) | `deployment-verification: <value>` lines | `pending` in 사용자 확인 필요, other values in 변경 |
+| selected E2E-to-final reports (fresh `step_archive/step009_*.md` to `step014_*.md`, plus `step_archive/outputs/step014_*.md`) | `deployment-verification: <value>` lines | `pending` in 사용자 확인 필요, other values in 변경 |
 | `step_archive/outputs/browser-output.json`, only when it describes the current HTML | axe `accessibility_incomplete` rule ids of every viewport and route, `environment.isolation`, `environment.backend` | 사용자 확인 필요, 발견 |
 | the selected QA namespace returned by `inspect`, steps 1 to the selected total | `verifier.mode` `same-agent` (a stale report is marked 이전 빌드), the six selected final-step regression outcomes as a table | 사용자 확인 필요, 발견 |
 | the selected Jev profile/generation namespace (legacy also keeps `jev-reviews/`) | abstentions, low confidence, unverified runs and changed inputs, one line per step and input | 사용자 확인 필요 |
@@ -72,12 +73,16 @@ backticks, `|` and control characters, and a line that looks like a credential s
 
 ## When it runs
 
-- Claude Code: once `quality-gate.mjs --inspect-final` exits 0 at the selected final step (fresh20), the main session runs the
-  command once and sends `Step 020/20 완료` (existing36/50 retain `Step 036/36 완료`/`Step 050/50 완료`) followed directly by the unchanged output (harness-rules
-  §2, `/webapp`, and the generated `SPEC-020.md`, which fresh step 20 reads first). If the command fails,
+- Claude Code: once `quality-gate.mjs --inspect-final` exits 0 at the selected final step (fresh14), the main session runs the
+  command once and sends `Step 014/14 완료` (existing20/36/50 retain `Step 020/20 완료`/ `Step 036/36 완료`/`Step 050/50 완료`) followed directly by the unchanged output (harness-rules
+  §2, `/webapp`, and the generated `SPEC-014.md`, which fresh step 14 reads first). If the command fails,
   the message adds only `## 사용자 확인 필요` and `- 확인 불가: final-summary 실행 실패`. The step
   executor keeps its one-line handoff. Flat SPEC aliases are advisory and profile/generation-bound. Mismatched alias bytes
   are preserved at guarded `step_archive/specs/history/<sha256>/SPEC-NNN.md` before replacement;
   archive failure preserves the original. Legacy SPEC generation remains unchanged.
 - Codex: when the state manager reports `completed`, the webapp skill's Completion report runs the
   command and leads the final response with its output.
+
+The completion example is conditional on actual final PASS. The current native
+browser verifier refuses generated HTML without a host-network-isolation adapter;
+this reporting helper does not remove that gate or prove live execution.

@@ -324,9 +324,48 @@ $validSteps = Get-ReportedSteps $progress
 $existing = New-Object System.Collections.Generic.HashSet[int]
 foreach ($s in @($progress.completed_steps)) { [void]$existing.Add([int]$s) }
 
+$orderedProfile = $selectedProfile.workflow_profile -ceq 'planning-first-14-v1'
+if ($orderedProfile) {
+    # A new14 run may only persist a contiguous completed prefix. Do not repair
+    # a contradictory record by accepting its missing prerequisite later.
+    $prefixValid = @($progress.completed_steps).Count -eq $existing.Count
+    foreach ($s in @($progress.completed_steps)) {
+        if (($s -isnot [int] -and $s -isnot [long]) -or $s -lt 1 -or $s -gt $totalSteps) { $prefixValid = $false }
+    }
+    for ($i = 1; $i -le $existing.Count; $i++) {
+        if (-not $existing.Contains($i)) { $prefixValid = $false }
+    }
+    if (-not $prefixValid) {
+        Write-WriterLog 'New14 completed prefix is inconsistent -> preserve progress and fail closed.'
+        try { $mutex.ReleaseMutex() } catch {}; $mutex.Dispose(); exit 0
+    }
+    $validSteps = @($validSteps | Sort-Object)
+}
+
 $completedNew = @()
 foreach ($s in $validSteps) {
     if (-not $existing.Contains($s)) {
+        if ($orderedProfile -and $s -ne ($existing.Count + $completedNew.Count + 1)) {
+            Add-Refusal $s 'dependency' 'unavailable' 'FAIL' 'earlier-step-incomplete'
+            continue
+        }
+        if ($selectedProfile.workflow_profile -ceq 'planning-first-14-v1' -and $s -eq $selectedProfile.milestones.environment) {
+            # New14 folds real environment observations into design2. Keep old
+            # profiles' historical completion interpretation unchanged.
+            $environmentPassed = $false
+            $environmentInspector = Join-Path (Split-Path $PSScriptRoot -Parent) 'scripts/environment-report.mjs'
+            try {
+                $environmentJson = (& node $environmentInspector inspect --workspace $projectRoot 2>$null | Out-String)
+                $environmentExit = $LASTEXITCODE
+                $environmentResult = $environmentJson | ConvertFrom-Json -ErrorAction Stop
+                $environmentPassed = $environmentExit -eq 0 -and $null -ne $environmentResult -and $environmentResult.status -eq 'current' -and $environmentResult.verdict -eq 'PASS'
+            } catch {}
+            if (-not $environmentPassed) {
+                Write-WriterLog "Step $s remains incomplete: environment evidence missing, invalid, failed, or stale."
+                Add-Refusal $s 'environment' 'unavailable' 'FAIL' 'environment-evidence-missing-invalid-or-stale'
+                continue
+            }
+        }
         if ($s -in @($selectedProfile.milestones.quality) -and $s -ne $selectedProfile.milestones.final) {
             # The r1 (step 38) and r2 (step 44) milestones need current measured quality, as on Codex
             # (codex/scripts/lib/acceptance.mjs). The trust5 Stop block cannot enforce them during

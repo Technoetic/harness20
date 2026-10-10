@@ -19,7 +19,7 @@ function runPowerShell(args, options) {
   });
 }
 
-test('isolated packaged preflight validates all three definitions and refuses missing shared dependencies or changed bodies', {
+test('isolated packaged preflight validates all four definitions and refuses missing shared dependencies or changed bodies', {
   skip: process.platform !== 'win32', timeout: 180000
 }, async () => {
   const sandbox = await makeWorkspace(); // Existing helper guards cleanup beneath the temporary test root.
@@ -54,8 +54,8 @@ test('isolated packaged preflight validates all three definitions and refuses mi
   assert.equal(positive.report.manifest.name, 'harness20');
   assert.equal(positive.report.manifest.version, '4.1.0');
   assert.equal(positive.report.codex_version, 'codex-cli 0.150.1');
-  assert.equal(positive.report.step_count, 20);
-  assert.deepEqual(positive.report.workflow_profiles, { 'legacy-50-v1': 50, 'research-free-36-v1': 36, 'planning-first-20-v1': 20 });
+  assert.equal(positive.report.step_count, 14);
+  assert.deepEqual(positive.report.workflow_profiles, { 'legacy-50-v1': 50, 'research-free-36-v1': 36, 'planning-first-20-v1': 20, 'planning-first-14-v1': 14 });
   assert.equal(positive.report.shared_dependencies_verified, true);
 
   const dependency = join(packaged, 'scripts/lib/json-io.mjs');
@@ -81,7 +81,7 @@ test('native smoke readers use the validated selected profile and reject count o
   const mainOffset = smokeSource.lastIndexOf('\ntry {');
   assert.ok(mainOffset > 0);
   const paths = [];
-  for (const workflowProfile of ['research-free-36-v1', 'legacy-50-v1', 'planning-first-20-v1']) {
+  for (const workflowProfile of ['research-free-36-v1', 'legacy-50-v1', 'planning-first-20-v1', 'planning-first-14-v1']) {
     const workspaceRoot = await makeWorkspace();
     const state = await initWorkflow({ workspaceRoot, workflowProfile, topic: 'Public profile smoke fixture' });
     const receipt = parseReceipt({ schema_version: state.schema_version,
@@ -97,13 +97,16 @@ test('native smoke readers use the validated selected profile and reject count o
 $newRoot = '${paths[0]}'
 $legacyRoot = '${paths[1]}'
 $planningRoot = '${paths[2]}'
-foreach ($case in @(@{root=$newRoot;profile='research-free-36-v1';total=36}, @{root=$legacyRoot;profile='legacy-50-v1';total=50}, @{root=$planningRoot;profile='planning-first-20-v1';total=20})) {
+$fourteenRoot = '${paths[3]}'
+foreach ($case in @(@{root=$newRoot;profile='research-free-36-v1';total=36}, @{root=$legacyRoot;profile='legacy-50-v1';total=50}, @{root=$planningRoot;profile='planning-first-20-v1';total=20}, @{root=$fourteenRoot;profile='planning-first-14-v1';total=14})) {
   $state = Read-StrictJson (Resolve-SafeFile $case.root 'step_archive/.harness50-codex/state.json' 'State') 'State'
   [void](Assert-State $state $case.root 'Reader')
   $receipts = @(Read-Receipts $case.root $state.workflow_id 'Reader' $case.profile)
   if ($receipts.Count -ne 1) { throw 'Expected one receipt' }
-  $contract = Get-NativeStepContract $PluginRoot 17 $case.profile
-  $expectedPath = if ($case.total -eq 50) { 'codex/assets/steps/step017.md' } else { 'codex/assets/profiles/' + $case.profile + '/steps/step017.md' }
+  $sample = if ($case.total -eq 14) { 3 } else { 17 }
+  $contract = Get-NativeStepContract $PluginRoot $sample $case.profile
+  $body = 'step{0:D3}.md' -f $sample
+  $expectedPath = if ($case.total -eq 50) { 'codex/assets/steps/' + $body } else { 'codex/assets/profiles/' + $case.profile + '/steps/' + $body }
   if ($contract.target -cne $expectedPath) { throw 'Wrong selected contract' }
   $state.total_steps = if ($case.total -eq 50) { 36 } else { 50 }
   try { [void](Assert-State $state $case.root 'Reader'); throw 'Count mismatch accepted' } catch {

@@ -124,15 +124,15 @@ must include representative concrete detail routes and separately test its other
 valid and invalid parameter cases. A finite manifest is not proof of every
 possible application state.
 
-For fresh planning-first20 the design/implementation/routing/E2E/final stages are 2/9/14/15/20.
+For fresh planning-first14 the design/implementation/routing/E2E/final stages are 2/9/14/15/20.
 Explicit research-free36 retains 18/25/30/31/36 and report030.
 Explicit legacy50 retains 30/37/44/45/50 and report044; existing historical
 receipt fallback applies only there. The manifest capacity remains 1–50 routes.
 
 ## Verification
 
-Step 14 is **클라이언트 사이드 라우팅** (client-side routing). Step 2 designs
-the route inventory and Step 9 implements it; Step 14 integrates and rechecks it
+Step 8 is **클라이언트 사이드 라우팅** (client-side routing). Step 2 designs
+the route inventory and Step 3 implements it; Step 8 integrates and rechecks it
 after JavaScript modularization, CSS separation and design corrections. Its
 required completion checks cover the screen/URL map, deep links and traversal,
 native and compatible backends, mode-specific server fallback, and ordinary
@@ -141,16 +141,16 @@ screen regions in the same HTML can be selected directly from the current URL.
 Development JavaScript and CSS stay in separate source files; the build bundles
 them into the one self-contained HTML, including its inert JSON route manifest.
 
-Step 14 writes `step_archive/step014_routing검증.md` under the
-`routing-integration-report` artifact acceptance ID. Steps 15–20 consume this
+Step 8 writes `step_archive/step008_routing검증.md` under the
+`routing-integration-report` artifact acceptance ID. Fresh14 Steps 9–14 consume this
 routing, structure, accessibility and build evidence. Missing or failed routing
 checks block a new completion. Existing workspaces follow
 [the legacy Step44 migration guide](STEP044-MIGRATION.md); historical receipts stay
-immutable and are not promoted to current validation evidence. Step 14 reviews the server fallback
-configuration and local direct entry; Step 15 requires local history-mode direct
+immutable and are not promoted to current validation evidence. Step 8 reviews the server fallback
+configuration and local direct entry; Step 9 requires local history-mode direct
 entry and reload, and repeats them on a real deployment only when an authorized
 target is already available. Otherwise it records deployment verification as
-pending and scopes completion to the local artifact. Step 20 still requires the
+pending and scopes completion to the local artifact. Step 14 still requires the
 final schema-3 browser report bound to the current HTML.
 
 Run the verifier from a checkout with one [browser backend](BROWSER-TOOLS.md)
@@ -162,7 +162,7 @@ node "<validation-checkout>/scripts/verify-output.mjs" --workspace "<project-roo
 ```
 
 `--backend playwright` or `--backend aside` forces a backend; `auto` prefers Playwright
-and falls back to Aside. A Step 3 environment lock (original tool3 in old36/50) (`step_archive/outputs/browser-backend.json`)
+and falls back to Aside. A design Step 2 environment lock (original tool3 in old36/50) (`step_archive/outputs/browser-backend.json`)
 takes precedence over that order: `auto` then uses only the locked backend
 ([backend lock](BROWSER-TOOLS.md#backend-lock-step-3)). With the Playwright backend, `--executable-path "<browser-path>"`
 selects an installed Chromium-based browser explicitly.
@@ -187,7 +187,7 @@ it cannot establish that condition. Screenshots for this scenario use
 Both scenarios share the existing overall deadline and network restrictions.
 
 `navigation_api.available` and `navigation_api.property_present` report observed
-capability, not proof that an application used the native backend. Step 15 must
+capability, not proof that an application used the native backend. Step 9 must
 also demonstrate native interception in a capable browser, as well as correct
 behavior when the API is missing or present but unusable. The shipped router has
 real-browser regression coverage for these cases and for direct `file://` use.
@@ -200,7 +200,7 @@ satisfy fresh completion. Existing historical receipts retain their recovery
 semantics; replaying a receipt does not perform a new browser verification.
 
 Codex validates the route inventory against the same stable HTML bytes it hashes.
-Both hosts check current quality, browser and final regression evidence before recording a fresh Step 20.
+Both hosts check current quality, browser and final regression evidence before recording a fresh Step 14.
 The inspection command does not execute project commands or launch a browser:
 
 ```text
@@ -209,7 +209,7 @@ node "<plugin-root>/scripts/quality-gate.mjs" --inspect-final --workspace "<proj
 
 History-mode verification serves the same HTML at the declared paths in an isolated
 browser context. **This proves application routing, not deployment rewrites.**
-Step 15 also checks direct entry and refresh on an already authorized, available
+Step 9 also checks direct entry and refresh on an already authorized, available
 deployment target. Without one, `deployment-verification: pending` is explicit;
 local completion does not claim deployment readiness. If deployment is itself a
 user requirement, pending verification cannot satisfy that requirement. No step
@@ -218,3 +218,7 @@ tested build digest for reuse in Steps 16–20. Live evidence applies only to th
 deployed revision that was checked, not to later local builds.
 Keep project-specific E2E for title, focus, active
 navigation, dialogs, filters, asynchronous data, and other states.
+
+Explicit `planning-first-20-v1` runs keep environment3, implementation9, E2E15,
+final20, quality10/14/20, QA11/16/17/18 and Jev1/2/9/15/19, with their original
+profile/generation evidence paths. Existing20/36/50 bodies and indexes are preserved.

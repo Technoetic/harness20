@@ -461,13 +461,14 @@ function webappContractErrors(text) {
   validateManagerResource(errors, resources, "webapp resources");
   const stepReferences = resources.match(/[^\s`|]*stepNNN\.md/g) ?? [];
   const expectedStepReferences = [
+    "codex/assets/profiles/planning-first-14-v1/steps/stepNNN.md",
     "codex/assets/profiles/planning-first-20-v1/steps/stepNNN.md",
     "codex/assets/profiles/research-free-36-v1/steps/stepNNN.md",
     "codex/assets/steps/stepNNN.md"
   ];
   if (JSON.stringify(stepReferences) !== JSON.stringify(expectedStepReferences) ||
       !resources.includes("`begin.step_target`") || !resources.includes("relative to the plugin root")) {
-    errors.push("webapp resources must use manager-derived paths for all three allowlisted profiles");
+    errors.push("webapp resources must use manager-derived paths for all four allowlisted profiles");
   }
   if (!resources.includes("relative to this SKILL.md")) {
     errors.push("webapp resources must resolve relative to SKILL.md");
@@ -1042,10 +1043,10 @@ test("webapp storage contract rejects direct opening while accepting prohibition
   }
 });
 
-test("webapp manager-selected references cover fresh20 and preserved36/50 regular resources", async () => {
+test("webapp manager-selected references cover fresh14 and preserved20/36/50 regular resources", async () => {
   const text = await readSkill("webapp");
   assert.deepEqual(webappContractErrors(text), []);
-  for (const [directory, count] of [["codex/assets/profiles/planning-first-20-v1/steps", 20], ["codex/assets/profiles/research-free-36-v1/steps", 36], ["codex/assets/steps", 50]]) {
+  for (const [directory, count] of [["codex/assets/profiles/planning-first-14-v1/steps", 14], ["codex/assets/profiles/planning-first-20-v1/steps", 20], ["codex/assets/profiles/research-free-36-v1/steps", 36], ["codex/assets/steps", 50]]) {
     await Promise.all(Array.from({ length: count }, (_, index) =>
       readRepo(`${directory}/step${String(index + 1).padStart(3, "0")}.md`)
     ));

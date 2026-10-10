@@ -36,7 +36,7 @@ function call(root,command,input,exit=0) {
 function failed(r) {assert.equal(r.status,2);assert.equal(r.stdout,'');assert.deepEqual(JSON.parse(r.stderr),diagnostic);}
 async function fixture() {
   const root=await makeWorkspace();
-  const state=await initWorkflow({workspaceRoot:root,topic:'Repair public total fixture.',now,idFactory:()=> 'cli-generation'});
+  const state=await initWorkflow({workflowProfile:'planning-first-20-v1',workspaceRoot:root,topic:'Repair public total fixture.',now,idFactory:()=> 'cli-generation'});
   const begun=await beginStep({workspaceRoot:root,step:1,marker:state.continuation,now,idFactory:()=> 'cli-attempt'});
   await failStep({workspaceRoot:root,step:1,attemptId:begun.attempt.id,reason:'Wrong total.',evidence:[],now});
   await mkdir(join(root,'src'));const bytes=Buffer.from('export const total = 7;');await writeFile(join(root,'src/app.js'),bytes);

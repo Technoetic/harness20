@@ -17,8 +17,8 @@ const profile = 'planning-first-20-v1';
 const repo = resolve(import.meta.dirname, '../..');
 const oldPolicy = '8b2754566775198f537b407e516cb4033a863587b7870e126d84a5d87e4bf06d';
 
-test('fresh selection starts with planning and exposes twenty retained gates', () => {
-  const p = defaultWorkflowProfile();
+test('explicit twenty selection preserves planning and retained gates', () => {
+  const p = getWorkflowProfile(profile);
   assert.equal(p.id, profile); assert.equal(p.stepCount, 20);
   assert.deepEqual(p.originalSteps, [25,30,31,32,33,34,35,36,37,38,39,41,42,44,45,46,47,48,49,50]);
   assert.deepEqual(p.milestones.quality, [10,14,20]);
@@ -38,9 +38,9 @@ test('persisted old definitions and mismatched counts are independent of the new
   assert.equal(getWorkflowProfile('research-free-36-v1').milestones.planning,17);
 });
 
-test('native fresh entry needs only the request and begins planning without deleted artifacts', async () => {
+test('native explicit twenty entry needs only the request and begins planning without deleted artifacts', async () => {
   const root = await makeWorkspace();
-  const state = await initWorkflow({workspaceRoot:root,topic:'Build a small calculator with accessible keyboard controls.'});
+  const state = await initWorkflow({workspaceRoot:root,workflowProfile:profile,topic:'Build a small calculator with accessible keyboard controls.'});
   assert.equal(state.workflow_profile,profile); assert.equal(state.total_steps,20);
   assert.deepEqual(state.completed_steps,[]); assert.equal(state.current_step,1);
   const begun = await beginStep({workspaceRoot:root,step:1,marker:state.continuation});
@@ -54,7 +54,7 @@ test('native fresh entry needs only the request and begins planning without dele
 
 test('all twenty native transitions preserve measured gates and terminal replay', async () => {
   const root = await makeWorkspace(); const pluginRoot = await makePluginFixture({workflowProfile:profile});
-  let state = await initWorkflow({workspaceRoot:root,topic:'Synthetic twenty-step lifecycle'});
+  let state = await initWorkflow({workspaceRoot:root,workflowProfile:profile,topic:'Synthetic twenty-step lifecycle'});
   for (let step=1;step<=20;step++) {
     const begun = await beginStep({workspaceRoot:root,step,marker:state.continuation});
     await prepareSchedulerMilestone(root,step,profile);
@@ -78,7 +78,7 @@ test('explicit36 and legacy50 pause/resume retain their original definitions', a
     assert.equal(after.workflow_profile ?? 'legacy-50-v1',id); assert.equal(after.total_steps,count);assert.equal(after.current_step,1);
     assert.equal((await showWorkflow({workspaceRoot:root})).workflow_profile ?? 'legacy-50-v1',id);
   }
-  const state=createInitialState({workflowId:'fixture',workspaceRoot:'C:/fixture',topicSha256:'a'.repeat(64),now:'2026-10-04T00:00:00.000Z'});
+  const state=createInitialState({workflowProfile:profile,workflowId:'fixture',workspaceRoot:'C:/fixture',topicSha256:'a'.repeat(64),now:'2026-10-04T00:00:00.000Z'});
   assert.equal(state.total_steps,20);assert.throws(()=>validateState({...state,total_steps:36}));
 });
 
@@ -113,8 +113,8 @@ test('shorter final summary collects deployment status from its own E2E step15',
   assert.doesNotMatch(report.text,/step031_\*\.md/);
 });
 
-test('all-profile validation includes previous36 alongside legacy50 and fresh20', async () => {
+test('all-profile validation includes explicit20 alongside fresh14 and older36/50', async () => {
   const reports=await validateAllProfiles(repo);
-  assert.equal(reports.length,3);
-  assert.deepEqual(reports.map(r=>r.steps.length).sort((a,b)=>a-b),[20,36,50]);
+  assert.equal(reports.length,4);
+  assert.deepEqual(reports.map(r=>r.steps.length).sort((a,b)=>a-b),[14,20,36,50]);
 });

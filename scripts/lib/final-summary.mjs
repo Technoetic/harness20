@@ -120,7 +120,7 @@ async function collectDeployment(root, out, context) {
   const files = [];
   const start = context.profile.milestones.e2e;
   const final = context.profile.milestones.final;
-  const reportPattern = new RegExp(`^step0(?:${Array.from({length: final - start + 1}, (_, i) => start + i).join('|')})_.+\\.md$`);
+  const reportPattern = new RegExp(`^step(?:${Array.from({length: final - start + 1}, (_, i) => pad(start + i)).join('|')})_.+\\.md$`);
   for (const [dir, pattern] of [['step_archive', reportPattern], ['step_archive/outputs', new RegExp(`^step${pad(final)}_.+\\.md$`)]]) {
     const { names } = await listNames(root, dir, pattern);
     files.push(...names.map(name => `${dir}/${name}`));

@@ -1,7 +1,7 @@
 # Design contract: visual tokens and exclusions
 
-For fresh `planning-first-20-v1`, Step 2 fixes the visual tokens and exclusions.
-Implementation 9, independent layout review 11 and final design review 19 compare supplied
+For fresh `planning-first-14-v1`, Step 2 fixes the visual tokens and exclusions.
+Implementation 3, independent layout review 5 and final design review 13 compare supplied
 requirements/materials, that contract and measured current output. External
 reference captures and research-provenance files are not prerequisites.
 Both hosts use the same contract format. The default exclusion list and
@@ -80,7 +80,7 @@ The values are an example.
 A `legacy` or `host` item may be adopted only when the TOPIC asks for that style or
 the selected aesthetic cannot exist without it. Step 2 then sets `adopted: true`,
 writes the reason in `exception_reason` and repeats it in the layout design as one
-`결정/사유: <id> 채택 — <사유>` line (the Claude step 20 summary lists these lines).
+`결정/사유: <id> 채택 — <사유>` line (the Claude fresh14 step14 summary lists these lines; existing20/36/50 retain their final20/36/50 summaries).
 A `topic` item is never adopted. When the TOPIC both asks for and excludes the same
 style:
 
@@ -92,15 +92,15 @@ style:
 
 ## Precedence and judgement
 
-- The contract wins over a supplied reference. Planning-first20 reviews the current output
+- The contract wins over a supplied reference. Fresh planning-first14 and explicit20 review the current output
   against the Step2 contract; an excluded reference element is not required.
   Explicit legacy Step43 keeps its difference notation: **Claude** as `제외 계약: <id>`,
   **Codex** as `excluded-by-contract` plus id.
-- At step 19 an element that matches an item with `adopted: false` is at least an
+- At fresh step13 (explicit20 step19, explicit36 step35 and legacy50 step49), an element that matches an item with `adopted: false` is at least an
   `Important` finding. A style preference outside the contract is advisory.
 - Values outside `tokens` are token violations, as before.
 
-Fresh20 must have its Step2 contract; explicit research-free36 still requires its Step18 contract. A missing required block remains missing
+Fresh14 and existing20 must have their Step2 contract; explicit research-free36 still requires its Step18 contract. A missing required block remains missing
 input; do not apply the historical fallback below to a fresh run.
 
 ## Legacy workspaces without a contract
@@ -127,3 +127,7 @@ To leave out a style you saw in a result, add `디자인 제외: <style>` to the
 ## Not covered
 
 No script checks CSS against these items yet; the checks are the reviews above.
+
+Explicit `planning-first-20-v1` runs keep environment3, implementation9, E2E15,
+final20, quality10/14/20, QA11/16/17/18 and Jev1/2/9/15/19, with their original
+profile/generation evidence paths. Existing20/36/50 bodies and indexes are preserved.

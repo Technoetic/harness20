@@ -2,9 +2,10 @@
 export const LEGACY_WORKFLOW_PROFILE = "legacy-50-v1";
 export const RESEARCH_FREE_WORKFLOW_PROFILE = "research-free-36-v1";
 export const PLANNING_FIRST_WORKFLOW_PROFILE = "planning-first-20-v1";
-export const DEFAULT_WORKFLOW_PROFILE = PLANNING_FIRST_WORKFLOW_PROFILE;
+export const PLANNING_FIRST_14_V1_WORKFLOW_PROFILE = "planning-first-14-v1";
+export const DEFAULT_WORKFLOW_PROFILE = PLANNING_FIRST_14_V1_WORKFLOW_PROFILE;
 export const WORKFLOW_PROFILE_IDS = Object.freeze([
-  LEGACY_WORKFLOW_PROFILE, RESEARCH_FREE_WORKFLOW_PROFILE, PLANNING_FIRST_WORKFLOW_PROFILE
+  LEGACY_WORKFLOW_PROFILE, RESEARCH_FREE_WORKFLOW_PROFILE, PLANNING_FIRST_WORKFLOW_PROFILE, PLANNING_FIRST_14_V1_WORKFLOW_PROFILE
 ]);
 
 const retained = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,21,25,30,31,32,33,34,35,36,37,38,39,41,42,44,45,46,47,48,49,50];
@@ -23,7 +24,9 @@ function definition(id, originals, sourceDirectory, targetDirectory) {
     indexPath: `${targetDirectory}/index.json`,
     milestones: Object.freeze({
       dependency: coordinate(21), planning: coordinate(25), design: coordinate(30),
-      environment: coordinate(31), implementation: coordinate(37),
+      // Fourteen-step runs prepare the environment after the selected design
+      // passes, inside step2; original31 itself is intentionally not retained.
+      environment: id === PLANNING_FIRST_14_V1_WORKFLOW_PROFILE ? 2 : coordinate(31), implementation: coordinate(37),
       e2e: coordinate(45), final: coordinate(50),
       quality: Object.freeze([38,44,50].map(coordinate)),
       independentQa: Object.freeze((id === LEGACY_WORKFLOW_PROFILE ? [39,40,43,46,47,48] : [39,46,47,48]).map(coordinate)),
@@ -38,7 +41,9 @@ const profiles = new Map([
   [RESEARCH_FREE_WORKFLOW_PROFILE, definition(RESEARCH_FREE_WORKFLOW_PROFILE, retained,
     `assets/profiles/${RESEARCH_FREE_WORKFLOW_PROFILE}/steps`, `codex/assets/profiles/${RESEARCH_FREE_WORKFLOW_PROFILE}/steps`)],
   [PLANNING_FIRST_WORKFLOW_PROFILE, definition(PLANNING_FIRST_WORKFLOW_PROFILE, retained.slice(16),
-    `assets/profiles/${PLANNING_FIRST_WORKFLOW_PROFILE}/steps`, `codex/assets/profiles/${PLANNING_FIRST_WORKFLOW_PROFILE}/steps`)]
+    `assets/profiles/${PLANNING_FIRST_WORKFLOW_PROFILE}/steps`, `codex/assets/profiles/${PLANNING_FIRST_WORKFLOW_PROFILE}/steps`)],
+  [PLANNING_FIRST_14_V1_WORKFLOW_PROFILE, definition(PLANNING_FIRST_14_V1_WORKFLOW_PROFILE, [25,30,37,38,39,41,42,44,45,46,47,48,49,50],
+    `assets/profiles/${PLANNING_FIRST_14_V1_WORKFLOW_PROFILE}/steps`, `codex/assets/profiles/${PLANNING_FIRST_14_V1_WORKFLOW_PROFILE}/steps`)]
 ]);
 
 export function getWorkflowProfile(id) {
